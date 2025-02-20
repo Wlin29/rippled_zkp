@@ -156,6 +156,7 @@ class Xrpl(ConanFile):
             'xrpl.libpb',
             'ed25519',
             'secp256k1',
+            'snark',
         ]
         # TODO: Fix the protobufs to include each other relative to
         # `include/`, not `include/ripple/proto/`.
@@ -173,6 +174,7 @@ class Xrpl(ConanFile):
             'sqlite3::sqlite',
             'xxhash::xxhash',
             'zlib::zlib',
+            'snark::snark',
         ]
         if self.options.rocksdb:
             libxrpl.requires.append('rocksdb::librocksdb')

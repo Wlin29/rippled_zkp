@@ -27,6 +27,11 @@
 #include <string>
 #include <vector>
 
+#define CURVE_ALT_BN128
+#include <boost/test/unit_test.hpp>
+#include <libff/algebra/curves/alt_bn128/alt_bn128_pp.hpp>
+#include <libsnark/common/default_types/r1cs_ppzksnark_pp.hpp>
+
 namespace ripple {
 
 class SecretKey_test : public beast::unit_test::suite
@@ -346,6 +351,15 @@ public:
     }
 
     void
+    testLibsnarkIntegration()
+    {
+        testcase("libsnark integration");
+
+        libff::alt_bn128_pp::init_public_params();
+        std::cout << "Curve parameters initialized" << std::endl;
+    }
+
+    void
     run() override
     {
         testBase58();
@@ -359,6 +373,9 @@ public:
         // Ed25519
         testKeyDerivationEd25519();
         testSigning(KeyType::ed25519);
+
+        // Libsnark
+        testLibsnarkIntegration();
     }
 
 private:
