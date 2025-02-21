@@ -96,7 +96,9 @@ find_package(nudb REQUIRED)
 find_package(date REQUIRED)
 find_package(xxHash REQUIRED)
 
+add_definitions(-DCURVE_BN128) 
 include_directories(/usr/local/include)
+include_directories(external/libsnark/depends)
 link_directories(/usr/local/lib)
 add_library(libff_profiling_stub STATIC external/libsnark/depends/libff/libff/common/libff_profiling_stub.cpp)
 
