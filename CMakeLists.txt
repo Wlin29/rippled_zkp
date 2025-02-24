@@ -96,10 +96,12 @@ find_package(nudb REQUIRED)
 find_package(date REQUIRED)
 find_package(xxHash REQUIRED)
 
+# Libsnark
 add_definitions(-DCURVE_BN128) 
 include_directories(/usr/local/include)
-include_directories(external/libsnark/depends)
+include_directories(dependencies)
 link_directories(/usr/local/lib)
+link_directories(${CMAKE_CURRENT_SOURCE_DIR}/dependencies/depends/ate-pairing)
 add_library(libff_profiling_stub STATIC external/libsnark/depends/libff/libff/common/libff_profiling_stub.cpp)
 
 
@@ -115,6 +117,7 @@ target_link_libraries(ripple_libs INTERFACE
   -l:libff.a
   libff_profiling_stub
   -lgmp
+  -l:libzm.a
 )
 
 # Work around changes to Conan recipe for now.
