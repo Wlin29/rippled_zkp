@@ -42,178 +42,6 @@
 using namespace libsnark;
 using namespace libff;
 
-// #include <libff/common/default_types/ec_pp.hpp>
-// #include <libsnark/common/default_types/r1cs_gg_ppzksnark_pp.hpp>
-// // #include
-// //
-// <libsnark/relations/constraint_satisfaction_problems/r1cs/examples/r1cs_examples.hpp>
-// #include
-// <libsnark/zk_proof_systems/ppzksnark/r1cs_gg_ppzksnark/r1cs_gg_ppzksnark.hpp>
-
-// using namespace libsnark;
-// typedef default_r1cs_gg_ppzksnark_pp ppT;
-
-// bool
-// run_custom_r1cs_gg_ppzksnark()
-// {
-//     typedef libff::Fr<ppT> FieldT;
-//     ppT::init_public_params();
-//     // Set up a protoboard manually
-//     protoboard<FieldT> pb;
-
-//     // Allocate variables; here z is the public output
-//     pb_variable<FieldT> x, y, z;
-//     x.allocate(pb, "x");
-//     y.allocate(pb, "y");
-//     z.allocate(pb, "z");
-//     pb.set_input_sizes(1);  // mark z as public
-
-//     // Add constraint: x * y = z
-//     pb.add_r1cs_constraint(
-//         r1cs_constraint<FieldT>(x, y, z), "multiplication constraint");
-
-//     // Assign witness values: 3 * 4 = 12
-//     pb.val(x) = FieldT(3);
-//     pb.val(y) = FieldT(4);
-//     pb.val(z) = FieldT(12);
-
-//     // Generator phase
-//     libff::print_header("R1CS GG-ppzkSNARK Generator");
-//     r1cs_constraint_system<FieldT> cs = pb.get_constraint_system();
-//     r1cs_gg_ppzksnark_keypair<ppT> keypair =
-//         r1cs_gg_ppzksnark_generator<ppT>(cs);
-//     printf("\n");
-//     libff::print_indent();
-//     libff::print_mem("after generator");
-
-//     // Preprocess verification key
-//     libff::print_header("Preprocess verification key");
-//     r1cs_gg_ppzksnark_processed_verification_key<ppT> pvk =
-//         r1cs_gg_ppzksnark_verifier_process_vk<ppT>(keypair.vk);
-
-//     // Prover phase
-//     libff::print_header("R1CS GG-ppzkSNARK Prover");
-//     r1cs_gg_ppzksnark_proof<ppT> proof = r1cs_gg_ppzksnark_prover<ppT>(
-//         keypair.pk, pb.primary_input(), pb.auxiliary_input());
-//     printf("\n");
-//     libff::print_indent();
-//     libff::print_mem("after prover");
-
-//     // Verifier phase
-//     libff::print_header("R1CS GG-ppzkSNARK Verifier");
-//     const bool ans = r1cs_gg_ppzksnark_verifier_strong_IC<ppT>(
-//         keypair.vk, pb.primary_input(), proof);
-//     printf("\n");
-//     libff::print_indent();
-//     libff::print_mem("after verifier");
-//     printf("* The verification result is: %s\n", (ans ? "PASS" : "FAIL"));
-
-//     // Online verifier phase (using the processed verification key)
-//     libff::print_header("R1CS GG-ppzkSNARK Online Verifier");
-//     const bool ans2 = r1cs_gg_ppzksnark_online_verifier_strong_IC<ppT>(
-//         pvk, pb.primary_input(), proof);
-//     assert(ans == ans2);
-
-//     return ans;
-// }
-
-// // Define convenient types
-// typedef default_r1cs_ppzksnark_pp ppT;
-// typedef libff::Fr<ppT> FieldT;
-
-// // Copy or define the MultiplicationGadget and helper functions
-// class MultiplicationGadget : public gadget<FieldT>
-// {
-// private:
-//     pb_variable<FieldT> x;  // private input
-//     pb_variable<FieldT> y;  // private input
-//     pb_variable<FieldT> z;  // public output
-
-// public:
-//     MultiplicationGadget(protoboard<FieldT>& pb, const std::string&
-//     annotation_prefix)
-//         : gadget<FieldT>(pb, annotation_prefix)
-//     {
-//         // Allocate public output first
-//         z.allocate(pb, annotation_prefix + "/z");
-//         // Allocate private inputs
-//         x.allocate(pb, annotation_prefix + "/x");
-//         y.allocate(pb, annotation_prefix + "/y");
-//         // Mark z as public
-//         pb.set_input_sizes(1);
-//     }
-
-//     void generate_r1cs_constraints()
-//     {
-//         // Constraint: x * y = z
-//         this->pb.add_r1cs_constraint(r1cs_constraint<FieldT>(x, y, z),
-//                                       annotation_prefix + "/multiplication");
-//     }
-
-//     void generate_r1cs_witness(const FieldT& x_val, const FieldT& y_val)
-//     {
-//         this->pb.val(x) = x_val;
-//         this->pb.val(y) = y_val;
-//         this->pb.val(z) = x_val * y_val;
-//     }
-// };
-
-// void test_basic_snark()
-// {
-//     std::cout << "Testing basic SNARK operation..." << std::endl;
-//     // Initialize curve parameters
-//     ppT::init_public_params();
-
-//     // Set up protoboard and gadget
-//     protoboard<FieldT> pb;
-//     MultiplicationGadget gadget(pb, "multiplication");
-//     gadget.generate_r1cs_constraints();
-//     // Set witness: 3 * 4 = 12
-//     gadget.generate_r1cs_witness(FieldT(3), FieldT(4));
-
-//     // Show debugging info
-//     std::cout << "Constraints: " <<
-//     pb.get_constraint_system().num_constraints() << std::endl; std::cout <<
-//     "Public input size: " << pb.primary_input().size() << std::endl;
-
-//     // Generate keys and proof
-//     const auto keypair =
-//     r1cs_ppzksnark_generator<ppT>(pb.get_constraint_system()); const auto
-//     proof = r1cs_ppzksnark_prover<ppT>(
-//         keypair.pk, pb.primary_input(), pb.auxiliary_input());
-
-//     // Verify the proof
-//     bool verified = r1cs_ppzksnark_verifier_strong_IC<ppT>(
-//         keypair.vk, pb.primary_input(), proof);
-
-//     std::cout << "Proof verification: " << (verified ? "SUCCESS" : "FAILURE")
-//     << std::endl;
-// }
-
-// void test_invalid_proof()
-// {
-//     std::cout << "\nTesting invalid SNARK proof..." << std::endl;
-//     ppT::init_public_params();
-//     protoboard<FieldT> pb;
-//     MultiplicationGadget gadget(pb, "multiplication");
-//     gadget.generate_r1cs_constraints();
-//     gadget.generate_r1cs_witness(FieldT(3), FieldT(4));
-
-//     const auto constraint_system = pb.get_constraint_system();
-//     const auto keypair = r1cs_ppzksnark_generator<ppT>(constraint_system);
-//     const auto proof = r1cs_ppzksnark_prover<ppT>(
-//         keypair.pk, pb.primary_input(), pb.auxiliary_input());
-
-//     // Create invalid public input (expecting 3*4=13 instead of 12)
-//     std::vector<FieldT> invalid_input = pb.primary_input();
-//     invalid_input[0] = FieldT(13);
-//     bool verified = r1cs_ppzksnark_verifier_strong_IC<ppT>(
-//         keypair.vk, invalid_input, proof);
-
-//     std::cout << "Invalid proof verification (should fail): "
-//               << (verified ? "SUCCESS" : "FAILURE") << std::endl;
-// }
-
 namespace ripple {
 
 class SecretKey_test : public beast::unit_test::suite
@@ -562,7 +390,6 @@ public:
             r1cs_constraint<Fr<default_r1cs_gg_ppzksnark_pp>>(x + y, 1, out),
             "x + y = out");
 
-        // Assign values to variables
         pb.val(out) = 15;  // Public output value
         pb.val(x) = 10;    // Private input x
         pb.val(y) = 5;     // Private input y
@@ -600,8 +427,6 @@ public:
             std::cerr << "Proof verification failed!" << std::endl;
         }
 
-        // const bool result = run_custom_r1cs_gg_ppzksnark();
-        // BEAST_EXPECT(result);
     }
 
     void

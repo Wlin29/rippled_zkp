@@ -31,6 +31,17 @@
 #include <memory>
 #include <regex>
 
+#include <cassert>
+#include <iostream>
+#include <libff/common/default_types/ec_pp.hpp>
+#include <libsnark/common/default_types/r1cs_ppzksnark_pp.hpp>
+#include <libsnark/gadgetlib1/protoboard.hpp>
+// #include "AmountCircuit.h"
+#include "libxrpl/zkp/AmountCircuit.h"
+
+using namespace libsnark;
+using namespace libff;
+
 namespace ripple {
 
 /**
@@ -61,6 +72,12 @@ public:
 
         testcase("STObject constructor errors");
         testObjectCtorErrors();
+
+        testcase("Test Amount Circuit Sufficient Funds");
+        testAmountCircuitSufficientFunds();
+
+        testcase("Test Amount Circuit Insufficient Funds");
+        testAmountCircuitInsufficientFunds();
     }
 
     void
@@ -1614,6 +1631,66 @@ public:
         {
             BEAST_EXPECT(strcmp(ex.what(), "Unknown field") == 0);
         }
+    }
+
+    void
+    testAmountCircuitSufficientFunds()
+    {
+        testcase("Amount Circuit Sufficient Funds");
+        using FieldT = libff::Fr<libff::default_ec_pp>;
+        default_ec_pp::init_public_params();
+        protoboard<FieldT> pb;
+
+        pb_variable<FieldT> x;
+        pb_variable<FieldT> max_amount;
+        x.allocate(pb, "x");
+        max_amount.allocate(pb, "max_amount");
+
+        AmountCircuit<FieldT> amountCircuit(pb, x, max_amount);
+        amountCircuit.generate_r1cs_constraints();
+
+        FieldT x_val = 5;
+        FieldT max = 10;
+        amountCircuit.generate_r1cs_witness(x_val, max);
+
+        const bool is_satisfied = pb.is_satisfied();
+        if (!is_satisfied)
+        {
+            std::cout << "R1CS not satisfied" << std::endl;
+        }
+        BEAST_EXPECT(is_satisfied);
+        std::cout << "Amount Circuit Sufficient Funds Completed Successfully"
+                  << std::endl;
+    }
+
+    void
+    testAmountCircuitInsufficientFunds()
+    {
+        testcase("Amount Circuit Insufficient Funds");
+        using FieldT = libff::Fr<libff::default_ec_pp>;
+        default_ec_pp::init_public_params();
+        protoboard<FieldT> pb;
+
+        pb_variable<FieldT> x;
+        pb_variable<FieldT> max_amount;
+        x.allocate(pb, "x");
+        max_amount.allocate(pb, "max_amount");
+
+        AmountCircuit<FieldT> amountCircuit(pb, x, max_amount);
+        amountCircuit.generate_r1cs_constraints();
+
+        FieldT x_val = 15;
+        FieldT max = 10;
+        amountCircuit.generate_r1cs_witness(x_val, max);
+
+        const bool is_satisfied = pb.is_satisfied();
+        if (!is_satisfied)
+        {
+            std::cout << "R1CS not satisfied" << std::endl;
+        }
+        BEAST_EXPECT(!is_satisfied);
+        std::cout << "Amount Circuit Insufficient Funds Completed Successfully"
+                  << std::endl;
     }
 
     void
