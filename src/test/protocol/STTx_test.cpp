@@ -31,13 +31,12 @@
 #include <memory>
 #include <regex>
 
+#include "libxrpl/zkp/SufficientFundsCircuit.h"
 #include <cassert>
 #include <iostream>
 #include <libff/common/default_types/ec_pp.hpp>
 #include <libsnark/common/default_types/r1cs_ppzksnark_pp.hpp>
 #include <libsnark/gadgetlib1/protoboard.hpp>
-// #include "AmountCircuit.h"
-#include "libxrpl/zkp/AmountCircuit.h"
 
 using namespace libsnark;
 using namespace libff;
@@ -73,11 +72,8 @@ public:
         testcase("STObject constructor errors");
         testObjectCtorErrors();
 
-        testcase("Test Amount Circuit Sufficient Funds");
-        testAmountCircuitSufficientFunds();
-
-        testcase("Test Amount Circuit Insufficient Funds");
-        testAmountCircuitInsufficientFunds();
+        testcase("Test Sufficient Funds Circuit");
+        testRangeCircuitSufficientFunds();
     }
 
     void
@@ -1634,63 +1630,102 @@ public:
     }
 
     void
-    testAmountCircuitSufficientFunds()
+    testRangeCircuitSufficientFunds()
     {
-        testcase("Amount Circuit Sufficient Funds");
-        using FieldT = libff::Fr<libff::default_ec_pp>;
-        default_ec_pp::init_public_params();
-        protoboard<FieldT> pb;
+        using namespace libff;
+        using namespace libsnark;
 
-        pb_variable<FieldT> x;
-        pb_variable<FieldT> max_amount;
-        x.allocate(pb, "x");
-        max_amount.allocate(pb, "max_amount");
+        libff::alt_bn128_pp::init_public_params();
+        auto fr = [](uint64_t x) -> FrType { return FrType(x); };
+        const size_t BIT_LENGTH = 64;
+        protoboard<FrType> pb;
 
-        AmountCircuit<FieldT> amountCircuit(pb, x, max_amount);
-        amountCircuit.generate_r1cs_constraints();
-
-        FieldT x_val = 5;
-        FieldT max = 10;
-        amountCircuit.generate_r1cs_witness(x_val, max);
-
-        const bool is_satisfied = pb.is_satisfied();
-        if (!is_satisfied)
+        // Test 1: Balance > Purchase Amount (should pass)
         {
-            std::cout << "R1CS not satisfied" << std::endl;
+            SufficientFundsCircuit<FrType> circuit(pb, BIT_LENGTH);
+
+            circuit.generate_r1cs_constraints();
+
+            // Set values: 1000 XRP balance, trying to spend 500 XRP
+            circuit.generate_r1cs_witness(fr(1000), fr(500));
+
+            bool satisfied = circuit.is_satisfied();
+            BEAST_EXPECT(satisfied == true);
+
+            if (satisfied == true)
+                pass();
+            else
+                fail("Sufficient funds case failed");
+
+            auto cs = circuit.get_constraint_system();
+            auto primary_input = circuit.get_primary_input();
+            auto auxiliary_input = circuit.get_auxiliary_input();
+
+            // Verify that the inputs satisfy the constraint system
+            bool inputs_satisfy =
+                cs.is_satisfied(primary_input, auxiliary_input);
+            BEAST_EXPECT(inputs_satisfy);
+
+            log << "Primary input size: " << primary_input.size() << std::endl;
+            log << "Auxiliary input size: " << auxiliary_input.size()
+                << std::endl;
         }
-        BEAST_EXPECT(is_satisfied);
-        std::cout << "Amount Circuit Sufficient Funds Completed Successfully"
-                  << std::endl;
-    }
 
-    void
-    testAmountCircuitInsufficientFunds()
-    {
-        testcase("Amount Circuit Insufficient Funds");
-        using FieldT = libff::Fr<libff::default_ec_pp>;
-        default_ec_pp::init_public_params();
-        protoboard<FieldT> pb;
-
-        pb_variable<FieldT> x;
-        pb_variable<FieldT> max_amount;
-        x.allocate(pb, "x");
-        max_amount.allocate(pb, "max_amount");
-
-        AmountCircuit<FieldT> amountCircuit(pb, x, max_amount);
-        amountCircuit.generate_r1cs_constraints();
-
-        FieldT x_val = 15;
-        FieldT max = 10;
-        amountCircuit.generate_r1cs_witness(x_val, max);
-
-        const bool is_satisfied = pb.is_satisfied();
-        if (!is_satisfied)
+        // Test 2: Balance == Purchase Amount (edge case, should pass)
         {
-            std::cout << "R1CS not satisfied" << std::endl;
+            protoboard<FrType> pb;
+
+            SufficientFundsCircuit<FrType> circuit(pb, BIT_LENGTH);
+            circuit.generate_r1cs_constraints();
+            circuit.generate_r1cs_witness(fr(500), fr(500));
+
+            bool satisfied = circuit.is_satisfied();
+            BEAST_EXPECT(satisfied);
+
+            if (satisfied)
+                pass();
+            else
+                fail("Equal funds case failed");
         }
-        BEAST_EXPECT(!is_satisfied);
-        std::cout << "Amount Circuit Insufficient Funds Completed Successfully"
-                  << std::endl;
+
+        // Test 3: Balance < Purchase Amount (should fail)
+        {
+            protoboard<FrType> pb;
+
+            SufficientFundsCircuit<FrType> circuit(pb, BIT_LENGTH);
+            circuit.generate_r1cs_constraints();
+
+            // Set values: 100 XRP balance, trying to spend 500 XRP
+            circuit.generate_r1cs_witness(fr(100), fr(500));
+
+            // The constraint system should be unsatisfied
+            bool satisfied = circuit.is_satisfied();
+            BEAST_EXPECT(!satisfied);
+
+            if (!satisfied)
+                pass();
+            else
+                fail("Insufficient funds case not failing correctly");
+        }
+
+        // Test 4: Zero Balance (edge case, should fail for non-zero purchase)
+        {
+            protoboard<FrType> pb;
+
+            SufficientFundsCircuit<FrType> circuit(pb, BIT_LENGTH);
+            circuit.generate_r1cs_constraints();
+
+            // Set balance to 0 and amount to 1
+            circuit.generate_r1cs_witness(fr(0), fr(1));
+
+            bool satisfied = circuit.is_satisfied();
+            BEAST_EXPECT(!satisfied);
+
+            if (!satisfied)
+                pass();
+            else
+                fail("Zero balance case not failing correctly");
+        }
     }
 
     void
