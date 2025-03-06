@@ -31,6 +31,7 @@
 #include <memory>
 #include <regex>
 
+#include "libxrpl/zkp/BalanceCircuit.h"
 #include "libxrpl/zkp/SufficientFundsCircuit.h"
 #include <cassert>
 #include <iostream>
@@ -74,6 +75,14 @@ public:
 
         testcase("Test Sufficient Funds Circuit");
         testRangeCircuitSufficientFunds();
+
+        testcase(
+            "Sufficient Funds Circuit Proof Generation and Verification "
+            "Performance Metrics");
+        testSufficientFundsZKP();
+
+        testcase("Test Balance Circuit");
+        testBalanceCircuit();
     }
 
     void
@@ -1729,6 +1738,98 @@ public:
     }
 
     void
+    testSufficientFundsZKP()
+    {
+        libff::alt_bn128_pp::init_public_params();
+        auto fr = [](uint64_t x) -> FrType { return FrType(x); };
+        const size_t BIT_LENGTH = 64;
+
+        const int iterations = 100;
+        long long totalProofGenTime = 0;
+        long long minProofGenTime = std::numeric_limits<long long>::max();
+        long long maxProofGenTime = 0;
+        long long totalProofVerifyTime = 0;
+        long long minProofVerifyTime = std::numeric_limits<long long>::max();
+        long long maxProofVerifyTime = 0;
+
+        for (int i = 0; i < iterations; ++i)
+        {
+            // Set up circuit with sufficient funds: balance 1000, purchase 500
+            protoboard<FrType> pb;
+            SufficientFundsCircuit<FrType> circuit(pb, BIT_LENGTH);
+
+            BEAST_EXPECT(circuit.is_satisfied());
+
+            // Time proof generation
+            auto startProofGen = std::chrono::high_resolution_clock::now();
+            circuit.generate_r1cs_constraints();
+            circuit.generate_r1cs_witness(fr(1000), fr(500));
+            auto endProofGen = std::chrono::high_resolution_clock::now();
+            long long proofGenTime =
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    endProofGen - startProofGen)
+                    .count();
+            totalProofGenTime += proofGenTime;
+
+            // Fix type mismatch by using static_cast
+            minProofGenTime =
+                std::min(minProofGenTime, static_cast<long long>(proofGenTime));
+            maxProofGenTime =
+                std::max(maxProofGenTime, static_cast<long long>(proofGenTime));
+
+            // Time proof verification
+            auto startProofVerify = std::chrono::high_resolution_clock::now();
+            bool satisfied = circuit.is_satisfied();
+            auto endProofVerify = std::chrono::high_resolution_clock::now();
+            long long proofVerifyTime =
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    endProofVerify - startProofVerify)
+                    .count();
+            totalProofVerifyTime += proofVerifyTime;
+
+            // Fix type mismatch by using static_cast
+            minProofVerifyTime = std::min(
+                minProofVerifyTime, static_cast<long long>(proofVerifyTime));
+            maxProofVerifyTime = std::max(
+                maxProofVerifyTime, static_cast<long long>(proofVerifyTime));
+        }
+
+        log << "Proof Generation - Total: " << totalProofGenTime << " µs, "
+            << "Min: " << minProofGenTime << " µs, "
+            << "Max: " << maxProofGenTime << " µs\n";
+        log << "Proof Verification - Total: " << totalProofVerifyTime << " µs, "
+            << "Min: " << minProofVerifyTime << " µs, "
+            << "Max: " << maxProofVerifyTime << " µs\n";
+    }
+
+    void
+    testBalanceCircuit()
+    {
+        using namespace ripple::zkp;
+
+        // Initialize curve parameters
+        libff::alt_bn128_pp::init_public_params();
+
+        // Create protoboard
+        libsnark::protoboard<FrType> pb;
+
+        // Create circuit (2 inputs, 1 output)
+        BalanceCircuit<FrType> circuit(pb, 2, 1, "test_balance");
+
+        // Generate constraints
+        circuit.generate_r1cs_constraints();
+
+        // Test valid case: 50 + 50 = 90 + 10(fee)
+        std::vector<FrType> inputs = {FrType(50), FrType(50)};
+        std::vector<FrType> outputs = {FrType(90)};
+        FrType fee(10);
+
+        circuit.generate_r1cs_witness(inputs, outputs, fee);
+        bool satisfied = circuit.is_satisfied();
+        BEAST_EXPECT(satisfied == true);
+    }
+
+    void
     testSTTx(KeyType keyType)
     {
         auto const keypair = randomKeyPair(keyType);
@@ -1740,8 +1841,8 @@ public:
         });
         j.sign(keypair.first, keypair.second);
 
-        // Rules store a reference to the presets. Create a local to guarantee
-        // proper lifetime.
+        // Rules store a reference to the presets. Create a local to
+        // guarantee proper lifetime.
         std::unordered_set<uint256, beast::uhash<>> const presets;
         Rules const defaultRules{presets};
         BEAST_EXPECT(!defaultRules.enabled(featureExpandedSignerList));
@@ -1820,7 +1921,8 @@ public:
             BEAST_EXPECT(got.empty());
         }
         {
-            // Make a payment with a defaulted PathSet field, which is invalid.
+            // Make a payment with a defaulted PathSet field, which is
+            // invalid.
             STObject defaultPath{getPayment()};
             defaultPath.setFieldPathSet(sfPaths, STPathSet{});
 
