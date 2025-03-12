@@ -30,6 +30,7 @@
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/Feature.h>
 #include <xrpl/protocol/jss.h>
+#include <libxrpl/zkp/ZkPayment.h>
 
 namespace ripple {
 

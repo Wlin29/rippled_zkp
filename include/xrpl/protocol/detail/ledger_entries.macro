@@ -436,3 +436,9 @@ LEDGER_ENTRY(ltCREDENTIAL, 0x0081, Credential, ({
     {sfPreviousTxnID,        soeREQUIRED},
     {sfPreviousTxnLgrSeq,    soeREQUIRED},
 }))
+
+LEDGER_ENTRY(ltSHIELDED_POOL, 0x0082, ShieldedPool, ({
+    {sfShieldedState, soeREQUIRED},   // Serialized Merkle tree
+    {sfCurrentRoot, soeREQUIRED},     // Current root hash
+    {sfPoolSize, soeREQUIRED},        // Number of commitments
+}))

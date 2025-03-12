@@ -1,0 +1,26 @@
+#ifndef RIPPLE_TX_ZKWITHDRAW_H_INCLUDED
+#define RIPPLE_TX_ZKWITHDRAW_H_INCLUDED
+
+#include <xrpld/app/tx/impl/Transactor.h>
+
+namespace ripple {
+
+class ZkWithdraw : public Transactor
+{
+public:
+    static constexpr ConsequencesFactoryType ConsequencesFactory{Normal};
+
+    explicit ZkWithdraw(ApplyContext& ctx) : Transactor(ctx) {}
+
+    static NotTEC preflight(PreflightContext const& ctx);
+    static TER preclaim(PreclaimContext const& ctx);
+    TER doApply() override;
+
+private:
+    std::shared_ptr<SLE> getShieldedPool(bool create = false);
+    bool verifyProof();
+};
+
+} // namespace ripple
+
+#endif

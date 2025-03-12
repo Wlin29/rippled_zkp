@@ -484,3 +484,22 @@ TRANSACTION(ttUNL_MODIFY, 102, UNLModify, ({
     {sfUNLModifyValidator, soeREQUIRED},
 }))
 
+/** zero-knowlege proof transaction types
+ */
+ TRANSACTION(ttZK_DEPOSIT, 1001, ZkDeposit, ({
+    {sfAmount, soeREQUIRED},
+    {sfDestination, soeREQUIRED},
+    {sfDestinationTag, soeOPTIONAL},
+    {sfInvoiceID, soeOPTIONAL},
+    {sfCredentialIDs, soeOPTIONAL},
+    {sfZKProof, soeOPTIONAL} 
+}))
+
+TRANSACTION(ttZK_WITHDRAW, 1002, ZkWithdraw, ({
+    {sfAmount, soeREQUIRED},
+    {sfDestination, soeREQUIRED},
+    {sfDestinationTag, soeOPTIONAL},
+    {sfInvoiceID, soeOPTIONAL},
+    {sfCredentialIDs, soeOPTIONAL},
+    {sfZKProof, soeOPTIONAL} 
+}))
