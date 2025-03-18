@@ -31,8 +31,8 @@
 #include <memory>
 #include <regex>
 
-#include "libxrpl/zkp/BalanceCircuit.h"
-#include "libxrpl/zkp/SufficientFundsCircuit.h"
+#include "libxrpl/zkp/circuits/BalanceCircuit.h"
+#include "libxrpl/zkp/circuits/SufficientFundsCircuit.h"
 #include <cassert>
 #include <iostream>
 #include <libff/common/default_types/ec_pp.hpp>

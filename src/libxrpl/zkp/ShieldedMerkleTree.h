@@ -1,64 +1,65 @@
-#ifndef SHIELDED_MERKLE_TREE_H
-#define SHIELDED_MERKLE_TREE_H
+#pragma once
 
-#include <xrpl/basics/base_uint.h>
-#include <xrpl/protocol/Serializer.h>
-#include <unordered_set>
 #include <vector>
+#include <set>
+#include <cstdint>
+#include <xrpl/protocol/UintTypes.h>
+#include <xrpl/protocol/Serializer.h>
+// #include <xrpl/protocol/SerialIter.h>
 
 namespace ripple {
 
-class ShieldedMerkleTree {
-private:
-    static constexpr size_t TREE_DEPTH = 2;  // Depth of the Merkle tree
-    
-    // The actual tree structure
-    std::vector<std::vector<uint256>> tree;
-    
-    // List of commitments (leaf nodes)
-    std::vector<uint256> commitments;
-    
-    // Set of spent nullifiers
-    std::unordered_set<uint256> nullifiers;
-    
-    // Recently valid roots for withdrawal verification
-    std::vector<uint256> rootHistory;
-    
-    // Hash function to combine two child nodes
-    uint256 hashChildren(const uint256& left, const uint256& right);
-    
-    // Recalculate tree path from leaf to root
-    void updatePath(size_t leafIndex);
-    
+// You may adjust the depth as needed.
+constexpr size_t TREE_DEPTH = 10;
+
+class ShieldedMerkleTree
+{
 public:
     ShieldedMerkleTree();
-    
-    // Add a commitment to the tree
+
+    // Returns the SHA512-Half hash of two child nodes.
+    static uint256 hashChildren(const uint256& left, const uint256& right);
+
+    // Update the authentication path from the given leaf index up to the root.
+    void updatePath(size_t leafIndex);
+
+    // Add a new commitment as a leaf, update the tree and return its index.
     size_t addCommitment(const uint256& commitment);
-    
-    // Check if a nullifier has been spent
+
+    // Check whether a given nullifier is already marked as spent.
     bool isNullifierSpent(const uint256& nullifier) const;
-    
-    // Mark a nullifier as spent
+
+    // Mark a given nullifier as spent.
     void markNullifierSpent(const uint256& nullifier);
-    
-    // Get the current root hash
+
+    // Get the current Merkle root.
     uint256 getRoot() const;
-    
-    // Check if a root hash is valid (in history)
+
+    // Check whether a given root is valid (exists in history).
     bool isValidRoot(const uint256& root) const;
-    
-    // Get the authentication path for a commitment
+
+    // Get the authentication path (sibling nodes) for a given leaf index.
     std::vector<uint256> getAuthPath(size_t leafIndex) const;
-    
-    // Get the number of commitments
-    size_t getCommitmentCount() const { return commitments.size(); }
-    
-    // Serialization/deserialization
+
+    // Serialization
     void serialize(Serializer& s) const;
     static ShieldedMerkleTree deserialize(SerialIter& sit);
+
+    // Accessor for commitments if needed.
+    std::vector<uint256> const& getCommitments() const { return commitments; }
+
+private:
+    // The list of commitments (leaf values).
+    std::vector<uint256> commitments;
+
+    // The binary tree: level 0 is the root, level TREE_DEPTH are the leaves.
+    std::vector< std::vector<uint256> > tree;
+
+    // A set of spent nullifiers.
+    std::set<uint256> nullifiers;
+
+    // A history of recently computed roots.
+    std::vector<uint256> rootHistory;
 };
 
 } // namespace ripple
-
-#endif

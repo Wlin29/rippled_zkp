@@ -98,6 +98,7 @@ find_package(xxHash REQUIRED)
 
 # Libsnark
 add_definitions(-DCURVE_BN128) 
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 include_directories(/usr/local/include)
 include_directories(dependencies)
 link_directories(/usr/local/lib)

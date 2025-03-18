@@ -15,6 +15,11 @@ public:
     static NotTEC preflight(PreflightContext const& ctx);
     static TER preclaim(PreclaimContext const& ctx);
     TER doApply() override;
+    
+    static TER accountSend(ApplyView& view,
+                           AccountID const& src,
+                           AccountID const& dst,
+                           STAmount const& amount);
 
 private:
     std::shared_ptr<SLE> getShieldedPool(bool create = false);

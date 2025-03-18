@@ -1,7 +1,7 @@
 #ifndef RIPPLE_TX_ZKWITHDRAW_H_INCLUDED
 #define RIPPLE_TX_ZKWITHDRAW_H_INCLUDED
 
-#include <xrpld/app/tx/impl/Transactor.h>
+#include <xrpld/app/tx/detail/Transactor.h>
 
 namespace ripple {
 

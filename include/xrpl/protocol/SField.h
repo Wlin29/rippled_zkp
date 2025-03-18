@@ -95,7 +95,8 @@ class STCurrency;
     STYPE(STI_TRANSACTION, 10001)                 \
     STYPE(STI_LEDGERENTRY, 10002)                 \
     STYPE(STI_VALIDATION, 10003)                  \
-    STYPE(STI_METADATA, 10004)
+    STYPE(STI_METADATA, 10004)                    \
+    STYPE(STI_ZKPROOF, 27)
 
 #pragma push_macro("TO_ENUM")
 #undef TO_ENUM
@@ -361,6 +362,7 @@ using SF_NUMBER = TypedField<STNumber>;
 using SF_VL = TypedField<STBlob>;
 using SF_VECTOR256 = TypedField<STVector256>;
 using SF_XCHAIN_BRIDGE = TypedField<STXChainBridge>;
+using SF_ZKPROOF = TypedField<STBlob>; // Using STBlob for ZKProof data
 
 //------------------------------------------------------------------------------
 
@@ -377,6 +379,7 @@ using SF_XCHAIN_BRIDGE = TypedField<STXChainBridge>;
 
 extern SField const sfInvalid;
 extern SField const sfGeneric;
+extern SF_ZKPROOF const sfZKProof;
 
 #include <xrpl/protocol/detail/sfields.macro>
 

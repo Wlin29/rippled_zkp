@@ -441,4 +441,12 @@ LEDGER_ENTRY(ltSHIELDED_POOL, 0x0082, ShieldedPool, ({
     {sfShieldedState, soeREQUIRED},   // Serialized Merkle tree
     {sfCurrentRoot, soeREQUIRED},     // Current root hash
     {sfPoolSize, soeREQUIRED},        // Number of commitments
+    {sfNullifier, soeREQUIRED},       // Nullifiers
+    {sfZKProof, soeREQUIRED},         // Zero-knowledge proof
+    {sfAccount, soeREQUIRED},         // Account Identifier
+    {sfDestination, soeREQUIRED},     // Destination account
+}))
+
+LEDGER_ENTRY(ltNULLIFIER , 0x0083, nullifier, ({
+    {sfNullifier, soeREQUIRED},       // Nullifiers
 }))
