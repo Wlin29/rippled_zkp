@@ -71,9 +71,6 @@ BalanceCircuit<FieldT>::generate_r1cs_constraints()
     this->pb.add_r1cs_constraint(
         libsnark::r1cs_constraint<FieldT>(1, input_sum - total_outflow, 0),
         "conservation_of_funds");
-
-    // Constraint 5: All values must be non-negative (implicit in field
-    // operations)
 }
 
 template <typename FieldT>

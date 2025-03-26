@@ -1,6 +1,6 @@
 #include "ZkDeposit.h"
 #include "ShieldedMerkleTree.h"
-// #include "ZkProver.h"
+#include "ShieldedState.h"
 #include <xrpl/protocol/Feature.h>
 #include <xrpl/protocol/Indexes.h>
 #include <xrpl/protocol/jss.h>
@@ -52,37 +52,35 @@ ZkDeposit::doApply()
     auto const amount = ctx_.tx.getFieldAmount(sfAmount);
     uint256 commitment = ctx_.tx.getFieldH256(sfCommitment);
 
-    // Obtain the Shielded Pool ledger entry (or create one if it doesn't exist).
-    auto shieldedPool = getShieldedPool(true);
-    if (!shieldedPool)
+    // Create or retrieve the ShieldedState
+    auto sle = getShieldedPool(true);
+    if (!sle)
         return tecINTERNAL;
 
-    // Deserialize the serialized Merkle tree from the ledger.
-    SerialIter sit(
-        shieldedPool->getFieldVL(sfShieldedState).data(),
-        shieldedPool->getFieldVL(sfShieldedState).size());
-    auto tree = ShieldedMerkleTree::deserialize(sit);
+    // Either deserialize existing state or create a new one
+    ShieldedState state;
+    if (sle->isFieldPresent(sfShieldedState)) {
+        auto const& stateBlob = sle->getFieldVL(sfShieldedState);
+        state = ShieldedState::deserialize(stateBlob);
+    } else {
+        state = ShieldedState(ShieldedMerkleTree());
+    }
 
-    // Add the new commitment.
-    size_t index = tree.addCommitment(commitment);
+    // Add the new commitment to the Merkle tree
+    size_t index = state.addCommitment(commitment);
 
-    // Optional: perform additional checks using the index if desired.
-    
-    // Transfer funds (example, moving funds into the pool).
+    // Transfer funds (example, moving funds into the pool)
     TER result = accountSend(ctx_.view(), account, xrpAccount(), amount);
     if (result != tesSUCCESS)
         return result;
 
-    // Serialize the updated tree back into a blob.
-    Serializer s;
-    tree.serialize(s);
-    shieldedPool->setFieldVL(sfShieldedState, s.getData());
+    // Update the ledger with the new state
+    Blob stateBlob = state.serialize();
+    sle->setFieldVL(sfShieldedState, stateBlob);
+    sle->setFieldH256(sfCurrentRoot, state.getRoot());
+    sle->setFieldU32(sfPoolSize, static_cast<std::uint32_t>(state.getTree().getCommitments().size()));
 
-    // Update the ledger entry with the new tree root and pool size.
-    shieldedPool->setFieldH256(sfCurrentRoot, tree.getRoot());
-    shieldedPool->setFieldU32(sfPoolSize, static_cast<std::uint32_t>(tree.getCommitments().size()));
-
-    ctx_.view().update(shieldedPool);
+    ctx_.view().update(sle);
     return tesSUCCESS;
 }
 
@@ -98,10 +96,9 @@ ZkDeposit::getShieldedPool(bool create)
         shieldedPool = std::make_shared<SLE>(poolKeylet);
         
         // Initialize with empty tree
-        ShieldedMerkleTree initialTree;
-        Serializer s;
-        initialTree.serialize(s);
-        shieldedPool->setFieldVL(sfShieldedState, s.getData());
+        ShieldedState initialTree(ShieldedMerkleTree());
+        Blob initialState = initialTree.serialize();
+        shieldedPool->setFieldVL(sfShieldedState, initialState);
         
         // Set initial root & size
         shieldedPool->setFieldH256(sfCurrentRoot, initialTree.getRoot());
