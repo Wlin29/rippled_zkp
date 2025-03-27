@@ -71,6 +71,7 @@ SufficientFundsCircuit<FieldT>::generate_r1cs_witness(
     cmp->generate_r1cs_witness();
 }
 
+// Explicitly instantiate the template for alt_bn128 field
 template class SufficientFundsCircuit<FrType>;
 
 }  // namespace libsnark

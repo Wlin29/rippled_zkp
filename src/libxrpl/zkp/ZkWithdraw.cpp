@@ -8,13 +8,14 @@
 
 namespace ripple {
 
-// Create Keylet for shielded pools
+// Add this to create Keylet for shielded pools
 static Keylet
 shieldedPoolKeylet()
 {
     return Keylet(ltSHIELDED_POOL, uint256());
 }
 
+// In the Keylet namespace
 namespace keylet {
 inline Keylet nullifier(uint256 const& id)
 {
