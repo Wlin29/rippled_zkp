@@ -45,8 +45,21 @@ public:
     void serialize(Serializer& s) const;
     static ShieldedMerkleTree deserialize(SerialIter& sit);
 
-    // Accessor for commitments if needed.
-    std::vector<uint256> const& getCommitments() const { return commitments; }
+    // Get the Merkle path for a commitment (aliased to getAuthPath)
+    std::vector<uint256> getPath(size_t leafIndex) const;
+    
+    // Verify a Merkle path for a commitment
+    bool verifyPath(size_t leafIndex, const uint256& commitment, const std::vector<uint256>& path) const;
+    
+    // Get all commitments
+    const std::vector<uint256>& getCommitments() const { return commitments; }
+    
+    // Get the number of commitments
+    size_t getCommitmentCount() const { return commitments.size(); }
+    
+    // Serialization/deserialization
+    // void serialize(Serializer& s) const;
+    // static ShieldedMerkleTree deserialize(SerialIter& sit);
 
 private:
     // The list of commitments (leaf values).

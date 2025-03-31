@@ -121,6 +121,41 @@ std::vector<uint256> ShieldedMerkleTree::getAuthPath(size_t leafIndex) const
     return path;
 }
 
+std::vector<uint256> 
+ShieldedMerkleTree::getPath(size_t leafIndex) const {
+    return getAuthPath(leafIndex);
+}
+
+bool 
+ShieldedMerkleTree::verifyPath(size_t leafIndex, const uint256& commitment, const std::vector<uint256>& path) const {
+    // Verify the path length
+    if (path.size() != TREE_DEPTH) {
+        return false;
+    }
+    
+    // Start with the commitment itself
+    uint256 currentHash = commitment;
+    size_t idx = leafIndex;
+    
+    // Traverse up the tree using the path
+    for (size_t i = 0; i < path.size(); i++) {
+        uint256 siblingHash = path[i];
+        
+        // Compute the parent hash based on whether the current node is a left or right child
+        if (idx % 2 == 0) { // Left child
+            currentHash = hashChildren(currentHash, siblingHash);
+        } else { // Right child
+            currentHash = hashChildren(siblingHash, currentHash);
+        }
+        
+        // Move up to the parent index
+        idx /= 2;
+    }
+    
+    // Check if we arrived at the root
+    return currentHash == getRoot();
+}
+
 void ShieldedMerkleTree::serialize(Serializer& s) const
 {
     s.add32(static_cast<uint32_t>(commitments.size()));
