@@ -21,7 +21,6 @@
 #include <xrpl/protocol/STLedgerEntry.h>
 
 namespace ripple {
-
 bool
 Keylet::check(STLedgerEntry const& sle) const
 {
@@ -37,5 +36,16 @@ Keylet::check(STLedgerEntry const& sle) const
 
     return sle.getType() == type;
 }
+
+namespace keylet {
+    Keylet
+    shieldedPool()
+    {
+        // Use a fixed ID for the singleton shielded pool
+        static uint256 const poolID = 
+            uint256("0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF");  // Use a fixed value for testing purposes
+        return {ltSHIELDED_POOL, poolID};
+    }
+} // namespace keylet
 
 }  // namespace ripple

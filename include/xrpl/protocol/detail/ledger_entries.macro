@@ -438,15 +438,17 @@ LEDGER_ENTRY(ltCREDENTIAL, 0x0081, Credential, ({
 }))
 
 LEDGER_ENTRY(ltSHIELDED_POOL, 0x0082, ShieldedPool, ({
-    {sfShieldedState, soeREQUIRED},   // Serialized Merkle tree
-    {sfCurrentRoot, soeREQUIRED},     // Current root hash
-    {sfPoolSize, soeREQUIRED},        // Number of commitments
-    {sfNullifier, soeREQUIRED},       // Nullifiers
-    {sfZKProof, soeREQUIRED},         // Zero-knowledge proof
-    {sfAccount, soeREQUIRED},         // Account Identifier
-    {sfDestination, soeREQUIRED},     // Destination account
+    {sfShieldedState, soeOPTIONAL},   // Serialized Merkle tree
+    {sfCurrentRoot, soeOPTIONAL},     // Current root hash
+    {sfPoolSize, soeOPTIONAL},        // Number of commitments
+    {sfNullifier, soeOPTIONAL},       // Nullifiers
+    {sfZKProof, soeOPTIONAL},         // Zero-knowledge proof
+    {sfAccount, soeOPTIONAL},         // Account Identifier
+    {sfDestination, soeOPTIONAL},     // Destination account
+    {sfPreviousTxnID, soeOPTIONAL},
+    {sfPreviousTxnLgrSeq, soeOPTIONAL}
 }))
 
 LEDGER_ENTRY(ltNULLIFIER , 0x0083, nullifier, ({
-    {sfNullifier, soeREQUIRED},       // Nullifiers
+    {sfNullifier, soeOPTIONAL},       // Nullifiers
 }))

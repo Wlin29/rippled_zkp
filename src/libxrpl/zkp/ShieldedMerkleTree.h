@@ -9,7 +9,6 @@
 
 namespace ripple {
 
-// You may adjust the depth as needed.
 constexpr size_t TREE_DEPTH = 10;
 
 class ShieldedMerkleTree

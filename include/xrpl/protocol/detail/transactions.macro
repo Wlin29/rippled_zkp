@@ -493,7 +493,8 @@ TRANSACTION(ttUNL_MODIFY, 102, UNLModify, ({
     {sfInvoiceID, soeOPTIONAL},
     {sfCredentialIDs, soeOPTIONAL},
     {sfCommitment, soeREQUIRED},
-    {sfZKProof, soeOPTIONAL} 
+    {sfZKProof, soeOPTIONAL},
+    {sfNullifier, soeREQUIRED},
 }))
 
 TRANSACTION(ttZK_WITHDRAW, 1002, ZkWithdraw, ({
@@ -503,5 +504,6 @@ TRANSACTION(ttZK_WITHDRAW, 1002, ZkWithdraw, ({
     {sfInvoiceID, soeOPTIONAL},
     {sfCredentialIDs, soeOPTIONAL},
     {sfCommitment, soeREQUIRED},
-    {sfZKProof, soeOPTIONAL} 
+    {sfZKProof, soeOPTIONAL},
+    {sfNullifier, soeREQUIRED},
 }))
