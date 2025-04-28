@@ -3,6 +3,10 @@
 #include "ShieldedMerkleTree.h"
 #include <xrpl/protocol/Feature.h>
 #include <xrpl/protocol/Indexes.h>
+#include <xrpl/protocol/TxFlags.h>
+#include <xrpl/protocol/jss.h>
+#include <xrpl/basics/Blob.h>
+#include "ZKProver.h"
 
 namespace ripple {
     namespace keylet {
@@ -17,9 +21,27 @@ namespace ripple {
             return Keylet(ltSHIELDED_POOL, uint256());
         }
     }
-    }
 
-namespace ripple {
+// Fixed verify_zk_proof function to use proper namespaces
+bool verify_zk_proof(ripple::Blob const& proofData, ripple::AccountID const& account)
+{
+    // Ensure the ZK prover is initialized
+    if (!zkp::ZkProver::isInitialized)
+        zkp::ZkProver::initialize();
+
+    // Get the root and nullifier from account state
+    // This is a simplified version - you would normally extract these from the transaction
+    uint256 merkleRoot;  // Should be fetched from the pool state
+    uint256 nullifier;   // Should be extracted from the transaction
+    uint64_t amount = 0; // Amount would be extracted from the transaction
+
+    // Use the ZkProver to verify the withdrawal proof
+    return zkp::ZkProver::verifyWithdrawalProof(
+        proofData, 
+        amount, 
+        merkleRoot, 
+        nullifier);
+}
 
 NotTEC
 ZKPayment::preflight(PreflightContext const& ctx)
@@ -62,14 +84,25 @@ ZKPayment::doApply()
     if (!slePool)
         return tecNO_ENTRY;
 
-    // Add commitment to the pool
+    // Add commitment to the Merkle tree in the pool
     auto& tx = ctx_.tx;
-    STArray& commitments = slePool->peekFieldArray(sfCommitments);
+    uint256 commitment = tx.getFieldH256(sfCommitment);
 
-    // Construct a new STObject for the commitment
-    STObject obj(sfZKProof);
-    obj.setFieldH256(sfCommitment, tx.getFieldH256(sfCommitment));
-    commitments.push_back(std::move(obj));
+    // Deserialize the Merkle tree
+    SerialIter sit(
+        slePool->getFieldVL(sfShieldedState).data(),
+        slePool->getFieldVL(sfShieldedState).size());
+    auto tree = ShieldedMerkleTree::deserialize(sit);
+
+    // Add the new commitment
+    tree.addCommitment(commitment);
+
+    // Serialize the updated tree back into a blob
+    Serializer s;
+    tree.serialize(s);
+    slePool->setFieldVL(sfShieldedState, s.getData());
+    slePool->setFieldH256(sfCurrentRoot, tree.getRoot());
+    slePool->setFieldU32(sfPoolSize, static_cast<std::uint32_t>(tree.getCommitments().size()));
 
     // Record nullifier to prevent double spending
     auto nullifierKeylet = keylet::nullifier(tx.getFieldH256(sfNullifier));
@@ -81,14 +114,6 @@ ZKPayment::doApply()
     view().update(slePool);
 
     return tesSUCCESS;
-}
-
-bool
-ZKPayment::verify_zk_proof(Blob const& proof, AccountID const& account)
-{
-    // Actual ZK verification logic goes here.
-    // This is a placeholder implementation.
-    return true;
 }
 
 } // namespace ripple

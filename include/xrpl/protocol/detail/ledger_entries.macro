@@ -441,7 +441,7 @@ LEDGER_ENTRY(ltSHIELDED_POOL, 0x0082, ShieldedPool, ({
     {sfShieldedState, soeOPTIONAL},   // Serialized Merkle tree
     {sfCurrentRoot, soeOPTIONAL},     // Current root hash
     {sfPoolSize, soeOPTIONAL},        // Number of commitments
-    {sfNullifier, soeOPTIONAL},       // Nullifiers
+    {sfNullifier, soeOPTIONAL},       // Nullifiers 
     {sfZKProof, soeOPTIONAL},         // Zero-knowledge proof
     {sfAccount, soeOPTIONAL},         // Account Identifier
     {sfDestination, soeOPTIONAL},     // Destination account

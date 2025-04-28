@@ -23,7 +23,6 @@ public:
 
 private:
     std::shared_ptr<SLE> getShieldedPool(bool create = false);
-    bool verifyProof();
 };
 
 } // namespace ripple

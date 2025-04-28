@@ -2,90 +2,78 @@
 #define ZK_PROVER_H
 
 #include <vector>
-#include <cstdint>
 #include <string>
 #include <memory>
 #include <xrpl/protocol/UintTypes.h>
-
 #include <libff/algebra/curves/alt_bn128/alt_bn128_pp.hpp>
-
-// Forward declarations to avoid exposing libsnark types in the header
-namespace libsnark {
-    template<typename ppT> class r1cs_ppzksnark_proving_key;
-    template<typename ppT> class r1cs_ppzksnark_verification_key;
-    template<typename ppT> class r1cs_ppzksnark_proof;
-}
+#include <libsnark/zk_proof_systems/ppzksnark/r1cs_ppzksnark/r1cs_ppzksnark.hpp>
 
 namespace ripple {
 namespace zkp {
 
-typedef libff::alt_bn128_pp DefaultCurve;
+using DefaultCurve = libff::alt_bn128_pp;
+
 class ZkProver {
 public:
-    // Initialize the library (call once at startup)
     static void initialize();
-
-    // Generate proving/verification keys (can be done once or loaded from files)
+    static bool isInitialized;
+    
+    // Separate keys for deposit and withdrawal
+    static std::shared_ptr<libsnark::r1cs_ppzksnark_proving_key<DefaultCurve>> depositProvingKey;
+    static std::shared_ptr<libsnark::r1cs_ppzksnark_verification_key<DefaultCurve>> depositVerificationKey;
+    static std::shared_ptr<libsnark::r1cs_ppzksnark_proving_key<DefaultCurve>> withdrawalProvingKey;
+    static std::shared_ptr<libsnark::r1cs_ppzksnark_verification_key<DefaultCurve>> withdrawalVerificationKey;
+    
+    // Legacy variables for backwards compatibility
+    static std::shared_ptr<libsnark::r1cs_ppzksnark_proving_key<DefaultCurve>> provingKey;
+    static std::shared_ptr<libsnark::r1cs_ppzksnark_verification_key<DefaultCurve>> verificationKey;
+    
+    // Key management
+    static bool generateDepositKeys(bool forceRegeneration = false);
+    static bool generateWithdrawalKeys(bool forceRegeneration = false);
     static bool generateKeys(bool forceRegeneration = false);
     
-    // Save keys to file for persistence
-    static bool saveKeys(const std::string& provingKeyPath, 
-                         const std::string& verificationKeyPath);
+    // Updated to use a base path
+    static bool saveKeys(const std::string& basePath);
+    static bool loadKeys(const std::string& basePath);
     
-    // Load keys from file
-    static bool loadKeys(const std::string& provingKeyPath, 
-                         const std::string& verificationKeyPath);
-
-    // Create a deposit proof (for shielding funds)
+    // Proof creation
     static std::vector<unsigned char> createDepositProof(
-        uint64_t publicAmount,           // Amount visible on chain
-        const uint256& commitment,       // Commitment to shield
-        const std::string& spendKey);    // Secret key for later spending
+        uint64_t publicAmount,
+        const uint256& commitment,
+        const std::string& spendKey);
     
-    // Create a withdrawal proof (for unshielding funds)
     static std::vector<unsigned char> createWithdrawalProof(
-        uint64_t publicAmount,           // Amount to withdraw
-        const uint256& nullifier,        // Nullifier to prevent double-spending
-        const uint256& merkleRoot,       // Current merkle root
-        const std::vector<uint256>& merklePath, // Authentication path
-        size_t pathIndex,                // Index in the tree
-        const std::string& spendKey);    // Secret key to authorize spending
+        uint64_t publicAmount,
+        const uint256& nullifier,
+        const uint256& merkleRoot,
+        const std::vector<uint256>& merklePath,
+        size_t pathIndex,
+        const std::string& spendKey);
     
-    // Verify a deposit proof
+    // Proof verification
     static bool verifyDepositProof(
         const std::vector<unsigned char>& proofData,
         uint64_t publicAmount,
         const uint256& commitment);
     
-    // Verify a withdrawal proof
     static bool verifyWithdrawalProof(
         const std::vector<unsigned char>& proofData,
         uint64_t publicAmount,
         const uint256& merkleRoot,
         const uint256& nullifier);
-
-    // Convert uint256 to the bit vector format used by libsnark
-    static std::vector<bool> uint256ToBits(const uint256& input);
     
-    // Convert from libsnark bit vector back to uint256
+    // Utility functions
+    static std::vector<bool> uint256ToBits(const uint256& input);
     static uint256 bitsToUint256(const std::vector<bool>& bits);
     
-    // Helper to serialize proof for on-chain storage
+private:
+    // Proof serialization
     static std::vector<unsigned char> serializeProof(
         const libsnark::r1cs_ppzksnark_proof<DefaultCurve>& proof);
-    
-    // Helper to deserialize proof from transaction data
     static libsnark::r1cs_ppzksnark_proof<DefaultCurve> deserializeProof(
         const std::vector<unsigned char>& proofData);
-
-private:
-    // Static members to hold the keys
-    static std::shared_ptr<libsnark::r1cs_ppzksnark_proving_key<DefaultCurve>> provingKey;
-    static std::shared_ptr<libsnark::r1cs_ppzksnark_verification_key<DefaultCurve>> verificationKey;
-    
-    // Flag to check if the system has been initialized
-    static bool isInitialized;
-}; 
+};
 
 } // namespace zkp
 } // namespace ripple

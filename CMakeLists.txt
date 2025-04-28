@@ -118,6 +118,7 @@ target_link_libraries(ripple_libs INTERFACE
   -l:libff.a
   libff_profiling_stub
   -lgmp
+  -lgmpxx
   -l:libzm.a
 )
 

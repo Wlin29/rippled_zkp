@@ -1,6 +1,5 @@
 #include "ZkDeposit.h"
 #include "ShieldedMerkleTree.h"
-// #include "ZkProver.h"
 #include <xrpl/protocol/Feature.h>
 #include <xrpl/protocol/Indexes.h>
 #include <xrpl/protocol/jss.h>
@@ -65,8 +64,6 @@ ZkDeposit::doApply()
 
     // Add the new commitment.
     size_t index = tree.addCommitment(commitment);
-
-    // Optional: perform additional checks using the index if desired.
     
     // Transfer funds (example, moving funds into the pool).
     TER result = accountSend(ctx_.view(), account, xrpAccount(), amount);
@@ -147,41 +144,6 @@ ZkDeposit::accountSend(ApplyView& view,
     view.update(sleDst);
 
     return tesSUCCESS;
-}
-
-bool
-ZkDeposit::verifyProof()
-{
-    // mock implementation
-    return true;
-
-    // // Get proof data from transaction
-    // auto const& proofBlob = ctx_.tx.getFieldVL(sfZKProof);
-    
-    // // Get public data
-    // uint64_t publicAmount = ctx_.tx.getFieldAmount(sfAmount).xrp().drops();
-    
-    // // Get commitment
-    // uint256 commitment;
-    // if (ctx_.tx.isFieldPresent(sfCommitment))
-    //     commitment = ctx_.tx.getFieldH256(sfCommitment);
-    // else
-    //     return false;
-    
-    // // Convert commitment to bit vector for ZKP verification
-    // std::vector<bool> commitmentBits;
-    // commitmentBits.reserve(256);
-    // for (int i = 0; i < 32; ++i) {
-    //     for (int j = 0; j < 8; ++j) {
-    //         commitmentBits.push_back((commitment.data()[i] >> j) & 1);
-    //     }
-    // }
-    
-    // // Verify the deposit proof
-    // return zkp::ZkProver::verifyDepositProof(
-    //     std::vector<unsigned char>(proofBlob.begin(), proofBlob.end()),
-    //     publicAmount,
-    //     commitmentBits);
 }
 
 } // namespace ripple

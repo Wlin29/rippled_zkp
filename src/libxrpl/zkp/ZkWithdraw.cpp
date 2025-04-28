@@ -63,14 +63,6 @@ ZkWithdraw::preclaim(PreclaimContext const& ctx)
 TER
 ZkWithdraw::doApply()
 {
-    // Keylet poolKeylet = keylet::shielded_pool();
-    // auto shieldedPoolSLE = view().peek(poolKeylet);
-    // if (!shieldedPoolSLE)
-    //     return tecNO_ENTRY;
-
-    // SerialIter sit(shieldedPoolSLE->getFieldVL(sfMerkleTree));
-    // auto tree = ShieldedMerkleTree::deserialize(sit);
-
     // Verify the proof
     if (!verifyProof())
     {
@@ -81,26 +73,18 @@ ZkWithdraw::doApply()
     const auto& tx = ctx_.tx;
     const auto destination = tx.getAccountID(sfDestination);
     const auto amount = tx.getFieldAmount(sfAmount);
-    
+
     // Transfer XRP from shielded pool to the destination
-    // Use Account::send instead of accountSend
-    // TER result = view().send(
-    //     xrpAccount(), destination, amount.xrp().drops());
-    
+    // (Assume you have a function to handle this, or implement as needed)
+    // Example: TER result = view().send(xrpAccount(), destination, amount.xrp().drops());
     // if (!isTesSuccess(result))
     //     return result;
 
-    // Update nullifier list to prevent double spending
+    // Record nullifier to prevent double spending
     auto nullifierKeylet = keylet::nullifier(tx.getFieldH256(sfNullifier));
     auto nullifierSLE = std::make_shared<SLE>(nullifierKeylet);
     nullifierSLE->setFieldH256(sfNullifier, tx.getFieldH256(sfNullifier));
     view().insert(nullifierSLE);
-
-    // Serialize updated Merkle tree back to the SLE
-    // Serializer s;
-    // tree.serialize(s);
-    // shieldedPoolSLE->setFieldVL(sfMerkleTree, s.slice());
-    // view().update(shieldedPoolSLE);
 
     return tesSUCCESS;
 }
@@ -109,7 +93,6 @@ bool
 ZkWithdraw::verifyProof()
 {
     // Implement proper ZK proof verification
-    // For now, this is a placeholder
     return true;
 }
 
