@@ -1,123 +1,104 @@
-#ifndef MERKLE_CIRCUIT_H
-#define MERKLE_CIRCUIT_H
+#pragma once
 
 #include <memory>
-#include <string>
 #include <vector>
-
+#include <string>
 #include <libff/algebra/curves/alt_bn128/alt_bn128_pp.hpp>
-
 #include <libsnark/gadgetlib1/protoboard.hpp>
 #include <libsnark/relations/constraint_satisfaction_problems/r1cs/r1cs.hpp>
 
 namespace ripple {
 namespace zkp {
 
-// Use the BN-128 curve as defined in ZKProver
 using DefaultCurve = libff::alt_bn128_pp;
 using FieldT = libff::Fr<DefaultCurve>;
 
 /**
- * MerkleCircuit - Creates and manages zero-knowledge proofs for Merkle tree operations
- * 
- * This circuit handles both deposit and withdrawal operations for confidential transactions,
- * providing cryptographic proof of membership in the shielded pool Merkle tree.
+ * MerkleCircuit
+ * -------------
+ * A zero-knowledge circuit for proving Merkle tree membership using libsnark's built-in gadgets.
+ * Supports constraint generation, witness assignment, and extraction of constraint system and inputs.
  */
-class MerkleCircuit {
+class MerkleCircuit
+{
 public:
     /**
-     * Constructor for the Merkle circuit
-     * @param treeDepth The depth of the Merkle tree being used
+     * Construct a MerkleCircuit for a tree of given depth.
+     * @param treeDepth The depth of the Merkle tree (number of levels).
      */
-    MerkleCircuit(size_t treeDepth);
-    
-    /**
-     * Destructor
-     */
+    explicit MerkleCircuit(size_t treeDepth);
+
     ~MerkleCircuit();
-    
+
     /**
-     * Generate the constraints for the circuit
-     * This creates the mathematical framework for the zero-knowledge proof
+     * Generate R1CS constraints for Merkle membership proof.
      */
     void generateConstraints();
-    
+
     /**
-     * Generate a witness for standard Merkle tree membership verification
-     * 
-     * @param leaf The leaf commitment data as bit vector
-     * @param path The authentication path as a vector of bit vectors
-     * @param root The Merkle root as a bit vector
-     * @param leafIndex The index of the leaf in the tree
+     * Assign witness values for a Merkle membership proof.
+     * @param leaf         The leaf value (as a vector of bits).
+     * @param root         The Merkle root (as a vector of bits).
      */
-    void generateWitness(
+    void generateDepositWitness(
+        const std::vector<bool>& leaf,
+        const std::vector<bool>& root);
+
+    /**
+     * Assign witness values for a Merkle membership proof.
+     * @param leaf         The leaf value (as a vector of bits).
+     * @param path         The authentication path (vector of sibling hashes, each as bits).
+     * @param root         The Merkle root (as a vector of bits).
+     * @param address      The index of the leaf in the tree (as an integer).
+     */
+     void generateWithdrawalWitness(
         const std::vector<bool>& leaf,
         const std::vector<std::vector<bool>>& path,
         const std::vector<bool>& root,
-        size_t leafIndex);
-    
+        size_t address);
+
     /**
-     * Generate a witness specifically for deposit operations
-     * 
-     * @param commitment The commitment as a bit vector
-     * @param root The Merkle root as a bit vector
-     * @param amount The deposit amount
-     */
-    void generateDepositWitness(
-        const std::vector<bool>& commitment,
-        const std::vector<bool>& root,
-        uint64_t amount);
-    
-    /**
-     * Get the constraint system for this circuit
-     * @return The constraint system
+     * Get the underlying constraint system.
      */
     libsnark::r1cs_constraint_system<FieldT> getConstraintSystem() const;
-    
+
     /**
-     * Get the primary input (public variables) for this circuit
-     * @return The primary input
+     * Get the primary (public) input for the circuit.
      */
     libsnark::r1cs_primary_input<FieldT> getPrimaryInput() const;
-    
+
     /**
-     * Get the auxiliary input (private witness) for this circuit
-     * @return The auxiliary input
+     * Get the auxiliary (private/witness) input for the circuit.
      */
     libsnark::r1cs_auxiliary_input<FieldT> getAuxiliaryInput() const;
 
-private:
     /**
-     * Helper method to set path bits based on leaf index
-     * @param leafIndex The index of the leaf in the tree
+     * Access the underlying protoboard (for advanced use).
      */
-    void setPathBits(size_t leafIndex);
-    
-    // Member variables
-    size_t treeDepth_;
-    std::shared_ptr<libsnark::protoboard<FieldT>> pb_;
-    
-    // Using void pointers to hide implementation details and avoid header issues
-    // These will be properly cast in the .cpp file
-    void* leafHash_;
-    void* rootHash_;
-    void* pathVars_;
-    void* merkleGadget_;
-    void* amount_;
+    std::shared_ptr<libsnark::protoboard<FieldT>> getProtoboard() const;
+
+    /**
+     * Get the Merkle tree depth.
+     */
+    size_t getTreeDepth() const;
+
+    /**
+     * Utility: Convert a uint256 (32-byte array) to a vector of bits (LSB first).
+     */
+    static std::vector<bool> uint256ToBits(const std::array<uint8_t, 32>& input);
+
+    /**
+     * Utility: Convert a vector of bits (LSB first) to a uint256 (32-byte array).
+     */
+    static std::array<uint8_t, 32> bitsToUint256(const std::vector<bool>& bits);
+
+private:
+    class Impl;
+    std::unique_ptr<Impl> pImpl_;
 };
 
-/**
- * Initialize cryptographic curve parameters
- */
-inline void initCurveParameters() {
-    static bool initialized = false;
-    if (!initialized) {
-        DefaultCurve::init_public_params();
-        initialized = true;
-    }
-}
+/// Initialize the curve parameters (must be called before using the circuit)
+void initCurveParameters();
 
 } // namespace zkp
 } // namespace ripple
-
-#endif // MERKLE_CIRCUIT_H

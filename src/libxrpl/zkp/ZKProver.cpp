@@ -180,7 +180,7 @@ std::vector<unsigned char> ZkProver::createDepositProof(
         std::vector<bool> rootBits(256, false);
         
         // Generate the witness
-        merkleCircuit->generateDepositWitness(commitmentBits, rootBits, publicAmount);
+        merkleCircuit->generateDepositWitness(commitmentBits, rootBits);
         
         // Get inputs for the proof
         auto primary_input = merkleCircuit->getPrimaryInput();
@@ -226,7 +226,7 @@ std::vector<unsigned char> ZkProver::createWithdrawalProof(
         }
         
         // Generate the witness
-        merkleCircuit->generateWitness(nullifierBits, pathBits, rootBits, pathIndex);
+        merkleCircuit->generateWithdrawalWitness(nullifierBits, pathBits, rootBits, pathIndex);
         
         // Get inputs for the proof
         auto primary_input = merkleCircuit->getPrimaryInput();
@@ -270,7 +270,7 @@ bool ZkProver::verifyDepositProof(
         }
         
         // Verify the proof
-        return libsnark::r1cs_ppzksnark_verifier<DefaultCurve>(
+        return libsnark::r1cs_ppzksnark_verifier_strong_IC<DefaultCurve>(
             *depositVerificationKey, primary_input, proof);
     } catch (std::exception& e) {
         std::cerr << "Error verifying deposit proof: " << e.what() << std::endl;
@@ -308,7 +308,7 @@ bool ZkProver::verifyWithdrawalProof(
         // In a real implementation, the nullifier verification would be part of the circuit
         
         // Verify the proof
-        return libsnark::r1cs_ppzksnark_verifier<DefaultCurve>(
+        return libsnark::r1cs_ppzksnark_verifier_strong_IC<DefaultCurve>(
             *withdrawalVerificationKey, primary_input, proof);
     } catch (std::exception& e) {
         std::cerr << "Error verifying withdrawal proof: " << e.what() << std::endl;
