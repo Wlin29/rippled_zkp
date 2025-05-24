@@ -173,24 +173,21 @@ std::vector<unsigned char> ZkProver::createDepositProof(
         auto merkleCircuit = std::make_shared<MerkleCircuit>(20);
         merkleCircuit->generateConstraints();
         
-        // Convert commitment to bits
+        // Convert inputs to bits
         std::vector<bool> commitmentBits = uint256ToBits(commitment);
+        std::vector<bool> rootBits(256, false); // dummy root for deposit
+        std::vector<bool> spendKeyBits = MerkleCircuit::spendKeyToBits(spendKey); // Add this
         
-        // Create a "dummy" root for deposit (will be replaced in actual transaction)
-        std::vector<bool> rootBits(256, false);
-        
-        // Generate the witness
-        merkleCircuit->generateDepositWitness(commitmentBits, rootBits);
-        
-        // Get inputs for the proof
-        auto primary_input = merkleCircuit->getPrimaryInput();
-        auto auxiliary_input = merkleCircuit->getAuxiliaryInput();
+        // Generate the witness (ADD SPEND KEY)
+        auto witness = merkleCircuit->generateDepositWitness(
+            commitmentBits, rootBits, spendKeyBits); // Now 3 arguments
         
         // Generate the proof
         auto proof = libsnark::r1cs_ppzksnark_prover<DefaultCurve>(
-            *depositProvingKey, primary_input, auxiliary_input);
+            *depositProvingKey, 
+            merkleCircuit->getPrimaryInput(), 
+            merkleCircuit->getAuxiliaryInput());
         
-        // Serialize the proof
         return serializeProof(proof);
     } catch (std::exception& e) {
         std::cerr << "Error creating deposit proof: " << e.what() << std::endl;
@@ -215,9 +212,10 @@ std::vector<unsigned char> ZkProver::createWithdrawalProof(
         auto merkleCircuit = std::make_shared<MerkleCircuit>(20);
         merkleCircuit->generateConstraints();
         
-        // Convert nullifier and root to bits
+        // Convert inputs to bits
         std::vector<bool> nullifierBits = uint256ToBits(nullifier);
         std::vector<bool> rootBits = uint256ToBits(merkleRoot);
+        std::vector<bool> spendKeyBits = MerkleCircuit::spendKeyToBits(spendKey); // Add this
         
         // Convert merkle path to bits
         std::vector<std::vector<bool>> pathBits;
@@ -225,18 +223,16 @@ std::vector<unsigned char> ZkProver::createWithdrawalProof(
             pathBits.push_back(uint256ToBits(node));
         }
         
-        // Generate the witness
-        merkleCircuit->generateWithdrawalWitness(nullifierBits, pathBits, rootBits, pathIndex);
-        
-        // Get inputs for the proof
-        auto primary_input = merkleCircuit->getPrimaryInput();
-        auto auxiliary_input = merkleCircuit->getAuxiliaryInput();
+        // Generate the witness (ADD SPEND KEY)
+        auto witness = merkleCircuit->generateWithdrawalWitness(
+            nullifierBits, pathBits, rootBits, spendKeyBits, pathIndex); // Now 5 arguments
         
         // Generate the proof
         auto proof = libsnark::r1cs_ppzksnark_prover<DefaultCurve>(
-            *withdrawalProvingKey, primary_input, auxiliary_input);
+            *withdrawalProvingKey, 
+            merkleCircuit->getPrimaryInput(), 
+            merkleCircuit->getAuxiliaryInput());
         
-        // Serialize the proof
         return serializeProof(proof);
     } catch (std::exception& e) {
         std::cerr << "Error creating withdrawal proof: " << e.what() << std::endl;

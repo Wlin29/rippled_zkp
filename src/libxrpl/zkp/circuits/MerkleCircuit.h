@@ -39,23 +39,34 @@ public:
      * Assign witness values for a Merkle membership proof.
      * @param leaf         The leaf value (as a vector of bits).
      * @param root         The Merkle root (as a vector of bits).
+     * @param spend_key    The spend key (as a vector of bits).
+     * @return The full witness vector (primary + auxiliary input).
      */
-    void generateDepositWitness(
+    std::vector<FieldT> generateDepositWitness(
         const std::vector<bool>& leaf,
-        const std::vector<bool>& root);
+        const std::vector<bool>& root,
+        const std::vector<bool>& spend_key);
 
     /**
      * Assign witness values for a Merkle membership proof.
      * @param leaf         The leaf value (as a vector of bits).
      * @param path         The authentication path (vector of sibling hashes, each as bits).
      * @param root         The Merkle root (as a vector of bits).
+     * @param spend_key    The spend key (as a vector of bits).
      * @param address      The index of the leaf in the tree (as an integer).
+     * @return The full witness vector (primary + auxiliary input).
      */
-     void generateWithdrawalWitness(
+    std::vector<FieldT> generateWithdrawalWitness(
         const std::vector<bool>& leaf,
         const std::vector<std::vector<bool>>& path,
         const std::vector<bool>& root,
+        const std::vector<bool>& spend_key,
         size_t address);
+
+    /**
+     * Get the nullifier hash (for advanced use).
+     */
+    std::vector<bool> getNullifierHash() const;
 
     /**
      * Get the underlying constraint system.
@@ -91,6 +102,13 @@ public:
      * Utility: Convert a vector of bits (LSB first) to a uint256 (32-byte array).
      */
     static std::array<uint8_t, 32> bitsToUint256(const std::vector<bool>& bits);
+
+    /**
+     * Utility: Convert a hex-encoded spend key to a vector of bits.
+     * @param spendKey The hex string representing the spend key.
+     * @return A vector of bits representing the spend key (LSB first).
+     */
+    static std::vector<bool> spendKeyToBits(const std::string& spendKey);
 
 private:
     class Impl;
