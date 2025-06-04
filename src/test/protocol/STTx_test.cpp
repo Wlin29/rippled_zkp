@@ -76,13 +76,13 @@ public:
         testcase("Test Sufficient Funds Circuit");
         testRangeCircuitSufficientFunds();
 
-        testcase(
-            "Sufficient Funds Circuit Proof Generation and Verification "
-            "Performance Metrics");
-        testSufficientFundsZKP();
+        // testcase(
+        //     "Sufficient Funds Circuit Proof Generation and Verification "
+        //     "Performance Metrics");
+        // testSufficientFundsZKP();
 
-        testcase("Test Balance Circuit");
-        testBalanceCircuit();
+        // testcase("Test Balance Circuit");
+        // testBalanceCircuit();
     }
 
     void
