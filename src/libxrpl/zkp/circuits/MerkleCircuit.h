@@ -64,7 +64,7 @@ public:
         size_t address);
 
     /**
-     * Get the nullifier hash (for advanced use).
+     * Get the nullifier hash.
      */
     std::vector<bool> getNullifierHash() const;
 

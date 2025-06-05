@@ -180,11 +180,11 @@ std::vector<unsigned char> ZkProver::createDepositProof(
         // Convert inputs to bits
         std::vector<bool> commitmentBits = uint256ToBits(commitment);
         std::vector<bool> rootBits(256, false); // dummy root for deposit
-        std::vector<bool> spendKeyBits = MerkleCircuit::spendKeyToBits(spendKey); // Add this
+        std::vector<bool> spendKeyBits = MerkleCircuit::spendKeyToBits(spendKey); 
         
         // Generate the witness (ADD SPEND KEY)
         auto witness = merkleCircuit->generateDepositWitness(
-            commitmentBits, rootBits, spendKeyBits); // Now 3 arguments
+            commitmentBits, rootBits, spendKeyBits); 
         
         // Generate the proof
         auto proof = libsnark::r1cs_ppzksnark_prover<DefaultCurve>(
@@ -219,7 +219,7 @@ std::vector<unsigned char> ZkProver::createWithdrawalProof(
         // Convert inputs to bits
         std::vector<bool> nullifierBits = uint256ToBits(nullifier);
         std::vector<bool> rootBits = uint256ToBits(merkleRoot);
-        std::vector<bool> spendKeyBits = MerkleCircuit::spendKeyToBits(spendKey); // Add this
+        std::vector<bool> spendKeyBits = MerkleCircuit::spendKeyToBits(spendKey);
         
         // Convert merkle path to bits
         std::vector<std::vector<bool>> pathBits;
@@ -229,7 +229,7 @@ std::vector<unsigned char> ZkProver::createWithdrawalProof(
         
         // Generate the witness (ADD SPEND KEY)
         auto witness = merkleCircuit->generateWithdrawalWitness(
-            nullifierBits, pathBits, rootBits, spendKeyBits, pathIndex); // Now 5 arguments
+            nullifierBits, pathBits, rootBits, spendKeyBits, pathIndex);
         
         // Generate the proof
         auto proof = libsnark::r1cs_ppzksnark_prover<DefaultCurve>(
@@ -351,6 +351,7 @@ uint256 ZkProver::bitsToUint256(const std::vector<bool>& bits) {
 std::vector<unsigned char> ZkProver::serializeProof(
     const libsnark::r1cs_ppzksnark_proof<DefaultCurve>& proof)
 {
+    std::cout << proof << std::endl; 
     try {
         // Use libsnark's built-in serialization
         std::ostringstream oss(std::ios::binary);
