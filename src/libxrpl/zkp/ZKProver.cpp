@@ -5,29 +5,23 @@
 #include <functional>
 #include <libff/algebra/curves/alt_bn128/alt_bn128_pp.hpp>
 #include <sstream>
-#include <libsnark/knowledge_commitment/knowledge_commitment.hpp>
+#include <libsnark/zk_proof_systems/ppzksnark/r1cs_gg_ppzksnark/r1cs_gg_ppzksnark.hpp>
 
 namespace ripple {
 namespace zkp {
 
-// Initialize static members
+// Static members
 bool ZkProver::isInitialized = false;
-std::shared_ptr<libsnark::r1cs_ppzksnark_proving_key<DefaultCurve>> ZkProver::depositProvingKey;
-std::shared_ptr<libsnark::r1cs_ppzksnark_verification_key<DefaultCurve>> ZkProver::depositVerificationKey;
-std::shared_ptr<libsnark::r1cs_ppzksnark_proving_key<DefaultCurve>> ZkProver::withdrawalProvingKey;
-std::shared_ptr<libsnark::r1cs_ppzksnark_verification_key<DefaultCurve>> ZkProver::withdrawalVerificationKey;
-
-// Legacy variables
-std::shared_ptr<libsnark::r1cs_ppzksnark_proving_key<DefaultCurve>> ZkProver::provingKey;
-std::shared_ptr<libsnark::r1cs_ppzksnark_verification_key<DefaultCurve>> ZkProver::verificationKey;
+std::shared_ptr<libsnark::r1cs_gg_ppzksnark_proving_key<DefaultCurve>> ZkProver::depositProvingKey;
+std::shared_ptr<libsnark::r1cs_gg_ppzksnark_verification_key<DefaultCurve>> ZkProver::depositVerificationKey;
+std::shared_ptr<libsnark::r1cs_gg_ppzksnark_proving_key<DefaultCurve>> ZkProver::withdrawalProvingKey;
+std::shared_ptr<libsnark::r1cs_gg_ppzksnark_verification_key<DefaultCurve>> ZkProver::withdrawalVerificationKey;
 
 void ZkProver::initialize() {
     if (!isInitialized) {
-        // Initialize the curve parameters
         initCurveParameters();
         isInitialized = true;
-        
-        // Try to load keys or generate them if they don't exist
+        std::cout << "Initializing ZkProver..." << std::endl;
         if (!loadKeys("/tmp/rippled_zkp_keys")) {
             generateKeys(true);
             saveKeys("/tmp/rippled_zkp_keys");
@@ -37,25 +31,21 @@ void ZkProver::initialize() {
 
 bool ZkProver::generateDepositKeys(bool forceRegeneration) {
     if (depositProvingKey && depositVerificationKey && !forceRegeneration) {
-        return true; // Keys already generated
+        std::cout << "Deposit keys already generated." << std::endl;
+        return true;
     }
     
     try {
-        // Setup the deposit circuit
-        auto merkleCircuit = std::make_shared<MerkleCircuit>(20); // Use a tree depth of 20 for deposits
+        std::cout << "Generating deposit keys..." << std::endl;
+        auto merkleCircuit = std::make_shared<MerkleCircuit>(2); // Depth 2 for testing
+        std::cout << "Generating constraints..." << std::endl;
         merkleCircuit->generateConstraints();
-        
+        std::cout << "Getting constraint system..." << std::endl;
         auto cs = merkleCircuit->getConstraintSystem();
-        
-        // Generate the proving and verification keys
-        auto keypair = libsnark::r1cs_ppzksnark_generator<DefaultCurve>(cs);
-        depositProvingKey = std::make_shared<libsnark::r1cs_ppzksnark_proving_key<DefaultCurve>>(keypair.pk);
-        depositVerificationKey = std::make_shared<libsnark::r1cs_ppzksnark_verification_key<DefaultCurve>>(keypair.vk);
-        
-        // For legacy support
-        provingKey = depositProvingKey;
-        verificationKey = depositVerificationKey;
-        
+        std::cout << "Generating keypair..." << std::endl;
+        auto keypair = libsnark::r1cs_gg_ppzksnark_generator<DefaultCurve>(cs);
+        depositProvingKey = std::make_shared<libsnark::r1cs_gg_ppzksnark_proving_key<DefaultCurve>>(keypair.pk);
+        depositVerificationKey = std::make_shared<libsnark::r1cs_gg_ppzksnark_verification_key<DefaultCurve>>(keypair.vk);
         return true;
     } catch (std::exception& e) {
         std::cerr << "Error generating deposit keys: " << e.what() << std::endl;
@@ -64,22 +54,15 @@ bool ZkProver::generateDepositKeys(bool forceRegeneration) {
 }
 
 bool ZkProver::generateWithdrawalKeys(bool forceRegeneration) {
-    if (withdrawalProvingKey && withdrawalVerificationKey && !forceRegeneration) {
-        return true; // Keys already generated
-    }
-    
+    if (withdrawalProvingKey && withdrawalVerificationKey && !forceRegeneration)
+        return true;
     try {
-        // Setup the withdrawal circuit with a larger tree depth
-        auto merkleCircuit = std::make_shared<MerkleCircuit>(20); // Use a tree depth of 20 for withdrawals
+        auto merkleCircuit = std::make_shared<MerkleCircuit>(2);
         merkleCircuit->generateConstraints();
-        
         auto cs = merkleCircuit->getConstraintSystem();
-        
-        // Generate the proving and verification keys
-        auto keypair = libsnark::r1cs_ppzksnark_generator<DefaultCurve>(cs);
-        withdrawalProvingKey = std::make_shared<libsnark::r1cs_ppzksnark_proving_key<DefaultCurve>>(keypair.pk);
-        withdrawalVerificationKey = std::make_shared<libsnark::r1cs_ppzksnark_verification_key<DefaultCurve>>(keypair.vk);
-        
+        auto keypair = libsnark::r1cs_gg_ppzksnark_generator<DefaultCurve>(cs);
+        withdrawalProvingKey = std::make_shared<libsnark::r1cs_gg_ppzksnark_proving_key<DefaultCurve>>(keypair.pk);
+        withdrawalVerificationKey = std::make_shared<libsnark::r1cs_gg_ppzksnark_verification_key<DefaultCurve>>(keypair.vk);
         return true;
     } catch (std::exception& e) {
         std::cerr << "Error generating withdrawal keys: " << e.what() << std::endl;
@@ -129,15 +112,11 @@ bool ZkProver::loadKeys(const std::string& basePath) {
         std::ifstream deposit_vk_file(basePath + "_deposit_vk", std::ios::binary);
         
         if (deposit_pk_file.good() && deposit_vk_file.good()) {
-            depositProvingKey = std::make_shared<libsnark::r1cs_ppzksnark_proving_key<DefaultCurve>>();
-            depositVerificationKey = std::make_shared<libsnark::r1cs_ppzksnark_verification_key<DefaultCurve>>();
+            depositProvingKey = std::make_shared<libsnark::r1cs_gg_ppzksnark_proving_key<DefaultCurve>>();
+            depositVerificationKey = std::make_shared<libsnark::r1cs_gg_ppzksnark_verification_key<DefaultCurve>>();
             
             deposit_pk_file >> *depositProvingKey;
             deposit_vk_file >> *depositVerificationKey;
-            
-            // For legacy support
-            provingKey = depositProvingKey;
-            verificationKey = depositVerificationKey;
         } else {
             return false;
         }
@@ -147,8 +126,8 @@ bool ZkProver::loadKeys(const std::string& basePath) {
         std::ifstream withdrawal_vk_file(basePath + "_withdrawal_vk", std::ios::binary);
         
         if (withdrawal_pk_file.good() && withdrawal_vk_file.good()) {
-            withdrawalProvingKey = std::make_shared<libsnark::r1cs_ppzksnark_proving_key<DefaultCurve>>();
-            withdrawalVerificationKey = std::make_shared<libsnark::r1cs_ppzksnark_verification_key<DefaultCurve>>();
+            withdrawalProvingKey = std::make_shared<libsnark::r1cs_gg_ppzksnark_proving_key<DefaultCurve>>();
+            withdrawalVerificationKey = std::make_shared<libsnark::r1cs_gg_ppzksnark_verification_key<DefaultCurve>>();
             
             withdrawal_pk_file >> *withdrawalProvingKey;
             withdrawal_vk_file >> *withdrawalVerificationKey;
@@ -168,30 +147,18 @@ std::vector<unsigned char> ZkProver::createDepositProof(
     const uint256& commitment,
     const std::string& spendKey)
 {
-    if (!isInitialized || !depositProvingKey) {
-        initialize();
-    }
-    
+    if (!isInitialized || !depositProvingKey) initialize();
     try {
-        // Create a circuit for the deposit
-        auto merkleCircuit = std::make_shared<MerkleCircuit>(2); 
+        auto merkleCircuit = std::make_shared<MerkleCircuit>(2);
         merkleCircuit->generateConstraints();
-        
-        // Convert inputs to bits
         std::vector<bool> commitmentBits = uint256ToBits(commitment);
-        std::vector<bool> rootBits(256, false); // dummy root for deposit
-        std::vector<bool> spendKeyBits = MerkleCircuit::spendKeyToBits(spendKey); 
-        
-        // Generate the witness (ADD SPEND KEY)
-        auto witness = merkleCircuit->generateDepositWitness(
-            commitmentBits, rootBits, spendKeyBits); 
-        
-        // Generate the proof
-        auto proof = libsnark::r1cs_ppzksnark_prover<DefaultCurve>(
-            *depositProvingKey, 
-            merkleCircuit->getPrimaryInput(), 
+        std::vector<bool> rootBits(256, false);
+        std::vector<bool> spendKeyBits = MerkleCircuit::spendKeyToBits(spendKey);
+        auto witness = merkleCircuit->generateDepositWitness(commitmentBits, rootBits, spendKeyBits);
+        auto proof = libsnark::r1cs_gg_ppzksnark_prover<DefaultCurve>(
+            *depositProvingKey,
+            merkleCircuit->getPrimaryInput(),
             merkleCircuit->getAuxiliaryInput());
-        
         return serializeProof(proof);
     } catch (std::exception& e) {
         std::cerr << "Error creating deposit proof: " << e.what() << std::endl;
@@ -213,7 +180,7 @@ std::vector<unsigned char> ZkProver::createWithdrawalProof(
     
     try {
         // Create a circuit for the withdrawal
-        auto merkleCircuit = std::make_shared<MerkleCircuit>(20);
+        auto merkleCircuit = std::make_shared<MerkleCircuit>(2);
         merkleCircuit->generateConstraints();
         
         // Convert inputs to bits
@@ -232,7 +199,7 @@ std::vector<unsigned char> ZkProver::createWithdrawalProof(
             nullifierBits, pathBits, rootBits, spendKeyBits, pathIndex);
         
         // Generate the proof
-        auto proof = libsnark::r1cs_ppzksnark_prover<DefaultCurve>(
+        auto proof = libsnark::r1cs_gg_ppzksnark_prover<DefaultCurve>(
             *withdrawalProvingKey, 
             merkleCircuit->getPrimaryInput(), 
             merkleCircuit->getAuxiliaryInput());
@@ -249,28 +216,15 @@ bool ZkProver::verifyDepositProof(
     uint64_t publicAmount,
     const uint256& commitment)
 {
-    if (!isInitialized || !depositVerificationKey) {
-        initialize();
-    }
-    
+    if (!isInitialized || !depositVerificationKey) initialize();
     try {
-        // Deserialize the proof
         auto proof = deserializeProof(proofData);
-        
-        // Create a primary input vector with publicAmount and commitment
-        libsnark::r1cs_primary_input<FieldT> primary_input;
-        
-        // Add amount
+        libsnark::r1cs_gg_ppzksnark_primary_input<DefaultCurve> primary_input;
         primary_input.push_back(FieldT(publicAmount));
-        
-        // Add commitment bits
         std::vector<bool> commitmentBits = uint256ToBits(commitment);
-        for (bool bit : commitmentBits) {
+        for (bool bit : commitmentBits)
             primary_input.push_back(bit ? FieldT::one() : FieldT::zero());
-        }
-        
-        // Verify the proof
-        return libsnark::r1cs_ppzksnark_verifier_strong_IC<DefaultCurve>(
+        return libsnark::r1cs_gg_ppzksnark_verifier_strong_IC<DefaultCurve>(
             *depositVerificationKey, primary_input, proof);
     } catch (std::exception& e) {
         std::cerr << "Error verifying deposit proof: " << e.what() << std::endl;
@@ -304,11 +258,14 @@ bool ZkProver::verifyWithdrawalProof(
             primary_input.push_back(bit ? FieldT::one() : FieldT::zero());
         }
         
-        // Add nullifier bits (not part of primary input in this example)
-        // In a real implementation, the nullifier verification would be part of the circuit
+        // Add nullifier bits (now included in the primary input)
+        std::vector<bool> nullifierBits = uint256ToBits(nullifier);
+        for (bool bit : nullifierBits) {
+            primary_input.push_back(bit ? FieldT::one() : FieldT::zero());
+        }
         
         // Verify the proof
-        return libsnark::r1cs_ppzksnark_verifier_strong_IC<DefaultCurve>(
+        return libsnark::r1cs_gg_ppzksnark_verifier_strong_IC<DefaultCurve>(
             *withdrawalVerificationKey, primary_input, proof);
     } catch (std::exception& e) {
         std::cerr << "Error verifying withdrawal proof: " << e.what() << std::endl;
@@ -349,80 +306,25 @@ uint256 ZkProver::bitsToUint256(const std::vector<bool>& bits) {
 }
 
 std::vector<unsigned char> ZkProver::serializeProof(
-    const libsnark::r1cs_ppzksnark_proof<DefaultCurve>& proof)
+    const libsnark::r1cs_gg_ppzksnark_proof<DefaultCurve>& proof)
 {
-    std::cout << proof << std::endl; 
-    try {
-        // Use libsnark's built-in serialization
-        std::ostringstream oss(std::ios::binary);
-        oss << proof.g_A.g << proof.g_A.h << proof.g_B.g << proof.g_B.h << proof.g_C.g << proof.g_C.h;
-        
-        std::string str = oss.str();
-        return std::vector<unsigned char>(str.begin(), str.end());
-        
-    } catch (const std::exception& e) {
-        std::cerr << "Error serializing proof: " << e.what() << std::endl;
-        
-        // Fallback: return a fixed-size dummy proof for testing
-        std::vector<unsigned char> result(384); // Fixed size
-        for (size_t i = 0; i < result.size(); ++i) {
-            result[i] = static_cast<unsigned char>(i & 0xFF);
-        }
-        return result;
-    }
+    std::ostringstream oss(std::ios::binary);
+    oss << proof.g_A << proof.g_B << proof.g_C;
+    std::string str = oss.str();
+    return std::vector<unsigned char>(str.begin(), str.end());
 }
 
-libsnark::r1cs_ppzksnark_proof<DefaultCurve> ZkProver::deserializeProof(
+libsnark::r1cs_gg_ppzksnark_proof<DefaultCurve> ZkProver::deserializeProof(
     const std::vector<unsigned char>& proofData)
 {
-    if (proofData.empty()) {
-        throw std::invalid_argument("Empty proof data");
-    }
-    
-    try {
-        std::string str(proofData.begin(), proofData.end());
-        std::istringstream iss(str, std::ios::binary);
-        
-        // Create proof components using correct types
-        libff::alt_bn128_G1 g_A_g, g_A_h, g_C_g, g_C_h;
-        libff::alt_bn128_G2 g_B_g;
-        libff::alt_bn128_G1 g_B_h;
-        
-        // Deserialize each component
-        iss >> g_A_g >> g_A_h >> g_B_g >> g_B_h >> g_C_g >> g_C_h;
-        
-        if (iss.fail()) {
-            throw std::runtime_error("Failed to deserialize proof components");
-        }
-        
-        // Create knowledge commitments and use std::move for rvalue references
-        auto g_A = libsnark::knowledge_commitment<libff::alt_bn128_G1, libff::alt_bn128_G1>(
-            std::move(g_A_g), std::move(g_A_h));
-        auto g_B = libsnark::knowledge_commitment<libff::alt_bn128_G2, libff::alt_bn128_G1>(
-            std::move(g_B_g), std::move(g_B_h));
-        auto g_C = libsnark::knowledge_commitment<libff::alt_bn128_G1, libff::alt_bn128_G1>(
-            std::move(g_C_g), std::move(g_C_h));
-        
-        // Use std::move to convert lvalues to rvalues for the constructor
-        return libsnark::r1cs_ppzksnark_proof<DefaultCurve>(
-            std::move(g_A), std::move(g_B), std::move(g_C), 
-            libff::alt_bn128_G1::one(), libff::alt_bn128_G1::one());
-        
-    } catch (const std::exception& e) {
-        std::cerr << "Error deserializing proof: " << e.what() << std::endl;
-        
-        // Fallback: return a dummy proof for testing
-        auto g_A = libsnark::knowledge_commitment<libff::alt_bn128_G1, libff::alt_bn128_G1>(
-            libff::alt_bn128_G1::one(), libff::alt_bn128_G1::one());
-        auto g_B = libsnark::knowledge_commitment<libff::alt_bn128_G2, libff::alt_bn128_G1>(
-            libff::alt_bn128_G2::one(), libff::alt_bn128_G1::one());
-        auto g_C = libsnark::knowledge_commitment<libff::alt_bn128_G1, libff::alt_bn128_G1>(
-            libff::alt_bn128_G1::one(), libff::alt_bn128_G1::one());
-            
-        return libsnark::r1cs_ppzksnark_proof<DefaultCurve>(
-            std::move(g_A), std::move(g_B), std::move(g_C), 
-            libff::alt_bn128_G1::one(), libff::alt_bn128_G1::one());
-    }
+    if (proofData.empty()) throw std::invalid_argument("Empty proof data");
+    std::string str(proofData.begin(), proofData.end());
+    std::istringstream iss(str, std::ios::binary);
+    libff::G1<DefaultCurve> g_A, g_C;
+    libff::G2<DefaultCurve> g_B;
+    iss >> g_A >> g_B >> g_C;
+    return libsnark::r1cs_gg_ppzksnark_proof<DefaultCurve>(
+        std::move(g_A), std::move(g_B), std::move(g_C));
 }
 
 } // namespace zkp

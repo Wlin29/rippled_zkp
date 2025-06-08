@@ -4,12 +4,11 @@
 #include <libff/algebra/curves/alt_bn128/alt_bn128_pp.hpp>
 #include <libsnark/gadgetlib1/gadget.hpp>
 #include <libsnark/gadgetlib1/gadgets/basic_gadgets.hpp>
-#include <libsnark/zk_proof_systems/ppzksnark/r1cs_ppzksnark/r1cs_ppzksnark.hpp>
+#include <libsnark/zk_proof_systems/ppzksnark/r1cs_gg_ppzksnark/r1cs_gg_ppzksnark.hpp>
 #include <memory>
 
 namespace libsnark {
 
-// Use alt_bn128 curve explicitly instead of default_r1cs_ppzksnark_pp
 using CurveType = libff::alt_bn128_pp;
 using FrType = libff::Fr<CurveType>;
 

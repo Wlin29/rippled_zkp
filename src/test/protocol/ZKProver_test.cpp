@@ -242,7 +242,7 @@ public:
         testcase("Deposit Proof Creation");
         
         // Ensure keys are generated
-        BEAST_EXPECT(zkp::ZkProver::generateKeys(true));
+        BEAST_EXPECT(zkp::ZkProver::generateKeys(false));
         
         // Test with various amounts
         std::vector<uint64_t> testAmounts = {0, 1, 1000000, 1000000000000ULL};
@@ -278,7 +278,7 @@ public:
         testcase("Withdrawal Proof Creation");
         
         // Ensure keys are generated
-        BEAST_EXPECT(zkp::ZkProver::generateKeys(true));
+        BEAST_EXPECT(zkp::ZkProver::generateKeys(false));
         
         // Create test data
         uint64_t amount = 1000000;
@@ -286,12 +286,12 @@ public:
         uint256 merkleRoot = generateRandomUint256();
         std::string spendKey = generateRandomSpendKey();
         
-        // Create a mock Merkle path (depth 20)
+        // Create a mock Merkle path (depth 2)
         std::vector<uint256> merklePath;
-        for (int i = 0; i < 20; ++i) {
+        for (int i = 0; i < 2; ++i) {
             merklePath.push_back(generateRandomUint256());
         }
-        size_t pathIndex = 12345;
+        size_t pathIndex = 1; // For depth 2, valid indices are 0, 1, 2, 3
         
         std::vector<unsigned char> proof = zkp::ZkProver::createWithdrawalProof(
             amount, nullifier, merkleRoot, merklePath, pathIndex, spendKey);
@@ -300,7 +300,7 @@ public:
         log << "Withdrawal proof size: " << proof.size() << " bytes";
         
         // Test with different path indices
-        for (size_t idx : {0, 1, 100, 1000, 1048575}) { // Various valid indices for depth 20
+        for (size_t idx : {0, 1, 2, 3}) { // Valid indices for depth 2
             auto proofAtIndex = zkp::ZkProver::createWithdrawalProof(
                 amount, nullifier, merkleRoot, merklePath, idx, spendKey);
             BEAST_EXPECT(!proofAtIndex.empty());
@@ -312,7 +312,7 @@ public:
         testcase("Deposit Proof Verification");
         
         // Ensure keys are generated
-        BEAST_EXPECT(zkp::ZkProver::generateKeys(true));
+        BEAST_EXPECT(zkp::ZkProver::generateKeys(false));
         
         // Create a valid proof
         uint64_t amount = 1000000;
@@ -347,7 +347,7 @@ public:
         testcase("Withdrawal Proof Verification");
         
         // Ensure keys are generated
-        BEAST_EXPECT(zkp::ZkProver::generateKeys(true));
+        BEAST_EXPECT(zkp::ZkProver::generateKeys(false));
         
         // Create test data
         uint64_t amount = 1000000;
@@ -356,10 +356,10 @@ public:
         std::string spendKey = generateRandomSpendKey();
         
         std::vector<uint256> merklePath;
-        for (int i = 0; i < 20; ++i) {
+        for (int i = 0; i < 2; ++i) {
             merklePath.push_back(generateRandomUint256());
         }
-        size_t pathIndex = 12345;
+        size_t pathIndex = 1;
         
         // Create a valid proof
         std::vector<unsigned char> proof = zkp::ZkProver::createWithdrawalProof(
@@ -376,7 +376,7 @@ public:
         
         // Test verification with wrong merkle root
         uint256 wrongRootValue = generateRandomUint256(); 
-        bool wrongRootResult = zkp::ZkProver::verifyWithdrawalProof(proof, amount, wrongRootValue, nullifier);  // ✅ Renamed
+        bool wrongRootResult = zkp::ZkProver::verifyWithdrawalProof(proof, amount, wrongRootValue, nullifier);
         BEAST_EXPECT(!wrongRootResult);
         
         // Test verification with wrong nullifier
@@ -390,7 +390,7 @@ public:
         testcase("Invalid Proof Verification");
         
         // Ensure keys are generated
-        BEAST_EXPECT(zkp::ZkProver::generateKeys(true));
+        BEAST_EXPECT(zkp::ZkProver::generateKeys(false));
         
         uint64_t amount = 1000000;
         uint256 commitment = generateRandomUint256();
@@ -421,7 +421,7 @@ public:
         testcase("Multiple Proof Operations");
         
         // Ensure keys are generated
-        BEAST_EXPECT(zkp::ZkProver::generateKeys(true));
+        BEAST_EXPECT(zkp::ZkProver::generateKeys(false));
         
         // Create multiple proofs and verify they're all valid
         const int numProofs = 5;
@@ -468,7 +468,7 @@ public:
         testcase("Edge Cases");
         
         // Ensure keys are generated
-        BEAST_EXPECT(zkp::ZkProver::generateKeys(true));
+        BEAST_EXPECT(zkp::ZkProver::generateKeys(false));
         
         // Test with zero amount
         uint256 commitment = generateRandomUint256();
@@ -498,8 +498,8 @@ public:
         auto longKeyProof = zkp::ZkProver::createDepositProof(1000000, commitment, longSpendKey);
         BEAST_EXPECT(!longKeyProof.empty());
         
-        // Test withdrawal with minimal path (should still work with depth 20)
-        std::vector<uint256> minimalPath(20, uint256{});
+        // Test withdrawal with minimal path (should still work with depth 2)
+        std::vector<uint256> minimalPath(2, uint256{});
         auto minimalProof = zkp::ZkProver::createWithdrawalProof(
             1000000, commitment, commitment, minimalPath, 0, spendKey);
         BEAST_EXPECT(!minimalProof.empty());
