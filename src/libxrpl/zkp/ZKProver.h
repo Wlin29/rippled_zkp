@@ -5,6 +5,7 @@
 #include <xrpl/basics/base_uint.h>
 #include <libff/algebra/curves/alt_bn128/alt_bn128_pp.hpp>
 #include <libsnark/zk_proof_systems/ppzksnark/r1cs_gg_ppzksnark/r1cs_gg_ppzksnark.hpp>
+#include <libxrpl/zkp/circuits/MerkleCircuit.h>
 
 namespace ripple {
 namespace zkp {
@@ -42,11 +43,16 @@ public:
     static bool saveKeys(const std::string& basePath);
     static bool loadKeys(const std::string& basePath);
 
+    static std::shared_ptr<MerkleCircuit> depositCircuit;
+    static std::shared_ptr<MerkleCircuit> withdrawalCircuit;
+
     // UPDATED: Proof creation returns ProofData (proof + public inputs)
     static ProofData createDepositProof(
         uint64_t amount,
         const uint256& commitment,
-        const std::string& spendKey);  // Secret only used here
+        const std::string& spendKey,
+        const FieldT& value_randomness // NEW PARAM
+    );
 
     static ProofData createWithdrawalProof(
         uint64_t amount,                     
@@ -54,20 +60,22 @@ public:
         const uint256& nullifier,           
         const std::vector<uint256>& merklePath,
         size_t pathIndex,
-        const std::string& spendKey);       // Secret only used here
+        const std::string& spendKey,
+        const FieldT& value_randomness // NEW PARAM
+    );
 
-    // UPDATED: Verification uses ONLY public inputs (no secrets!)
+    // Verification with individual parameters
     static bool verifyDepositProof(
         const std::vector<unsigned char>& proof,
-        const FieldT& anchor,           // PUBLIC
-        const FieldT& nullifier,        // PUBLIC (derived from secret, but public)
-        const FieldT& value_commitment); // PUBLIC
+        const FieldT& anchor,
+        const FieldT& nullifier,
+        const FieldT& value_commitment);
 
     static bool verifyWithdrawalProof(
         const std::vector<unsigned char>& proof,
-        const FieldT& anchor,           // PUBLIC
-        const FieldT& nullifier,        // PUBLIC
-        const FieldT& value_commitment); // PUBLIC
+        const FieldT& anchor,
+        const FieldT& nullifier,
+        const FieldT& value_commitment);
     
     // CONVENIENCE: Verify using ProofData structure
     static bool verifyDepositProof(const ProofData& proofData) {
