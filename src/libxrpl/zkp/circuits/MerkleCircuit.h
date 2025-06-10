@@ -3,14 +3,15 @@
 #include <memory>
 #include <vector>
 #include <string>
-#include <array>  // ← ADD: For std::array in uint256ToBits
+#include <array>
 #include <libff/algebra/curves/alt_bn128/alt_bn128_pp.hpp>
 #include <libsnark/gadgetlib1/protoboard.hpp>
 #include <libsnark/gadgetlib1/gadgets/basic_gadgets.hpp>
-#include <libsnark/gadgetlib1/gadgets/hashes/sha256/sha256_gadget.hpp>  // ← ADD: For SHA256 gadgets
-#include <libsnark/gadgetlib1/gadgets/hashes/hash_io.hpp>              // ← ADD: For digest_variable
-#include <libsnark/gadgetlib1/gadgets/merkle_tree/merkle_tree_check_read_gadget.hpp>  // ← ADD: For Merkle gadgets
+#include <libsnark/gadgetlib1/gadgets/hashes/sha256/sha256_gadget.hpp>
+#include <libsnark/gadgetlib1/gadgets/hashes/hash_io.hpp>
+#include <libsnark/gadgetlib1/gadgets/merkle_tree/merkle_tree_check_read_gadget.hpp>
 #include <libsnark/relations/constraint_satisfaction_problems/r1cs/r1cs.hpp>
+
 
 namespace ripple {
 namespace zkp {
@@ -18,7 +19,7 @@ namespace zkp {
 using DefaultCurve = libff::alt_bn128_pp;
 using FieldT = libff::Fr<DefaultCurve>;
 
-// ← ADD: Forward declarations for libsnark types used in implementation
+// Forward declarations for libsnark types
 using libsnark::digest_variable;
 using libsnark::block_variable;
 using libsnark::sha256_compression_function_gadget;
@@ -35,12 +36,11 @@ using libsnark::merkle_tree_check_read_gadget;
  * Public inputs: [anchor, nullifier, value_commitment]
  * Private inputs: [value, value_randomness, spend_key, rho, address_bits, auth_path]
  * 
- * Constraints:
- * - commitment = SHA256(value || spend_key)  [leaf in Merkle tree]
- * - nullifier = SHA256(spend_key || rho)     [prevents double-spending]
- * - value_commitment = SHA256(value || value_randomness)  [hides amount]
- * - Merkle path verification: commitment ∈ tree with root = anchor
- * - Range constraints: value ∈ [0, 2^64-1]
+ * SHA256-based constraints:
+ * - value_commitment = SHA256(value_bits || value_randomness_bits)
+ * - nullifier = SHA256(spend_key_bits || rho_bits)
+ * - note_commitment = SHA256(value_bits || spend_key_bits || rho_bits)
+ * - Merkle path verification: note_commitment ∈ tree with root = anchor
  * - Boolean constraints: all bits ∈ {0,1}
  */
 class MerkleCircuit

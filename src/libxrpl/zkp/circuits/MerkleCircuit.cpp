@@ -3,6 +3,8 @@
 #include <libsnark/gadgetlib1/pb_variable.hpp>
 #include <libsnark/gadgetlib1/protoboard.hpp>
 #include <libsnark/gadgetlib1/gadgets/basic_gadgets.hpp>
+#include <libsnark/gadgetlib1/gadgets/hashes/sha256/sha256_gadget.hpp>
+#include <libsnark/gadgetlib1/gadgets/hashes/hash_io.hpp>
 #include <algorithm>
 #include <cassert>
 
@@ -12,6 +14,9 @@ namespace zkp {
 using libsnark::pb_variable;
 using libsnark::pb_variable_array;
 using libsnark::pb_linear_combination;
+using libsnark::packing_gadget;
+using libsnark::multipacking_gadget;
+using libsnark::sha256_two_to_one_hash_gadget;
 
 void initCurveParameters() {
     static bool initialized = false;
@@ -37,6 +42,36 @@ private:
     pb_variable<FieldT> spend_key_;                 
     pb_variable<FieldT> rho_;                       
     
+    // BIT REPRESENTATIONS
+    pb_variable_array<FieldT> value_bits_;          // 64 bits
+    pb_variable_array<FieldT> value_randomness_bits_; // 256 bits
+    pb_variable_array<FieldT> spend_key_bits_;      // 256 bits
+    pb_variable_array<FieldT> rho_bits_;            // 256 bits
+    
+    // SHA256 TWO-TO-ONE HASH GADGETS
+    std::unique_ptr<sha256_two_to_one_hash_gadget<FieldT>> value_commit_hasher_;
+    std::unique_ptr<sha256_two_to_one_hash_gadget<FieldT>> nullifier_hasher_;
+    std::unique_ptr<sha256_two_to_one_hash_gadget<FieldT>> note_commit_hasher_;
+    
+    // DIGEST VARIABLES (SHA256 inputs and outputs)
+    std::unique_ptr<digest_variable<FieldT>> value_digest_;
+    std::unique_ptr<digest_variable<FieldT>> value_randomness_digest_;
+    std::unique_ptr<digest_variable<FieldT>> spend_key_digest_;
+    std::unique_ptr<digest_variable<FieldT>> rho_digest_;
+    
+    std::unique_ptr<digest_variable<FieldT>> value_commit_digest_;
+    std::unique_ptr<digest_variable<FieldT>> nullifier_digest_;
+    std::unique_ptr<digest_variable<FieldT>> note_commit_digest_;
+    
+    // PACKING GADGETS (convert bits to field elements)
+    std::unique_ptr<packing_gadget<FieldT>> value_packer_;
+    std::unique_ptr<packing_gadget<FieldT>> spend_key_packer_;
+    std::unique_ptr<packing_gadget<FieldT>> value_randomness_packer_;
+    std::unique_ptr<packing_gadget<FieldT>> rho_packer_;
+    std::unique_ptr<packing_gadget<FieldT>> value_commit_packer_;
+    std::unique_ptr<packing_gadget<FieldT>> nullifier_packer_;
+    std::unique_ptr<packing_gadget<FieldT>> anchor_packer_;
+    
 public:
     Impl(size_t tree_depth) : tree_depth_(tree_depth) {
         std::cout << "Creating working MerkleCircuit with depth " << tree_depth << std::endl;
@@ -51,51 +86,147 @@ public:
         // Set the number of primary inputs
         pb_->set_input_sizes(3);
         
-        // Allocate private inputs
+        // Allocate private field elements
         value_.allocate(*pb_, "value");
         value_randomness_.allocate(*pb_, "value_randomness");
         spend_key_.allocate(*pb_, "spend_key");
         rho_.allocate(*pb_, "rho");
         
-        std::cout << "Working MerkleCircuit initialized successfully" << std::endl;
+        std::cout << "MerkleCircuit initialized successfully" << std::endl;
     }
     
     void generateConstraints() {
         std::cout << "Generating working constraints..." << std::endl;
         
-        // WORKING CONSTRAINTS
+        // 1. ALLOCATE BIT VARIABLES
+        value_bits_.allocate(*pb_, 64, "value_bits");
+        value_randomness_bits_.allocate(*pb_, 256, "value_randomness_bits");
+        spend_key_bits_.allocate(*pb_, 256, "spend_key_bits");
+        rho_bits_.allocate(*pb_, 256, "rho_bits");
         
-        // 1. VALUE COMMITMENT CONSTRAINT
-        // value_commitment = value + value_randomness (simplified)
-        pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
-            value_ + value_randomness_, 
-            1, 
-            value_commitment_
-        ), "value_commitment_constraint");
+        // 2. SETUP PACKING GADGETS (field elements ↔ bits)
+        value_packer_ = std::make_unique<packing_gadget<FieldT>>(
+            *pb_, value_bits_, value_, "value_packer");
         
-        // 2. NULLIFIER CONSTRAINT  
-        // nullifier = spend_key + rho (simplified)
-        pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
-            spend_key_ + rho_, 
-            1, 
-            nullifier_
-        ), "nullifier_constraint");
+        spend_key_packer_ = std::make_unique<packing_gadget<FieldT>>(
+            *pb_, spend_key_bits_, spend_key_, "spend_key_packer");
         
-        // 3. ANCHOR CONSTRAINT
-        // anchor = spend_key (simplified)
-        pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
-            spend_key_, 
-            1, 
-            anchor_
-        ), "anchor_constraint");
+        value_randomness_packer_ = std::make_unique<packing_gadget<FieldT>>(
+            *pb_, value_randomness_bits_, value_randomness_, "value_randomness_packer");
         
-        // 4. VALUE CONSISTENCY CONSTRAINT (new - mathematically sound)
-        // value * 1 = value (always true, just ensures value is properly constrained)
-        pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
-            value_, 
-            1, 
-            value_
-        ), "value_consistency_constraint");
+        rho_packer_ = std::make_unique<packing_gadget<FieldT>>(
+            *pb_, rho_bits_, rho_, "rho_packer");
+        
+        // 3. SETUP DIGEST VARIABLES (256-bit chunks for two-to-one hashing)
+        
+        // Pad value to 256 bits for hashing
+        pb_variable_array<FieldT> padded_value_bits;
+        padded_value_bits.insert(padded_value_bits.end(), value_bits_.begin(), value_bits_.end());
+        // Pad remaining 192 bits with zeros
+        for (size_t i = 64; i < 256; ++i) {
+            pb_variable<FieldT> zero_bit;
+            zero_bit.allocate(*pb_, "value_padding_" + std::to_string(i));
+            padded_value_bits.insert(padded_value_bits.end(), zero_bit);
+        }
+        
+        value_digest_ = std::make_unique<digest_variable<FieldT>>(
+            *pb_, 256, "value_digest");
+        
+        value_randomness_digest_ = std::make_unique<digest_variable<FieldT>>(
+            *pb_, 256, "value_randomness_digest");
+        
+        spend_key_digest_ = std::make_unique<digest_variable<FieldT>>(
+            *pb_, 256, "spend_key_digest");
+        
+        rho_digest_ = std::make_unique<digest_variable<FieldT>>(
+            *pb_, 256, "rho_digest");
+        
+        // Output digests
+        value_commit_digest_ = std::make_unique<digest_variable<FieldT>>(
+            *pb_, 256, "value_commit_digest");
+        
+        nullifier_digest_ = std::make_unique<digest_variable<FieldT>>(
+            *pb_, 256, "nullifier_digest");
+        
+        note_commit_digest_ = std::make_unique<digest_variable<FieldT>>(
+            *pb_, 256, "note_commit_digest");
+        
+        // 4. SETUP SHA256 TWO-TO-ONE HASH GADGETS
+        
+        // Value commitment: SHA256(value || value_randomness)
+        value_commit_hasher_ = std::make_unique<sha256_two_to_one_hash_gadget<FieldT>>(
+            *pb_,
+            *value_digest_,           // left input (padded value)
+            *value_randomness_digest_, // right input (value_randomness)
+            *value_commit_digest_,     // output
+            "value_commit_hasher");
+        
+        // Nullifier: SHA256(spend_key || rho)
+        nullifier_hasher_ = std::make_unique<sha256_two_to_one_hash_gadget<FieldT>>(
+            *pb_,
+            *spend_key_digest_,       // left input
+            *rho_digest_,             // right input
+            *nullifier_digest_,       // output
+            "nullifier_hasher");
+        
+        // Note commitment: SHA256(value_commit_digest || nullifier_digest)
+        note_commit_hasher_ = std::make_unique<sha256_two_to_one_hash_gadget<FieldT>>(
+            *pb_,
+            *value_commit_digest_,    // left input (value commitment)
+            *nullifier_digest_,       // right input (nullifier)
+            *note_commit_digest_,     // output (becomes anchor)
+            "note_commit_hasher");
+        
+        // 5. SETUP PACKING GADGETS (SHA256 outputs → field elements)
+        value_commit_packer_ = std::make_unique<packing_gadget<FieldT>>(
+            *pb_, value_commit_digest_->bits, value_commitment_, "value_commit_packer");
+        
+        nullifier_packer_ = std::make_unique<packing_gadget<FieldT>>(
+            *pb_, nullifier_digest_->bits, nullifier_, "nullifier_packer");
+        
+        anchor_packer_ = std::make_unique<packing_gadget<FieldT>>(
+            *pb_, note_commit_digest_->bits, anchor_, "anchor_packer");
+        
+        // 6. GENERATE ALL CONSTRAINTS
+        
+        // Packing constraints (field elements ↔ bits)
+        value_packer_->generate_r1cs_constraints(true);
+        spend_key_packer_->generate_r1cs_constraints(true);
+        value_randomness_packer_->generate_r1cs_constraints(true);
+        rho_packer_->generate_r1cs_constraints(true);
+        
+        // Set padding bits to zero
+        for (size_t i = 64; i < 256; ++i) {
+            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                padded_value_bits[i], 1, 0), "value_padding_zero_" + std::to_string(i));
+        }
+        
+        // SHA256 two-to-one hash constraints
+        value_commit_hasher_->generate_r1cs_constraints();
+        nullifier_hasher_->generate_r1cs_constraints();
+        note_commit_hasher_->generate_r1cs_constraints();
+        
+        // Packing constraints (SHA256 outputs → field elements)
+        value_commit_packer_->generate_r1cs_constraints(true);
+        nullifier_packer_->generate_r1cs_constraints(true);
+        anchor_packer_->generate_r1cs_constraints(true);
+        
+        // 7. BOOLEAN CONSTRAINTS (ensure all bits are 0 or 1)
+        for (size_t i = 0; i < value_bits_.size(); ++i) {
+            libsnark::generate_boolean_r1cs_constraint<FieldT>(*pb_, value_bits_[i], "value_bit_" + std::to_string(i));
+        }
+        
+        for (size_t i = 0; i < spend_key_bits_.size(); ++i) {
+            libsnark::generate_boolean_r1cs_constraint<FieldT>(*pb_, spend_key_bits_[i], "spend_key_bit_" + std::to_string(i));
+        }
+        
+        for (size_t i = 0; i < value_randomness_bits_.size(); ++i) {
+            libsnark::generate_boolean_r1cs_constraint<FieldT>(*pb_, value_randomness_bits_[i], "value_randomness_bit_" + std::to_string(i));
+        }
+        
+        for (size_t i = 0; i < rho_bits_.size(); ++i) {
+            libsnark::generate_boolean_r1cs_constraint<FieldT>(*pb_, rho_bits_[i], "rho_bit_" + std::to_string(i));
+        }
         
         std::cout << "Total constraints: " << pb_->num_constraints() << std::endl;
     }
@@ -112,19 +243,47 @@ public:
         std::cout << "Generating working witness..." << std::endl;
         
         try {
-            // Set private inputs
+            // 1. SET FIELD ELEMENT VALUES
             pb_->val(value_) = FieldT(value);
             pb_->val(value_randomness_) = value_randomness;
+            pb_->val(spend_key_) = bitsToFieldElement(spend_key);
+            
+            // Generate deterministic rho from spend_key and value
             FieldT spend_key_field = bitsToFieldElement(spend_key);
-            pb_->val(spend_key_) = spend_key_field;
+            pb_->val(rho_) = spend_key_field + FieldT(value) + FieldT(12345);
             
-            // FIX: Use deterministic rho instead of random
-            pb_->val(rho_) = spend_key_field + FieldT(12345);  // Deterministic based on spend_key
+            // 2. SET DIGEST BITS DIRECTLY (since we're not using input bit arrays)
             
-            // Compute public outputs from constraints
-            pb_->val(value_commitment_) = pb_->val(value_) + pb_->val(value_randomness_);
-            pb_->val(nullifier_) = pb_->val(spend_key_) + pb_->val(rho_);
-            pb_->val(anchor_) = pb_->val(spend_key_);
+            // Set value digest bits (pad value to 256 bits)
+            for (size_t i = 0; i < 64; ++i) {
+                pb_->val(value_digest_->bits[i]) = pb_->val(value_bits_[i]);
+            }
+            for (size_t i = 64; i < 256; ++i) {
+                pb_->val(value_digest_->bits[i]) = FieldT::zero();
+            }
+            
+            // Set other digest bits
+            for (size_t i = 0; i < 256; ++i) {
+                pb_->val(value_randomness_digest_->bits[i]) = pb_->val(value_randomness_bits_[i]);
+                pb_->val(spend_key_digest_->bits[i]) = pb_->val(spend_key_bits_[i]);
+                pb_->val(rho_digest_->bits[i]) = pb_->val(rho_bits_[i]);
+            }
+            
+            // 3. GENERATE PACKING WITNESSES
+            value_packer_->generate_r1cs_witness_from_packed();
+            spend_key_packer_->generate_r1cs_witness_from_packed();
+            value_randomness_packer_->generate_r1cs_witness_from_packed();
+            rho_packer_->generate_r1cs_witness_from_packed();
+            
+            // 4. GENERATE SHA256 WITNESSES
+            value_commit_hasher_->generate_r1cs_witness();
+            nullifier_hasher_->generate_r1cs_witness();
+            note_commit_hasher_->generate_r1cs_witness();
+            
+            // 5. GENERATE PACKING WITNESSES (SHA256 outputs → field elements)
+            value_commit_packer_->generate_r1cs_witness_from_bits();
+            nullifier_packer_->generate_r1cs_witness_from_bits();
+            anchor_packer_->generate_r1cs_witness_from_bits();
             
             std::cout << "Working witness generation completed successfully" << std::endl;
             
@@ -143,9 +302,22 @@ private:
             if (bits[i]) {
                 result += power;
             }
-            power += power; // power *= 2 using addition since * 2 = + itself
+            power += power; // power *= 2
         }
         return result;
+    }
+    
+    std::vector<bool> fieldElementToBits(const FieldT& element) {
+        std::vector<bool> bits(253);
+        FieldT temp = element;
+        FieldT two = FieldT(2);
+        
+        for (size_t i = 0; i < 253; ++i) {
+            FieldT remainder = temp - ((temp * two.inverse()) + (temp * two.inverse())); // temp % 2
+            bits[i] = (remainder == FieldT::one());
+            temp = temp * two.inverse(); // temp /= 2
+        }
+        return bits;
     }
     
 public:
@@ -307,9 +479,8 @@ std::vector<bool> MerkleCircuit::fieldElementToBits(const FieldT& element) {
     FieldT two = FieldT(2);
     
     for (size_t i = 0; i < 253; ++i) {
-        // Use division approach instead of modulo
-        FieldT quotient = temp * two.inverse(); // temp / 2
-        FieldT remainder = temp - (quotient + quotient); // temp - 2 * floor(temp/2)
+        FieldT quotient = temp * two.inverse();
+        FieldT remainder = temp - (quotient + quotient);
         
         bits[i] = (remainder == FieldT::one());
         temp = quotient;
