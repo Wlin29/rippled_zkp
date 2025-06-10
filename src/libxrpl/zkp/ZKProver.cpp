@@ -258,7 +258,6 @@ ProofData ZkProver::createDepositProof(
     }
 }
 
-// UPDATED: Return ProofData instead of std::vector<unsigned char>
 ProofData ZkProver::createWithdrawalProof(
     uint64_t amount,
     const uint256& merkleRoot,
@@ -284,7 +283,7 @@ ProofData ZkProver::createWithdrawalProof(
             pathBits.push_back(uint256ToBits(pathNode));
         }
         
-        auto witness = withdrawalCircuit->generateWithdrawalWitness(  // USE stored circuit
+        auto witness = withdrawalCircuit->generateWithdrawalWitness(
             amount,
             value_randomness, 
             nullifierBits,
@@ -439,8 +438,9 @@ uint256 ZkProver::bitsToUint256(const std::vector<bool>& bits) {
 std::vector<unsigned char> ZkProver::serializeProof(
     const libsnark::r1cs_gg_ppzksnark_proof<DefaultCurve>& proof)
 {
-    std::ostringstream oss(std::ios::binary);
-    oss << proof.g_A << proof.g_B << proof.g_C;
+    std::ostringstream oss;
+    oss << proof;  
+    
     std::string str = oss.str();
     return std::vector<unsigned char>(str.begin(), str.end());
 }
@@ -448,14 +448,13 @@ std::vector<unsigned char> ZkProver::serializeProof(
 libsnark::r1cs_gg_ppzksnark_proof<DefaultCurve> ZkProver::deserializeProof(
     const std::vector<unsigned char>& proofData)
 {
-    if (proofData.empty()) throw std::invalid_argument("Empty proof data");
     std::string str(proofData.begin(), proofData.end());
-    std::istringstream iss(str, std::ios::binary);
-    libff::G1<DefaultCurve> g_A, g_C;
-    libff::G2<DefaultCurve> g_B;
-    iss >> g_A >> g_B >> g_C;
-    return libsnark::r1cs_gg_ppzksnark_proof<DefaultCurve>(
-        std::move(g_A), std::move(g_B), std::move(g_C));
+    std::istringstream iss(str);
+    
+    libsnark::r1cs_gg_ppzksnark_proof<DefaultCurve> proof;
+    iss >> proof;  
+    
+    return proof;
 }
 
 } // namespace zkp
