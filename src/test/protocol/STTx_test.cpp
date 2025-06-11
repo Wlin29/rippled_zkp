@@ -31,6 +31,17 @@
 #include <memory>
 #include <regex>
 
+#include "libxrpl/zkp/circuits/BalanceCircuit.h"
+#include "libxrpl/zkp/circuits/SufficientFundsCircuit.h"
+#include <cassert>
+#include <iostream>
+#include <libff/common/default_types/ec_pp.hpp>
+#include <libsnark/common/default_types/r1cs_ppzksnark_pp.hpp>
+#include <libsnark/gadgetlib1/protoboard.hpp>
+
+using namespace libsnark;
+using namespace libff;
+
 namespace ripple {
 
 /**
@@ -61,6 +72,17 @@ public:
 
         testcase("STObject constructor errors");
         testObjectCtorErrors();
+
+        testcase("Test Sufficient Funds Circuit");
+        testRangeCircuitSufficientFunds();
+
+        // testcase(
+        //     "Sufficient Funds Circuit Proof Generation and Verification "
+        //     "Performance Metrics");
+        // testSufficientFundsZKP();
+
+        // testcase("Test Balance Circuit");
+        // testBalanceCircuit();
     }
 
     void
@@ -1617,6 +1639,197 @@ public:
     }
 
     void
+    testRangeCircuitSufficientFunds()
+    {
+        using namespace libff;
+        using namespace libsnark;
+
+        libff::alt_bn128_pp::init_public_params();
+        auto fr = [](uint64_t x) -> FrType { return FrType(x); };
+        const size_t BIT_LENGTH = 64;
+        protoboard<FrType> pb;
+
+        // Test 1: Balance > Purchase Amount (should pass)
+        {
+            SufficientFundsCircuit<FrType> circuit(pb, BIT_LENGTH);
+
+            circuit.generate_r1cs_constraints();
+
+            // Set values: 1000 XRP balance, trying to spend 500 XRP
+            circuit.generate_r1cs_witness(fr(1000), fr(500));
+
+            bool satisfied = circuit.is_satisfied();
+            BEAST_EXPECT(satisfied == true);
+
+            if (satisfied == true)
+                pass();
+            else
+                fail("Sufficient funds case failed");
+
+            auto cs = circuit.get_constraint_system();
+            auto primary_input = circuit.get_primary_input();
+            auto auxiliary_input = circuit.get_auxiliary_input();
+
+            // Verify that the inputs satisfy the constraint system
+            bool inputs_satisfy =
+                cs.is_satisfied(primary_input, auxiliary_input);
+            BEAST_EXPECT(inputs_satisfy);
+
+            log << "Primary input size: " << primary_input.size() << std::endl;
+            log << "Auxiliary input size: " << auxiliary_input.size()
+                << std::endl;
+        }
+
+        // Test 2: Balance == Purchase Amount (edge case, should pass)
+        {
+            protoboard<FrType> pb;
+
+            SufficientFundsCircuit<FrType> circuit(pb, BIT_LENGTH);
+            circuit.generate_r1cs_constraints();
+            circuit.generate_r1cs_witness(fr(500), fr(500));
+
+            bool satisfied = circuit.is_satisfied();
+            BEAST_EXPECT(satisfied);
+
+            if (satisfied)
+                pass();
+            else
+                fail("Equal funds case failed");
+        }
+
+        // Test 3: Balance < Purchase Amount (should fail)
+        {
+            protoboard<FrType> pb;
+
+            SufficientFundsCircuit<FrType> circuit(pb, BIT_LENGTH);
+            circuit.generate_r1cs_constraints();
+
+            // Set values: 100 XRP balance, trying to spend 500 XRP
+            circuit.generate_r1cs_witness(fr(100), fr(500));
+
+            // The constraint system should be unsatisfied
+            bool satisfied = circuit.is_satisfied();
+            BEAST_EXPECT(!satisfied);
+
+            if (!satisfied)
+                pass();
+            else
+                fail("Insufficient funds case not failing correctly");
+        }
+
+        // Test 4: Zero Balance (edge case, should fail for non-zero purchase)
+        {
+            protoboard<FrType> pb;
+
+            SufficientFundsCircuit<FrType> circuit(pb, BIT_LENGTH);
+            circuit.generate_r1cs_constraints();
+
+            // Set balance to 0 and amount to 1
+            circuit.generate_r1cs_witness(fr(0), fr(1));
+
+            bool satisfied = circuit.is_satisfied();
+            BEAST_EXPECT(!satisfied);
+
+            if (!satisfied)
+                pass();
+            else
+                fail("Zero balance case not failing correctly");
+        }
+    }
+
+    void
+    testSufficientFundsZKP()
+    {
+        libff::alt_bn128_pp::init_public_params();
+        auto fr = [](uint64_t x) -> FrType { return FrType(x); };
+        const size_t BIT_LENGTH = 64;
+
+        const int iterations = 100;
+        long long totalProofGenTime = 0;
+        long long minProofGenTime = std::numeric_limits<long long>::max();
+        long long maxProofGenTime = 0;
+        long long totalProofVerifyTime = 0;
+        long long minProofVerifyTime = std::numeric_limits<long long>::max();
+        long long maxProofVerifyTime = 0;
+
+        for (int i = 0; i < iterations; ++i)
+        {
+            // Set up circuit with sufficient funds: balance 1000, purchase 500
+            protoboard<FrType> pb;
+            SufficientFundsCircuit<FrType> circuit(pb, BIT_LENGTH);
+
+            BEAST_EXPECT(circuit.is_satisfied());
+
+            // Time proof generation
+            auto startProofGen = std::chrono::high_resolution_clock::now();
+            circuit.generate_r1cs_constraints();
+            circuit.generate_r1cs_witness(fr(1000), fr(500));
+            auto endProofGen = std::chrono::high_resolution_clock::now();
+            long long proofGenTime =
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    endProofGen - startProofGen)
+                    .count();
+            totalProofGenTime += proofGenTime;
+
+            // Fix type mismatch by using static_cast
+            minProofGenTime =
+                std::min(minProofGenTime, static_cast<long long>(proofGenTime));
+            maxProofGenTime =
+                std::max(maxProofGenTime, static_cast<long long>(proofGenTime));
+
+            // Time proof verification
+            auto startProofVerify = std::chrono::high_resolution_clock::now();
+            bool satisfied = circuit.is_satisfied();
+            auto endProofVerify = std::chrono::high_resolution_clock::now();
+            long long proofVerifyTime =
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    endProofVerify - startProofVerify)
+                    .count();
+            totalProofVerifyTime += proofVerifyTime;
+
+            // Fix type mismatch by using static_cast
+            minProofVerifyTime = std::min(
+                minProofVerifyTime, static_cast<long long>(proofVerifyTime));
+            maxProofVerifyTime = std::max(
+                maxProofVerifyTime, static_cast<long long>(proofVerifyTime));
+        }
+
+        log << "Proof Generation - Total: " << totalProofGenTime << " µs, "
+            << "Min: " << minProofGenTime << " µs, "
+            << "Max: " << maxProofGenTime << " µs\n";
+        log << "Proof Verification - Total: " << totalProofVerifyTime << " µs, "
+            << "Min: " << minProofVerifyTime << " µs, "
+            << "Max: " << maxProofVerifyTime << " µs\n";
+    }
+
+    void
+    testBalanceCircuit()
+    {
+        using namespace ripple::zkp;
+
+        // Initialize curve parameters
+        libff::alt_bn128_pp::init_public_params();
+
+        // Create protoboard
+        libsnark::protoboard<FrType> pb;
+
+        // Create circuit (2 inputs, 1 output)
+        BalanceCircuit<FrType> circuit(pb, 2, 1, "test_balance");
+
+        // Generate constraints
+        circuit.generate_r1cs_constraints();
+
+        // Test valid case: 50 + 50 = 90 + 10(fee)
+        std::vector<FrType> inputs = {FrType(50), FrType(50)};
+        std::vector<FrType> outputs = {FrType(90)};
+        FrType fee(10);
+
+        circuit.generate_r1cs_witness(inputs, outputs, fee);
+        bool satisfied = circuit.is_satisfied();
+        BEAST_EXPECT(satisfied == true);
+    }
+
+    void
     testSTTx(KeyType keyType)
     {
         auto const keypair = randomKeyPair(keyType);
@@ -1628,8 +1841,8 @@ public:
         });
         j.sign(keypair.first, keypair.second);
 
-        // Rules store a reference to the presets. Create a local to guarantee
-        // proper lifetime.
+        // Rules store a reference to the presets. Create a local to
+        // guarantee proper lifetime.
         std::unordered_set<uint256, beast::uhash<>> const presets;
         Rules const defaultRules{presets};
         BEAST_EXPECT(!defaultRules.enabled(featureExpandedSignerList));
@@ -1708,7 +1921,8 @@ public:
             BEAST_EXPECT(got.empty());
         }
         {
-            // Make a payment with a defaulted PathSet field, which is invalid.
+            // Make a payment with a defaulted PathSet field, which is
+            // invalid.
             STObject defaultPath{getPayment()};
             defaultPath.setFieldPathSet(sfPaths, STPathSet{});
 

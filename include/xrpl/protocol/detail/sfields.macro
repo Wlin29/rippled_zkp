@@ -375,3 +375,12 @@ UNTYPED_SFIELD(sfPriceDataSeries,        ARRAY,     24)
 UNTYPED_SFIELD(sfAuthAccounts,           ARRAY,     25)
 UNTYPED_SFIELD(sfAuthorizeCredentials,   ARRAY,     26)
 UNTYPED_SFIELD(sfUnauthorizeCredentials, ARRAY,     27)
+
+// Zero knowledge Field types
+TYPED_SFIELD(sfShieldedState,      VL,         33)
+TYPED_SFIELD(sfCurrentRoot,        UINT256,    36)
+TYPED_SFIELD(sfPoolSize,           UINT32,     52)
+TYPED_SFIELD(sfZKProof,            VL,         60)
+TYPED_SFIELD(sfCommitment,         UINT256,    61)
+TYPED_SFIELD(sfNullifier,          UINT256,    62)
+TYPED_SFIELD(sfCommitments,        UINT256,    63)

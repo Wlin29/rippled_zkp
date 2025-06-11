@@ -27,6 +27,21 @@
 #include <string>
 #include <vector>
 
+// #define CURVE_ALT_BN128
+#include <libff/algebra/curves/alt_bn128/alt_bn128_pp.hpp>
+// #include <libsnark/common/default_types/r1cs_ppzksnark_pp.hpp>
+#include <libsnark/gadgetlib1/protoboard.hpp>
+#include <libsnark/zk_proof_systems/ppzksnark/r1cs_ppzksnark/r1cs_ppzksnark.hpp>
+
+#include <libff/common/utils.hpp>
+#include <libsnark/common/default_types/r1cs_gg_ppzksnark_pp.hpp>
+#include <libsnark/gadgetlib1/gadget.hpp>
+#include <libsnark/gadgetlib1/pb_variable.hpp>
+#include <libsnark/zk_proof_systems/ppzksnark/r1cs_gg_ppzksnark/r1cs_gg_ppzksnark.hpp>
+
+using namespace libsnark;
+using namespace libff;
+
 namespace ripple {
 
 class SecretKey_test : public beast::unit_test::suite
@@ -346,6 +361,75 @@ public:
     }
 
     void
+    testLibsnarkIntegration()
+    {
+        testcase("libsnark integration");
+
+        // libff::alt_bn128_pp::init_public_params();
+        // std::cout << "Curve parameters initialized" << std::endl;
+
+        // Initialize the curve parameters (default: bn128)
+        default_r1cs_gg_ppzksnark_pp::init_public_params();
+
+        // Create a protoboard for the R1CS constraint system
+        protoboard<Fr<default_r1cs_gg_ppzksnark_pp>> pb;
+
+        // Define variables: public output 'out' and private inputs 'x', 'y'
+        pb_variable<Fr<default_r1cs_gg_ppzksnark_pp>> out, x, y;
+
+        // Allocate variables on the protoboard
+        out.allocate(pb, "out");
+        x.allocate(pb, "x");
+        y.allocate(pb, "y");
+
+        // Set 'out' as the public input (first variable)
+        pb.set_input_sizes(1);
+
+        // Add constraint: x + y = out
+        pb.add_r1cs_constraint(
+            r1cs_constraint<Fr<default_r1cs_gg_ppzksnark_pp>>(x + y, 1, out),
+            "x + y = out");
+
+        pb.val(out) = 15;  // Public output value
+        pb.val(x) = 10;    // Private input x
+        pb.val(y) = 5;     // Private input y
+
+        // Verify the constraint system is satisfied
+        if (!pb.is_satisfied())
+        {
+            std::cerr << "Constraint system not satisfied!" << std::endl;
+        }
+
+        // Generate the trusted setup (key pair)
+        r1cs_gg_ppzksnark_keypair<default_r1cs_gg_ppzksnark_pp> keypair =
+            r1cs_gg_ppzksnark_generator<default_r1cs_gg_ppzksnark_pp>(
+                pb.get_constraint_system());
+
+        // Generate the proof using the proving key
+        r1cs_gg_ppzksnark_proof<default_r1cs_gg_ppzksnark_pp> proof =
+            r1cs_gg_ppzksnark_prover<default_r1cs_gg_ppzksnark_pp>(
+                keypair.pk,
+                pb.primary_input(),   // Public inputs (out)
+                pb.auxiliary_input()  // Private inputs (x, y)
+            );
+
+        // Verify the proof
+        bool verified =
+            r1cs_gg_ppzksnark_verifier_strong_IC<default_r1cs_gg_ppzksnark_pp>(
+                keypair.vk, pb.primary_input(), proof);
+
+        if (verified)
+        {
+            std::cout << "Proof verified successfully!" << std::endl;
+        }
+        else
+        {
+            std::cerr << "Proof verification failed!" << std::endl;
+        }
+
+    }
+
+    void
     run() override
     {
         testBase58();
@@ -359,6 +443,9 @@ public:
         // Ed25519
         testKeyDerivationEd25519();
         testSigning(KeyType::ed25519);
+
+        // Libsnark
+        testLibsnarkIntegration();
     }
 
 private:

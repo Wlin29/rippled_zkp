@@ -735,6 +735,8 @@ JSS(write_load);              // out: GetCounts
 JSS(xchain_owned_claim_id);   // in: LedgerEntry, AccountObjects
 JSS(xchain_owned_create_account_claim_id);  // in: LedgerEntry
 JSS(NegativeUNL);                           // out: ValidatorList; ledger type
+JSS(ShieldedPool);
+JSS(nullifier);
 // clang-format on
 
 #pragma push_macro("TRANSACTION")

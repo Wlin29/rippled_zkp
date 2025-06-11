@@ -49,6 +49,11 @@ struct Keylet
     check(STLedgerEntry const&) const;
 };
 
+namespace keylet {
+    Keylet shieldedPool();
+
+} // namespace keylet
+
 }  // namespace ripple
 
 #endif

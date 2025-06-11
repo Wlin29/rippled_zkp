@@ -18,6 +18,7 @@
 //==============================================================================
 
 #include <xrpl/beast/utility/instrumentation.h>
+#include "../zkp/STZKProof.h"
 #include <xrpl/protocol/SField.h>
 #include <string>
 #include <string_view>

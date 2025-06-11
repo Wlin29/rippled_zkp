@@ -59,6 +59,8 @@
 #include <xrpld/app/tx/detail/SetTrust.h>
 #include <xrpld/app/tx/detail/XChainBridge.h>
 #include <xrpl/protocol/TxFormats.h>
+#include "libxrpl/zkp/ZkDeposit.h"
+#include "libxrpl/zkp/ZkWithdraw.h"
 
 #include <stdexcept>
 
