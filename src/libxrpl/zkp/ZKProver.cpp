@@ -26,10 +26,12 @@ void ZkProver::initialize() {
         libff::alt_bn128_pp::init_public_params();
         isInitialized = true;
         std::cout << "Initializing ZkProver..." << std::endl;
-        if (!loadKeys("/tmp/rippled_zkp_keys")) {
-            generateKeys(true);
-            saveKeys("/tmp/rippled_zkp_keys");
-        }
+        generateKeys(true);  // Force regeneration
+        saveKeys("/tmp/rippled_zkp_keys");
+        // if (!loadKeys("/tmp/rippled_zkp_keys")) {
+        //     generateKeys(true);
+        //     saveKeys("/tmp/rippled_zkp_keys");
+        // }
     }
 }
 
@@ -145,7 +147,7 @@ bool ZkProver::saveKeys(const std::string& basePath) {
 
 bool ZkProver::loadKeys(const std::string& basePath) {
     try {
-        // Try to load deposit keys
+        // STEP 1: Load the keys first
         std::ifstream deposit_pk_file(basePath + "_deposit_pk", std::ios::binary);
         std::ifstream deposit_vk_file(basePath + "_deposit_vk", std::ios::binary);
         
@@ -155,11 +157,33 @@ bool ZkProver::loadKeys(const std::string& basePath) {
             
             deposit_pk_file >> *depositProvingKey;
             deposit_vk_file >> *depositVerificationKey;
+            
+            std::cout << "Loaded deposit keys with " << depositProvingKey->constraint_system.num_constraints() << " constraints" << std::endl;
         } else {
             return false;
         }
         
-        // Try to load withdrawal keys
+        // STEP 2: Create circuit that EXACTLY matches the loaded keys
+        std::cout << "Creating circuit to match loaded deposit keys..." << std::endl;
+        depositCircuit = std::make_shared<MerkleCircuit>(2);
+        depositCircuit->generateConstraints();
+        
+        // STEP 3: VERIFY the circuit matches the keys
+        auto circuit_cs = depositCircuit->getConstraintSystem();
+        auto key_cs = depositProvingKey->constraint_system;
+        
+        if (circuit_cs.num_constraints() != key_cs.num_constraints()) {
+            std::cerr << "ERROR: Circuit constraint count (" << circuit_cs.num_constraints() 
+                      << ") doesn't match key constraint count (" << key_cs.num_constraints() << ")" << std::endl;
+            
+            // FORCE key regeneration
+            std::cout << "Regenerating deposit keys due to mismatch..." << std::endl;
+            if (!generateDepositKeys(true)) {
+                return false;
+            }
+        }
+        
+        // Repeat for withdrawal keys...
         std::ifstream withdrawal_pk_file(basePath + "_withdrawal_pk", std::ios::binary);
         std::ifstream withdrawal_vk_file(basePath + "_withdrawal_vk", std::ios::binary);
         
@@ -169,21 +193,23 @@ bool ZkProver::loadKeys(const std::string& basePath) {
             
             withdrawal_pk_file >> *withdrawalProvingKey;
             withdrawal_vk_file >> *withdrawalVerificationKey;
-        } else {
-            return false;
-        }
-        
-        // CRITICAL FIX: Recreate circuits when loading keys
-        if (depositProvingKey && depositVerificationKey) {
-            std::cout << "Recreating deposit circuit to match loaded keys..." << std::endl;
-            depositCircuit = std::make_shared<MerkleCircuit>(2);
-            depositCircuit->generateConstraints();
-        }
-        
-        if (withdrawalProvingKey && withdrawalVerificationKey) {
-            std::cout << "Recreating withdrawal circuit to match loaded keys..." << std::endl;
+            
+            std::cout << "Creating circuit to match loaded withdrawal keys..." << std::endl;
             withdrawalCircuit = std::make_shared<MerkleCircuit>(2);
             withdrawalCircuit->generateConstraints();
+            
+            // Verify withdrawal circuit matches too
+            auto w_circuit_cs = withdrawalCircuit->getConstraintSystem();
+            auto w_key_cs = withdrawalProvingKey->constraint_system;
+            
+            if (w_circuit_cs.num_constraints() != w_key_cs.num_constraints()) {
+                std::cerr << "ERROR: Withdrawal circuit mismatch, regenerating..." << std::endl;
+                if (!generateWithdrawalKeys(true)) {
+                    return false;
+                }
+            }
+        } else {
+            return false;
         }
         
         return true;
@@ -197,9 +223,30 @@ ProofData ZkProver::createDepositProof(
     uint64_t amount, 
     const uint256& commitment, 
     const std::string& spendKey,
-    const FieldT& value_randomness // NEW PARAM
-) 
+    const FieldT& value_randomness) 
 {
+    std::cout << "=== CONSTRAINT SYSTEM DEBUG ===" << std::endl;
+    
+    // Get constraint systems from both key and current circuit
+    auto current_cs = depositCircuit->getConstraintSystem();
+    auto key_cs = depositProvingKey->constraint_system;
+    
+    std::cout << "Current circuit constraints: " << current_cs.num_constraints() << std::endl;
+    std::cout << "Proving key constraints: " << key_cs.num_constraints() << std::endl;
+    std::cout << "Current variables: " << current_cs.num_variables() << std::endl;
+    std::cout << "Key variables: " << key_cs.num_variables() << std::endl;
+    std::cout << "Current primary inputs: " << current_cs.num_inputs() << std::endl;
+    std::cout << "Key primary inputs: " << key_cs.num_inputs() << std::endl;
+    
+    // CRITICAL: Check if constraint systems match
+    if (current_cs.num_constraints() != key_cs.num_constraints() ||
+        current_cs.num_variables() != key_cs.num_variables() ||
+        current_cs.num_inputs() != key_cs.num_inputs()) {
+        std::cerr << "CONSTRAINT SYSTEM MISMATCH DETECTED!" << std::endl;
+        std::cerr << "Need to regenerate keys or fix circuit inconsistency" << std::endl;
+        return {};
+    }
+    
     try {
         if (!depositProvingKey || !depositCircuit) {
             std::cerr << "Deposit proving key or circuit not available" << std::endl;
@@ -405,7 +452,7 @@ bool ZkProver::verifyWithdrawalProof(
         
         auto proof = deserializeProof(proofData);
         
-        // Create primary input from PROVIDED public values (no secret computation!)
+        // Create primary input from PROVIDED public values
         libsnark::r1cs_primary_input<libff::Fr<DefaultCurve>> primary_input;
         primary_input.push_back(anchor);
         primary_input.push_back(nullifier);

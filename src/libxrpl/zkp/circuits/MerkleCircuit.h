@@ -179,6 +179,16 @@ public:
      */
     static std::vector<bool> fieldElementToBits(const FieldT& element);
 
+    /**
+    * Utility: Convert a vector of bits to a 32-byte array (for SHA256 input)
+    */
+    static std::array<uint8_t, 32> bitsToBytes(const std::vector<bool>& bits);
+
+    /**
+    * Utility: Convert a 32-byte array to a vector of bits
+    */
+    static std::vector<bool> bytesToBits(const std::array<uint8_t, 32>& bytes);
+
 private:
     class Impl;
     std::unique_ptr<Impl> pImpl_;

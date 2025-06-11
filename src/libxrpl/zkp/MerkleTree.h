@@ -9,7 +9,7 @@ namespace ripple {
 namespace zkp {
 
 /**
- * Zcash-style Merkle Tree implementation
+ * Merkle Tree implementation
  * Uses SHA256 for internal hash computations
  */
 class MerkleTree {

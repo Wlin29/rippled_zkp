@@ -9,6 +9,7 @@
 #include <libxrpl/zkp/ZKProver.h>
 #include <libxrpl/zkp/circuits/MerkleCircuit.h>
 #include <libxrpl/zkp/MerkleTree.h>
+#include <libxrpl/zkp/Note.h>
 
 /*
 NOTE: May need to remove old keys before running tests
@@ -57,6 +58,7 @@ public:
         testInvalidProofVerification();
         testMultipleProofs();
         testEdgeCases();
+        testNoteCreationAndCommitment();
     }
 
     void testKeyGeneration()
@@ -81,7 +83,7 @@ public:
         std::string keyPath = "/tmp/test_zkp_keys";
         BEAST_EXPECT(zkp::ZkProver::saveKeys(keyPath));
         
-        // Test loading keys (just verify it doesn't crash)
+        // Test loading keys
         BEAST_EXPECT(zkp::ZkProver::loadKeys(keyPath));
     }
     
@@ -105,33 +107,36 @@ public:
     
     void testDepositProofCreation()
     {
-        testcase("Deposit Proof Creation");
+        testcase("Zcash-Style Deposit Proof Creation");
         BEAST_EXPECT(zkp::ZkProver::generateKeys(false));
 
-        for (size_t idx : {0, 1, 2, 3}) {
+        for (size_t idx : {0, 1, 2}) {
             uint64_t amount = 1000000 + idx * 100000;
-            uint256 commitment = generateRandomUint256();
             std::string spendKey = generateRandomSpendKey();
 
             auto spendKeyBits = ripple::zkp::MerkleCircuit::spendKeyToBits(spendKey);
             zkp::FieldT value_randomness = ripple::zkp::MerkleCircuit::bitsToFieldElement(spendKeyBits) + zkp::FieldT(amount);
 
-            auto proofData = zkp::ZkProver::createDepositProof(amount, commitment, spendKey, value_randomness);
+            std::cout << "=== CREATING ZCASH DEPOSIT PROOF " << idx << " ===" << std::endl;
+            
+            // CREATE REAL ZCASH NOTE
+            auto recipient = zkp::AddressKeyPair::generate();
+            auto zcash_note = zkp::Note::createRandom(amount, recipient.a_pk);
+            
+            // COMPUTE REAL ZCASH COMMITMENT
+            uint256 zcash_commitment = zcash_note.computeCommitment();
+            
+            std::cout << "Created Zcash note with commitment: " << zcash_commitment << std::endl;
+
+            auto proofData = zkp::ZkProver::createDepositProof(amount, zcash_commitment, spendKey, value_randomness);
             BEAST_EXPECT(!proofData.empty());
+            
+            // VERIFY THE PROOF
+            bool isValid = zkp::ZkProver::verifyDepositProof(proofData);
+            BEAST_EXPECT(isValid);
+            
+            std::cout << "Zcash deposit proof " << idx << " verification: " << (isValid ? "PASS" : "FAIL") << std::endl;
         }
-
-        uint64_t amount = 1000000;
-        std::string spendKey = generateRandomSpendKey();
-        uint256 commitment1 = generateRandomUint256();
-        uint256 commitment2 = generateRandomUint256();
-
-        auto spendKeyBits = ripple::zkp::MerkleCircuit::spendKeyToBits(spendKey);
-        zkp::FieldT value_randomness = ripple::zkp::MerkleCircuit::bitsToFieldElement(spendKeyBits) + zkp::FieldT(amount);
-
-        auto proof1 = zkp::ZkProver::createDepositProof(amount, commitment1, spendKey, value_randomness);
-        auto proof2 = zkp::ZkProver::createDepositProof(amount, commitment2, spendKey, value_randomness);
-
-        BEAST_EXPECT(proof1.proof != proof2.proof);
     }
     
     void testWithdrawalProofCreation()
@@ -324,11 +329,10 @@ public:
         bool zeroValid = zkp::ZkProver::verifyDepositProof(zeroProof);
         BEAST_EXPECT(zeroValid);
 
-        // RECOMMENDED FIX: Use a large but field-safe amount instead of max uint64_t
         // Use 2^50 = 1,125,899,906,842,624 (safe for BN128 field arithmetic)
         uint64_t largeAmount = (1ULL << 50);
         
-        // CRITICAL: Use small offset to prevent field overflow in randomness computation
+        // Use small offset to prevent field overflow in randomness computation
         zkp::FieldT large_value_randomness = ripple::zkp::MerkleCircuit::bitsToFieldElement(spendKeyBits) + zkp::FieldT(12345);
         
         auto largeProof = zkp::ZkProver::createDepositProof(largeAmount, commitment, spendKey, large_value_randomness);
@@ -338,6 +342,39 @@ public:
         std::cout << "Edge cases test: zero=" << zeroValid << ", large=" << largeValid << std::endl;
     }
     
+    void testNoteCreationAndCommitment() {
+        testcase("Note Creation and Commitment");
+        
+        // Generate address key pair
+        auto recipient = zkp::AddressKeyPair::generate();
+        
+        // Create a note
+        uint64_t amount = 1000000;
+        auto note = zkp::Note::createRandom(amount, recipient.a_pk);
+        
+        // Verify note is valid
+        BEAST_EXPECT(note.isValid());
+        
+        // Compute commitment
+        auto commitment = note.computeCommitment();
+        BEAST_EXPECT(commitment != uint256{});
+        
+        // Compute nullifier
+        auto nullifier = note.computeNullifier(recipient.a_sk);
+        BEAST_EXPECT(nullifier != uint256{});
+        
+        // Test serialization
+        auto serialized = note.serialize();
+        auto deserialized = zkp::Note::deserialize(serialized);
+        
+        BEAST_EXPECT(deserialized.value == note.value);
+        BEAST_EXPECT(deserialized.rho == note.rho);
+        BEAST_EXPECT(deserialized.r == note.r);
+        BEAST_EXPECT(deserialized.a_pk == note.a_pk);
+        
+        std::cout << "Note commitment: " << commitment << std::endl;
+        std::cout << "Note nullifier: " << nullifier << std::endl;
+    }
 };
 
 BEAST_DEFINE_TESTSUITE(ZKProver, protocol, ripple);

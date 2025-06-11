@@ -112,7 +112,7 @@ public:
     }
     
     void generateConstraints() {
-        std::cout << "Generating working constraints..." << std::endl;
+        std::cout << "Generating  constraints..." << std::endl;
         
         // 1. ALLOCATE BIT VARIABLES
         value_bits_.allocate(*pb_, 64, "value_bits");
@@ -120,7 +120,18 @@ public:
         spend_key_bits_.allocate(*pb_, 256, "spend_key_bits");
         rho_bits_.allocate(*pb_, 256, "rho_bits");
         
-        // 2. SETUP PACKING GADGETS
+        // 2. ALLOCATE ZCASH NOTE COMPONENTS
+        pb_variable_array<FieldT> a_pk_bits_;       // 256 bits - recipient public key
+        pb_variable_array<FieldT> note_value_bits_; // 64 bits - note value  
+        pb_variable_array<FieldT> note_rho_bits_;   // 256 bits - nullifier seed
+        pb_variable_array<FieldT> note_r_bits_;     // 256 bits - commitment randomness
+        
+        a_pk_bits_.allocate(*pb_, 256, "a_pk_bits");
+        note_value_bits_.allocate(*pb_, 64, "note_value_bits"); 
+        note_rho_bits_.allocate(*pb_, 256, "note_rho_bits");
+        note_r_bits_.allocate(*pb_, 256, "note_r_bits");
+        
+        // 3. SETUP PACKING GADGETS (field elements ↔ bits)
         value_packer_ = std::make_unique<packing_gadget<FieldT>>(
             *pb_, value_bits_, value_, "value_packer");
         
@@ -133,76 +144,141 @@ public:
         rho_packer_ = std::make_unique<packing_gadget<FieldT>>(
             *pb_, rho_bits_, rho_, "rho_packer");
         
-        // 3. SETUP DIGEST VARIABLES (256-bit chunks for two-to-one hashing)
-        value_digest_ = std::make_unique<digest_variable<FieldT>>(
-            *pb_, 256, "value_digest");
+        // 4. SETUP DIGEST VARIABLES
+        value_digest_ = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "value_digest");
+        value_randomness_digest_ = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "value_randomness_digest");
+        spend_key_digest_ = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "spend_key_digest");
+        rho_digest_ = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "rho_digest");
         
-        value_randomness_digest_ = std::make_unique<digest_variable<FieldT>>(
-            *pb_, 256, "value_randomness_digest");
+        value_commit_digest_ = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "value_commit_digest");
+        nullifier_digest_ = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "nullifier_digest");
+        note_commit_digest_ = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "note_commit_digest");
+        computed_root_digest_ = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "computed_root_digest");
         
-        spend_key_digest_ = std::make_unique<digest_variable<FieldT>>(
-            *pb_, 256, "spend_key_digest");
+        // 5. ZCASH NOTE COMMITMENT: cm = SHA256(a_pk || value || rho || r)
+        // Split into two SHA256 operations for efficiency
         
-        rho_digest_ = std::make_unique<digest_variable<FieldT>>(
-            *pb_, 256, "rho_digest");
+        // First half: a_pk (256 bits) padded to 256 bits
+        auto note_first_half = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "note_first_half");
         
-        // Output digests
-        value_commit_digest_ = std::make_unique<digest_variable<FieldT>>(
-            *pb_, 256, "value_commit_digest");
+        // Set note_first_half = a_pk (derived from spend_key)
+        // a_pk = SHA256(spend_key) - derive recipient public key
+        auto spend_key_hash = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "spend_key_hash");
         
-        nullifier_digest_ = std::make_unique<digest_variable<FieldT>>(
-            *pb_, 256, "nullifier_digest");
+        // Hash spend_key to get a_pk
+        auto spend_key_hasher = std::make_unique<sha256_two_to_one_hash_gadget<FieldT>>(
+            *pb_,
+            *spend_key_digest_,      // left: spend_key
+            *spend_key_digest_,      // right: spend_key (repeated for 512-bit input)
+            *spend_key_hash,         // output: a_pk
+            "spend_key_hasher");
         
-        note_commit_digest_ = std::make_unique<digest_variable<FieldT>>(
-            *pb_, 256, "note_commit_digest");
+        // Copy a_pk bits
+        for (size_t i = 0; i < 256; ++i) {
+            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                a_pk_bits_[i], 1, spend_key_hash->bits[i]
+            ), "a_pk_from_spend_key_" + std::to_string(i));
+            
+            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                note_first_half->bits[i], 1, a_pk_bits_[i]
+            ), "note_first_half_" + std::to_string(i));
+        }
         
-        computed_root_digest_ = std::make_unique<digest_variable<FieldT>>(
-            *pb_, 256, "computed_root_digest");
+        // Second half: value (64 bits) || rho (256 bits) = 320 bits -> hash to 256 bits
+        auto value_rho_combined = std::make_unique<digest_variable<FieldT>>(*pb_, 512, "value_rho_combined");
         
-        // 4. SETUP SHA256 TWO-TO-ONE HASH GADGETS
+        // Pack value (64 bits, padded to 256)
+        for (size_t i = 0; i < 64; ++i) {
+            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                note_value_bits_[i], 1, value_bits_[i]
+            ), "note_value_" + std::to_string(i));
+            
+            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                value_rho_combined->bits[i], 1, note_value_bits_[i]
+            ), "value_rho_value_" + std::to_string(i));
+        }
         
-        // Value commitment: SHA256(value || value_randomness)
+        // Pad value to 256 bits with zeros
+        for (size_t i = 64; i < 256; ++i) {
+            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                value_rho_combined->bits[i], 1, FieldT::zero()
+            ), "value_rho_pad_" + std::to_string(i));
+        }
+        
+        // Pack rho (256 bits)
+        for (size_t i = 0; i < 256; ++i) {
+            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                note_rho_bits_[i], 1, rho_bits_[i]
+            ), "note_rho_" + std::to_string(i));
+            
+            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                value_rho_combined->bits[256 + i], 1, note_rho_bits_[i]
+            ), "value_rho_rho_" + std::to_string(i));
+        }
+        
+        // Hash value||rho to get second half
+        auto note_second_half = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "note_second_half");
+        
+        // Split value_rho_combined into two 256-bit halves for SHA256 two-to-one
+        auto value_rho_left = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "value_rho_left");
+        auto value_rho_right = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "value_rho_right");
+        
+        for (size_t i = 0; i < 256; ++i) {
+            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                value_rho_left->bits[i], 1, value_rho_combined->bits[i]
+            ), "value_rho_left_" + std::to_string(i));
+            
+            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                value_rho_right->bits[i], 1, value_rho_combined->bits[256 + i]
+            ), "value_rho_right_" + std::to_string(i));
+        }
+        
+        auto value_rho_hasher = std::make_unique<sha256_two_to_one_hash_gadget<FieldT>>(
+            *pb_,
+            *value_rho_left,         // left: padded value
+            *value_rho_right,        // right: rho
+            *note_second_half,       // output: hash(value||rho)
+            "value_rho_hasher");
+        
+        // Final note commitment: SHA256(first_half || second_half) = SHA256(a_pk || hash(value||rho))
+        note_commit_hasher_ = std::make_unique<sha256_two_to_one_hash_gadget<FieldT>>(
+            *pb_, 
+            *note_first_half,        // a_pk
+            *note_second_half,       // hash(value||rho)
+            *note_commit_digest_,    // final Zcash note commitment
+            "zcash_note_commit_hasher");
+        
+        // 6. VALUE COMMITMENT: SHA256(value || value_randomness)
         value_commit_hasher_ = std::make_unique<sha256_two_to_one_hash_gadget<FieldT>>(
             *pb_,
-            *value_digest_,           // left input (padded value)
-            *value_randomness_digest_, // right input (value_randomness)
-            *value_commit_digest_,     // output
+            *value_digest_,           // left: padded value
+            *value_randomness_digest_, // right: value_randomness
+            *value_commit_digest_,     // output: value commitment
             "value_commit_hasher");
         
-        // Nullifier: SHA256(spend_key || rho)
+        // 7. NULLIFIER: SHA256(spend_key || rho)
         nullifier_hasher_ = std::make_unique<sha256_two_to_one_hash_gadget<FieldT>>(
             *pb_,
-            *spend_key_digest_,       // left input
-            *rho_digest_,             // right input
-            *nullifier_digest_,       // output
+            *spend_key_digest_,       // left: spend_key (secret)
+            *rho_digest_,             // right: rho
+            *nullifier_digest_,       // output: nullifier
             "nullifier_hasher");
         
-        // Note commitment: SHA256(value_commit_digest || nullifier_digest)
-        note_commit_hasher_ = std::make_unique<sha256_two_to_one_hash_gadget<FieldT>>(
-            *pb_,
-            *value_commit_digest_,    // left input (value commitment)
-            *nullifier_digest_,       // right input (nullifier)
-            *note_commit_digest_,     // output (leaf in Merkle tree)
-            "note_commit_hasher");
-        
-        // 5. SETUP MERKLE TREE VERIFICATION
-        
-        // Authentication path for Merkle tree
+        // 8. MERKLE TREE VERIFICATION
         auth_path_ = std::make_unique<merkle_authentication_path_variable<FieldT, sha256_two_to_one_hash_gadget<FieldT>>>(
             *pb_, tree_depth_, "auth_path");
         
-        // Merkle tree verification gadget
         merkle_verifier_ = std::make_unique<merkle_tree_check_read_gadget<FieldT, sha256_two_to_one_hash_gadget<FieldT>>>(
             *pb_,
             tree_depth_,
             address_bits_,           // position in tree
-            *note_commit_digest_,    // leaf (note commitment)
+            *note_commit_digest_,    // leaf: Zcash note commitment
             *computed_root_digest_,  // computed root
             *auth_path_,            // authentication path
             read_successful_,        // read successful flag
             "merkle_verifier");
         
-        // 6. SETUP PACKING GADGETS (SHA256 OUTPUTS → FIELD ELEMENTS)
+        // 9. SETUP PACKING GADGETS (SHA256 outputs → field elements)
         value_commit_packer_ = std::make_unique<packing_gadget<FieldT>>(
             *pb_, value_commit_digest_->bits, value_commitment_, "value_commit_packer");
         
@@ -212,32 +288,34 @@ public:
         anchor_packer_ = std::make_unique<packing_gadget<FieldT>>(
             *pb_, computed_root_digest_->bits, anchor_, "anchor_packer");
         
-        // 7. GENERATE ALL CONSTRAINTS
+        // 10. GENERATE ALL CONSTRAINTS
         
-        // Packing constraints (field elements ↔ bits)
+        // Packing constraints
         value_packer_->generate_r1cs_constraints(true);
         spend_key_packer_->generate_r1cs_constraints(true);
         value_randomness_packer_->generate_r1cs_constraints(true);
         rho_packer_->generate_r1cs_constraints(true);
         
-        // SHA256 two-to-one hash constraints
+        // Hash constraints
+        spend_key_hasher->generate_r1cs_constraints();
+        value_rho_hasher->generate_r1cs_constraints();
+        note_commit_hasher_->generate_r1cs_constraints();
         value_commit_hasher_->generate_r1cs_constraints();
         nullifier_hasher_->generate_r1cs_constraints();
-        note_commit_hasher_->generate_r1cs_constraints();
         
-        // CRITICAL: Merkle tree verification constraints
+        // Merkle tree constraints
         merkle_verifier_->generate_r1cs_constraints();
         
-        // Constrain read_successful to 1 (successful read)
+        // Read successful constraint
         pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
             read_successful_, 1, FieldT::one()), "read_successful_constraint");
         
-        // Packing constraints (SHA256 outputs → field elements)
+        // Output packing constraints
         value_commit_packer_->generate_r1cs_constraints(true);
         nullifier_packer_->generate_r1cs_constraints(true);
         anchor_packer_->generate_r1cs_constraints(true);
         
-        // 8. BOOLEAN CONSTRAINTS (ensure all bits are 0 or 1)
+        // 11. BOOLEAN CONSTRAINTS
         for (size_t i = 0; i < value_bits_.size(); ++i) {
             libsnark::generate_boolean_r1cs_constraint<FieldT>(*pb_, value_bits_[i], "value_bit_" + std::to_string(i));
         }
@@ -254,12 +332,11 @@ public:
             libsnark::generate_boolean_r1cs_constraint<FieldT>(*pb_, rho_bits_[i], "rho_bit_" + std::to_string(i));
         }
         
-        // Address bit constraints
         for (size_t i = 0; i < address_bits_.size(); ++i) {
             libsnark::generate_boolean_r1cs_constraint<FieldT>(*pb_, address_bits_[i], "address_bit_" + std::to_string(i));
         }
         
-        std::cout << "constraints with Merkle verification generated. Total: " << pb_->num_constraints() << std::endl;
+        std::cout << "Note commitment constraints generated. Total: " << pb_->num_constraints() << std::endl;
     }
     
     void generateWitness(
@@ -525,15 +602,21 @@ std::vector<bool> MerkleCircuit::uint256ToBits(const std::array<uint8_t, 32>& in
     return bits;
 }
 
-std::array<uint8_t, 32> MerkleCircuit::bitsToUint256(const std::vector<bool>& bits) {
-    std::array<uint8_t, 32> result = {};
-    for (size_t i = 0; i < std::min(bits.size(), size_t(256)); i++) {
-        size_t byteIndex = i / 8;
-        size_t bitIndex = i % 8;
+uint256 MerkleCircuit::bitsToUint256(const std::vector<bool>& bits) {
+    std::array<uint8_t, 32> byte_array = {};
+    
+    for (size_t i = 0; i < std::min(bits.size(), size_t(256)); ++i) {
+        size_t byte_idx = i / 8;
+        size_t bit_idx = i % 8;
+        
         if (bits[i]) {
-            result[byteIndex] |= (1 << bitIndex);
+            byte_array[byte_idx] |= (1 << bit_idx);
         }
     }
+    
+    // Convert to uint256
+    uint256 result;
+    std::memcpy(result.begin(), byte_array.data(), 32);
     return result;
 }
 
@@ -573,6 +656,34 @@ std::vector<bool> MerkleCircuit::fieldElementToBits(const FieldT& element) {
         bits[i] = (remainder == FieldT::one());
         temp = quotient;
     }
+    return bits;
+}
+
+std::array<uint8_t, 32> MerkleCircuit::bitsToBytes(const std::vector<bool>& bits) {
+    std::array<uint8_t, 32> result = {};
+    
+    for (size_t i = 0; i < std::min(bits.size(), size_t(256)); ++i) {
+        size_t byte_idx = i / 8;
+        size_t bit_idx = i % 8;
+        
+        if (bits[i]) {
+            result[byte_idx] |= (1 << bit_idx);
+        }
+    }
+    
+    return result;
+}
+
+std::vector<bool> MerkleCircuit::bytesToBits(const std::array<uint8_t, 32>& bytes) {
+    std::vector<bool> bits(256);
+    
+    for (size_t i = 0; i < 256; ++i) {
+        size_t byte_idx = i / 8;
+        size_t bit_idx = i % 8;
+        
+        bits[i] = (bytes[byte_idx] >> bit_idx) & 1;
+    }
+    
     return bits;
 }
 
