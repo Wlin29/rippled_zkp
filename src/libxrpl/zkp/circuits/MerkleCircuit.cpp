@@ -177,7 +177,7 @@ public:
             *note_commit_digest_,     // output (becomes anchor)
             "note_commit_hasher");
         
-        // 5. SETUP PACKING GADGETS (SHA256 outputs → field elements)
+        // 5. SETUP PACKING GADGETS (SHA256 OUTPUTS → FIELD ELEMENTS)
         value_commit_packer_ = std::make_unique<packing_gadget<FieldT>>(
             *pb_, value_commit_digest_->bits, value_commitment_, "value_commit_packer");
         
@@ -252,11 +252,36 @@ public:
             FieldT spend_key_field = bitsToFieldElement(spend_key);
             pb_->val(rho_) = spend_key_field + FieldT(value) + FieldT(12345);
             
-            // 2. SET DIGEST BITS DIRECTLY (since we're not using input bit arrays)
+            // 2. CONVERT FIELD ELEMENTS TO BIT ARRAYS FIRST
+            
+            // Convert value to 64 bits
+            uint64_t value_u64 = value;
+            for (size_t i = 0; i < 64; ++i) {
+                pb_->val(value_bits_[i]) = FieldT((value_u64 >> i) & 1);
+            }
+            
+            // Convert spend_key to bits
+            for (size_t i = 0; i < std::min(spend_key.size(), size_t(256)); ++i) {
+                pb_->val(spend_key_bits_[i]) = spend_key[i] ? FieldT::one() : FieldT::zero();
+            }
+            
+            // Convert value_randomness to bits
+            std::vector<bool> value_randomness_bits = fieldElementToBits(value_randomness);
+            for (size_t i = 0; i < std::min(value_randomness_bits.size(), size_t(256)); ++i) {
+                pb_->val(value_randomness_bits_[i]) = value_randomness_bits[i] ? FieldT::one() : FieldT::zero();
+            }
+            
+            // Convert rho to bits
+            std::vector<bool> rho_bits = fieldElementToBits(pb_->val(rho_));
+            for (size_t i = 0; i < std::min(rho_bits.size(), size_t(256)); ++i) {
+                pb_->val(rho_bits_[i]) = rho_bits[i] ? FieldT::one() : FieldT::zero();
+            }
+            
+            // 3. NOW SET DIGEST BITS (after bit arrays are set)
             
             // Set value digest bits (pad value to 256 bits)
             for (size_t i = 0; i < 64; ++i) {
-                pb_->val(value_digest_->bits[i]) = pb_->val(value_bits_[i]);
+                pb_->val(value_digest_->bits[i]) = pb_->val(value_bits_[i]);  // ✅ Now this works
             }
             for (size_t i = 64; i < 256; ++i) {
                 pb_->val(value_digest_->bits[i]) = FieldT::zero();
@@ -269,18 +294,18 @@ public:
                 pb_->val(rho_digest_->bits[i]) = pb_->val(rho_bits_[i]);
             }
             
-            // 3. GENERATE PACKING WITNESSES
+            // 4. GENERATE PACKING WITNESSES
             value_packer_->generate_r1cs_witness_from_packed();
             spend_key_packer_->generate_r1cs_witness_from_packed();
             value_randomness_packer_->generate_r1cs_witness_from_packed();
             rho_packer_->generate_r1cs_witness_from_packed();
             
-            // 4. GENERATE SHA256 WITNESSES
+            // 5. GENERATE SHA256 WITNESSES
             value_commit_hasher_->generate_r1cs_witness();
             nullifier_hasher_->generate_r1cs_witness();
             note_commit_hasher_->generate_r1cs_witness();
             
-            // 5. GENERATE PACKING WITNESSES (SHA256 outputs → field elements)
+            // 6. GENERATE PACKING WITNESSES (SHA256 outputs → field elements)
             value_commit_packer_->generate_r1cs_witness_from_bits();
             nullifier_packer_->generate_r1cs_witness_from_bits();
             anchor_packer_->generate_r1cs_witness_from_bits();

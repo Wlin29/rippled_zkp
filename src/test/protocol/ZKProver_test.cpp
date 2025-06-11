@@ -9,6 +9,11 @@
 #include <libxrpl/zkp/ZKProver.h>
 #include <libxrpl/zkp/circuits/MerkleCircuit.h>
 
+/*
+NOTE: May need to remove old keys before running tests
+      rm -rf /tmp/zkp_test_keys*
+*/
+
 namespace ripple {
 
 class ZKProver_test : public beast::unit_test::suite
