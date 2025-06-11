@@ -208,32 +208,34 @@ ProofData ZkProver::createDepositProof(
         
         std::vector<bool> commitmentBits = uint256ToBits(commitment);
         std::vector<bool> spendKeyBits = MerkleCircuit::spendKeyToBits(spendKey);
+        
+        // For deposits, the note hasn't been added to tree yet
+        // So we use the commitment as both leaf and root (for simplicity)
         std::vector<bool> rootBits = commitmentBits;
         
         auto witness = depositCircuit->generateDepositWitness(  
             amount,
             value_randomness,
-            commitmentBits,
-            rootBits,
+            commitmentBits,  // leaf
+            rootBits,        // root (dummy)
             spendKeyBits
         );
         
-        // Extract PUBLIC values computed by the circuit
+        // Extract computed values from circuit
         FieldT public_anchor = depositCircuit->getAnchor();
         FieldT public_nullifier = depositCircuit->getNullifier();
         FieldT public_value_commitment = depositCircuit->getValueCommitment();
         
-        // Create primary input from PUBLIC values
+        // Create primary input
         std::vector<FieldT> primary_input;
         primary_input.push_back(public_anchor);
         primary_input.push_back(public_nullifier);
         primary_input.push_back(public_value_commitment);
 
-        std::cout << "=== PROOF CREATION DEBUG ===" << std::endl;
+        std::cout << "=== DEPOSIT PROOF CREATION DEBUG ===" << std::endl;
         std::cout << "Generated anchor: " << public_anchor << std::endl;
         std::cout << "Generated nullifier: " << public_nullifier << std::endl;
         std::cout << "Generated value_commitment: " << public_value_commitment << std::endl;
-        std::cout << "Primary input size: " << primary_input.size() << std::endl;
         
         // Generate proof
         auto proof = libsnark::r1cs_gg_ppzksnark_prover<DefaultCurve>(
@@ -244,7 +246,6 @@ ProofData ZkProver::createDepositProof(
         ss << proof;
         std::string proof_str = ss.str();
         
-        // Return proof + public inputs
         return ProofData{
             std::vector<unsigned char>(proof_str.begin(), proof_str.end()),
             public_anchor,
@@ -278,17 +279,30 @@ ProofData ZkProver::createWithdrawalProof(
         std::vector<bool> rootBits = uint256ToBits(merkleRoot);
         std::vector<bool> spendKeyBits = MerkleCircuit::spendKeyToBits(spendKey);
         
+        // Convert Merkle path to bit vectors
         std::vector<std::vector<bool>> pathBits;
         for (const auto& pathNode : merklePath) {
             pathBits.push_back(uint256ToBits(pathNode));
         }
         
+        // Ensure path has correct depth
+        size_t treeDepth = withdrawalCircuit->getTreeDepth();
+        while (pathBits.size() < treeDepth) {
+            pathBits.push_back(std::vector<bool>(256, false)); // Add dummy path elements
+        }
+        
+        std::cout << "=== WITHDRAWAL PROOF CREATION DEBUG ===" << std::endl;
+        std::cout << "Tree depth: " << treeDepth << std::endl;
+        std::cout << "Path index: " << pathIndex << std::endl;
+        std::cout << "Path length: " << pathBits.size() << std::endl;
+        std::cout << "Expected root: " << merkleRoot << std::endl;
+        
         auto witness = withdrawalCircuit->generateWithdrawalWitness(
             amount,
             value_randomness, 
-            nullifierBits,
-            pathBits,
-            rootBits,
+            nullifierBits,   // leaf (note commitment)
+            pathBits,        // authentication path
+            rootBits,        // expected root
             spendKeyBits,
             pathIndex
         );
@@ -296,6 +310,10 @@ ProofData ZkProver::createWithdrawalProof(
         FieldT public_anchor = withdrawalCircuit->getAnchor();
         FieldT public_nullifier = withdrawalCircuit->getNullifier();
         FieldT public_value_commitment = withdrawalCircuit->getValueCommitment();
+        
+        std::cout << "Computed anchor: " << public_anchor << std::endl;
+        std::cout << "Computed nullifier: " << public_nullifier << std::endl;
+        std::cout << "Computed value_commitment: " << public_value_commitment << std::endl;
         
         std::vector<FieldT> primary_input;
         primary_input.push_back(public_anchor);

@@ -8,6 +8,7 @@
 
 #include <libxrpl/zkp/ZKProver.h>
 #include <libxrpl/zkp/circuits/MerkleCircuit.h>
+#include <libxrpl/zkp/MerkleTree.h>
 
 /*
 NOTE: May need to remove old keys before running tests
@@ -138,22 +139,42 @@ public:
         testcase("Withdrawal Proof Creation");
         BEAST_EXPECT(zkp::ZkProver::generateKeys(false));
 
+        // Create a Merkle tree
+        zkp::MerkleTree tree(2); // depth 2 = 4 leaves max
+        
+        // Add some dummy notes to the tree
+        uint256 dummyNote1 = generateRandomUint256();
+        uint256 dummyNote2 = generateRandomUint256();
+        
+        size_t note1Index = tree.addLeaf(dummyNote1);
+        size_t note2Index = tree.addLeaf(dummyNote2);
+        
+        // Create our test note
         uint64_t amount = 2000000;
-        uint256 merkleRoot = generateRandomUint256();
-        uint256 nullifier = generateRandomUint256();
         std::string spendKey = generateRandomSpendKey();
-
-        std::vector<uint256> merklePath;
-        for (int i = 0; i < 2; ++i) {
-            merklePath.push_back(generateRandomUint256());
-        }
-        size_t pathIndex = 1;
-
         auto spendKeyBits = ripple::zkp::MerkleCircuit::spendKeyToBits(spendKey);
         zkp::FieldT value_randomness = ripple::zkp::MerkleCircuit::bitsToFieldElement(spendKeyBits) + zkp::FieldT(amount);
-
+        
+        // TODO: In real implementation, compute actual note commitment
+        uint256 ourNote = generateRandomUint256(); // Placeholder
+        size_t ourNoteIndex = tree.addLeaf(ourNote);
+        
+        // Get authentication path and root
+        auto authPath = tree.getAuthPath(ourNoteIndex);
+        uint256 merkleRoot = tree.getRoot();
+        
+        std::cout << "Tree root: " << merkleRoot << std::endl;
+        std::cout << "Note index: " << ourNoteIndex << std::endl;
+        std::cout << "Auth path length: " << authPath.size() << std::endl;
+        
+        // Verify the path works
+        bool pathValid = zkp::MerkleTree::verifyPath(ourNote, authPath, ourNoteIndex, merkleRoot);
+        BEAST_EXPECT(pathValid);
+        
+        uint256 nullifier = generateRandomUint256();
+        
         auto proofData = zkp::ZkProver::createWithdrawalProof(
-            amount, merkleRoot, nullifier, merklePath, pathIndex, spendKey, value_randomness);
+            amount, merkleRoot, nullifier, authPath, ourNoteIndex, spendKey, value_randomness);
         BEAST_EXPECT(!proofData.empty());
     }
     

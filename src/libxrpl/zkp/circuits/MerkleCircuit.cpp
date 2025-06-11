@@ -5,6 +5,7 @@
 #include <libsnark/gadgetlib1/gadgets/basic_gadgets.hpp>
 #include <libsnark/gadgetlib1/gadgets/hashes/sha256/sha256_gadget.hpp>
 #include <libsnark/gadgetlib1/gadgets/hashes/hash_io.hpp>
+#include <libsnark/gadgetlib1/gadgets/merkle_tree/merkle_tree_check_read_gadget.hpp>
 #include <algorithm>
 #include <cassert>
 
@@ -17,6 +18,8 @@ using libsnark::pb_linear_combination;
 using libsnark::packing_gadget;
 using libsnark::multipacking_gadget;
 using libsnark::sha256_two_to_one_hash_gadget;
+using libsnark::merkle_authentication_path_variable;
+using libsnark::merkle_tree_check_read_gadget;
 
 void initCurveParameters() {
     static bool initialized = false;
@@ -42,6 +45,10 @@ private:
     pb_variable<FieldT> spend_key_;                 
     pb_variable<FieldT> rho_;                       
     
+    // MERKLE TREE VARIABLES
+    pb_variable_array<FieldT> address_bits_;        // Position in tree
+    pb_variable<FieldT> read_successful_;           // Always 1 for successful reads
+    
     // BIT REPRESENTATIONS
     pb_variable_array<FieldT> value_bits_;          // 64 bits
     pb_variable_array<FieldT> value_randomness_bits_; // 256 bits
@@ -53,6 +60,10 @@ private:
     std::unique_ptr<sha256_two_to_one_hash_gadget<FieldT>> nullifier_hasher_;
     std::unique_ptr<sha256_two_to_one_hash_gadget<FieldT>> note_commit_hasher_;
     
+    // MERKLE TREE GADGETS
+    std::unique_ptr<merkle_authentication_path_variable<FieldT, sha256_two_to_one_hash_gadget<FieldT>>> auth_path_;
+    std::unique_ptr<merkle_tree_check_read_gadget<FieldT, sha256_two_to_one_hash_gadget<FieldT>>> merkle_verifier_;
+    
     // DIGEST VARIABLES (SHA256 inputs and outputs)
     std::unique_ptr<digest_variable<FieldT>> value_digest_;
     std::unique_ptr<digest_variable<FieldT>> value_randomness_digest_;
@@ -62,6 +73,7 @@ private:
     std::unique_ptr<digest_variable<FieldT>> value_commit_digest_;
     std::unique_ptr<digest_variable<FieldT>> nullifier_digest_;
     std::unique_ptr<digest_variable<FieldT>> note_commit_digest_;
+    std::unique_ptr<digest_variable<FieldT>> computed_root_digest_;
     
     // PACKING GADGETS (convert bits to field elements)
     std::unique_ptr<packing_gadget<FieldT>> value_packer_;
@@ -92,6 +104,10 @@ public:
         spend_key_.allocate(*pb_, "spend_key");
         rho_.allocate(*pb_, "rho");
         
+        // Allocate Merkle tree variables
+        address_bits_.allocate(*pb_, tree_depth_, "address_bits");
+        read_successful_.allocate(*pb_, "read_successful");
+        
         std::cout << "MerkleCircuit initialized successfully" << std::endl;
     }
     
@@ -104,7 +120,7 @@ public:
         spend_key_bits_.allocate(*pb_, 256, "spend_key_bits");
         rho_bits_.allocate(*pb_, 256, "rho_bits");
         
-        // 2. SETUP PACKING GADGETS (field elements ↔ bits)
+        // 2. SETUP PACKING GADGETS
         value_packer_ = std::make_unique<packing_gadget<FieldT>>(
             *pb_, value_bits_, value_, "value_packer");
         
@@ -118,17 +134,6 @@ public:
             *pb_, rho_bits_, rho_, "rho_packer");
         
         // 3. SETUP DIGEST VARIABLES (256-bit chunks for two-to-one hashing)
-        
-        // Pad value to 256 bits for hashing
-        pb_variable_array<FieldT> padded_value_bits;
-        padded_value_bits.insert(padded_value_bits.end(), value_bits_.begin(), value_bits_.end());
-        // Pad remaining 192 bits with zeros
-        for (size_t i = 64; i < 256; ++i) {
-            pb_variable<FieldT> zero_bit;
-            zero_bit.allocate(*pb_, "value_padding_" + std::to_string(i));
-            padded_value_bits.insert(padded_value_bits.end(), zero_bit);
-        }
-        
         value_digest_ = std::make_unique<digest_variable<FieldT>>(
             *pb_, 256, "value_digest");
         
@@ -150,6 +155,9 @@ public:
         
         note_commit_digest_ = std::make_unique<digest_variable<FieldT>>(
             *pb_, 256, "note_commit_digest");
+        
+        computed_root_digest_ = std::make_unique<digest_variable<FieldT>>(
+            *pb_, 256, "computed_root_digest");
         
         // 4. SETUP SHA256 TWO-TO-ONE HASH GADGETS
         
@@ -174,10 +182,27 @@ public:
             *pb_,
             *value_commit_digest_,    // left input (value commitment)
             *nullifier_digest_,       // right input (nullifier)
-            *note_commit_digest_,     // output (becomes anchor)
+            *note_commit_digest_,     // output (leaf in Merkle tree)
             "note_commit_hasher");
         
-        // 5. SETUP PACKING GADGETS (SHA256 OUTPUTS → FIELD ELEMENTS)
+        // 5. SETUP MERKLE TREE VERIFICATION
+        
+        // Authentication path for Merkle tree
+        auth_path_ = std::make_unique<merkle_authentication_path_variable<FieldT, sha256_two_to_one_hash_gadget<FieldT>>>(
+            *pb_, tree_depth_, "auth_path");
+        
+        // Merkle tree verification gadget
+        merkle_verifier_ = std::make_unique<merkle_tree_check_read_gadget<FieldT, sha256_two_to_one_hash_gadget<FieldT>>>(
+            *pb_,
+            tree_depth_,
+            address_bits_,           // position in tree
+            *note_commit_digest_,    // leaf (note commitment)
+            *computed_root_digest_,  // computed root
+            *auth_path_,            // authentication path
+            read_successful_,        // read successful flag
+            "merkle_verifier");
+        
+        // 6. SETUP PACKING GADGETS (SHA256 OUTPUTS → FIELD ELEMENTS)
         value_commit_packer_ = std::make_unique<packing_gadget<FieldT>>(
             *pb_, value_commit_digest_->bits, value_commitment_, "value_commit_packer");
         
@@ -185,9 +210,9 @@ public:
             *pb_, nullifier_digest_->bits, nullifier_, "nullifier_packer");
         
         anchor_packer_ = std::make_unique<packing_gadget<FieldT>>(
-            *pb_, note_commit_digest_->bits, anchor_, "anchor_packer");
+            *pb_, computed_root_digest_->bits, anchor_, "anchor_packer");
         
-        // 6. GENERATE ALL CONSTRAINTS
+        // 7. GENERATE ALL CONSTRAINTS
         
         // Packing constraints (field elements ↔ bits)
         value_packer_->generate_r1cs_constraints(true);
@@ -195,23 +220,24 @@ public:
         value_randomness_packer_->generate_r1cs_constraints(true);
         rho_packer_->generate_r1cs_constraints(true);
         
-        // Set padding bits to zero
-        for (size_t i = 64; i < 256; ++i) {
-            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
-                padded_value_bits[i], 1, 0), "value_padding_zero_" + std::to_string(i));
-        }
-        
         // SHA256 two-to-one hash constraints
         value_commit_hasher_->generate_r1cs_constraints();
         nullifier_hasher_->generate_r1cs_constraints();
         note_commit_hasher_->generate_r1cs_constraints();
+        
+        // CRITICAL: Merkle tree verification constraints
+        merkle_verifier_->generate_r1cs_constraints();
+        
+        // Constrain read_successful to 1 (successful read)
+        pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+            read_successful_, 1, FieldT::one()), "read_successful_constraint");
         
         // Packing constraints (SHA256 outputs → field elements)
         value_commit_packer_->generate_r1cs_constraints(true);
         nullifier_packer_->generate_r1cs_constraints(true);
         anchor_packer_->generate_r1cs_constraints(true);
         
-        // 7. BOOLEAN CONSTRAINTS (ensure all bits are 0 or 1)
+        // 8. BOOLEAN CONSTRAINTS (ensure all bits are 0 or 1)
         for (size_t i = 0; i < value_bits_.size(); ++i) {
             libsnark::generate_boolean_r1cs_constraint<FieldT>(*pb_, value_bits_[i], "value_bit_" + std::to_string(i));
         }
@@ -228,7 +254,12 @@ public:
             libsnark::generate_boolean_r1cs_constraint<FieldT>(*pb_, rho_bits_[i], "rho_bit_" + std::to_string(i));
         }
         
-        std::cout << "Total constraints: " << pb_->num_constraints() << std::endl;
+        // Address bit constraints
+        for (size_t i = 0; i < address_bits_.size(); ++i) {
+            libsnark::generate_boolean_r1cs_constraint<FieldT>(*pb_, address_bits_[i], "address_bit_" + std::to_string(i));
+        }
+        
+        std::cout << "constraints with Merkle verification generated. Total: " << pb_->num_constraints() << std::endl;
     }
     
     void generateWitness(
@@ -240,7 +271,7 @@ public:
         const std::vector<bool>& spend_key,
         size_t address)
     {
-        std::cout << "Generating working witness..." << std::endl;
+        std::cout << "Generating witness..." << std::endl;
         
         try {
             // 1. SET FIELD ELEMENT VALUES
@@ -251,10 +282,16 @@ public:
             // Generate deterministic rho from spend_key and value
             FieldT spend_key_field = bitsToFieldElement(spend_key);
             pb_->val(rho_) = spend_key_field + FieldT(value) + FieldT(12345);
+            pb_->val(read_successful_) = FieldT::one();
             
-            // 2. CONVERT FIELD ELEMENTS TO BIT ARRAYS FIRST
+            // 2. SET ADDRESS BITS FOR MERKLE PATH
+            for (size_t i = 0; i < tree_depth_; ++i) {
+                pb_->val(address_bits_[i]) = FieldT((address >> i) & 1);
+            }
             
-            // Convert value to 64 bits
+            // 3. CONVERT FIELD ELEMENTS TO BIT ARRAYS
+            
+            // Convert value to 64 bits, pad to 256
             uint64_t value_u64 = value;
             for (size_t i = 0; i < 64; ++i) {
                 pb_->val(value_bits_[i]) = FieldT((value_u64 >> i) & 1);
@@ -277,11 +314,11 @@ public:
                 pb_->val(rho_bits_[i]) = rho_bits[i] ? FieldT::one() : FieldT::zero();
             }
             
-            // 3. NOW SET DIGEST BITS (after bit arrays are set)
+            // 4. SET DIGEST BITS
             
             // Set value digest bits (pad value to 256 bits)
             for (size_t i = 0; i < 64; ++i) {
-                pb_->val(value_digest_->bits[i]) = pb_->val(value_bits_[i]);  // ✅ Now this works
+                pb_->val(value_digest_->bits[i]) = pb_->val(value_bits_[i]);
             }
             for (size_t i = 64; i < 256; ++i) {
                 pb_->val(value_digest_->bits[i]) = FieldT::zero();
@@ -294,18 +331,42 @@ public:
                 pb_->val(rho_digest_->bits[i]) = pb_->val(rho_bits_[i]);
             }
             
-            // 4. GENERATE PACKING WITNESSES
+            // 5. SET MERKLE AUTHENTICATION PATH
+            for (size_t i = 0; i < tree_depth_; ++i) {
+                if (i < path.size()) {
+                    for (size_t j = 0; j < 256; ++j) {
+                        if (j < path[i].size()) {
+                            pb_->val(auth_path_->left_digests[i].bits[j]) = path[i][j] ? FieldT::one() : FieldT::zero();
+                            pb_->val(auth_path_->right_digests[i].bits[j]) = path[i][j] ? FieldT::one() : FieldT::zero();
+                        } else {
+                            pb_->val(auth_path_->left_digests[i].bits[j]) = FieldT::zero();
+                            pb_->val(auth_path_->right_digests[i].bits[j]) = FieldT::zero();
+                        }
+                    }
+                } else {
+                    // Fill remaining path levels with zeros
+                    for (size_t j = 0; j < 256; ++j) {
+                        pb_->val(auth_path_->left_digests[i].bits[j]) = FieldT::zero();
+                        pb_->val(auth_path_->right_digests[i].bits[j]) = FieldT::zero();
+                    }
+                }
+            }
+            
+            // 6. GENERATE PACKING WITNESSES
             value_packer_->generate_r1cs_witness_from_packed();
             spend_key_packer_->generate_r1cs_witness_from_packed();
             value_randomness_packer_->generate_r1cs_witness_from_packed();
             rho_packer_->generate_r1cs_witness_from_packed();
             
-            // 5. GENERATE SHA256 WITNESSES
+            // 7. GENERATE SHA256 WITNESSES
             value_commit_hasher_->generate_r1cs_witness();
             nullifier_hasher_->generate_r1cs_witness();
             note_commit_hasher_->generate_r1cs_witness();
             
-            // 6. GENERATE PACKING WITNESSES (SHA256 outputs → field elements)
+            // 8. GENERATE MERKLE TREE WITNESS
+            merkle_verifier_->generate_r1cs_witness();
+            
+            // 9. GENERATE FINAL PACKING WITNESSES (SHA256 outputs → field elements)
             value_commit_packer_->generate_r1cs_witness_from_bits();
             nullifier_packer_->generate_r1cs_witness_from_bits();
             anchor_packer_->generate_r1cs_witness_from_bits();
@@ -377,6 +438,7 @@ public:
         const std::vector<bool>& root,
         const std::vector<bool>& spend_key)
     {
+        // For deposits, use dummy path (note not yet in tree)
         std::vector<std::vector<bool>> dummyPath(tree_depth_, std::vector<bool>(256, false));
         generateWitness(value, value_randomness, leaf, dummyPath, root, spend_key, 0);
         return pb_->auxiliary_input();
@@ -391,6 +453,7 @@ public:
         const std::vector<bool>& spend_key,
         size_t address)
     {
+        // For withdrawals, use real authentication path
         generateWitness(value, value_randomness, leaf, path, root, spend_key, address);
         return pb_->auxiliary_input();
     }
