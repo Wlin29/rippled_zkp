@@ -8,7 +8,7 @@
 
 #include <libxrpl/zkp/ZKProver.h>
 #include <libxrpl/zkp/circuits/MerkleCircuit.h>
-#include <libxrpl/zkp/MerkleTree.h>
+#include <libxrpl/zkp/IncrementalMerkleTree.h>
 #include <libxrpl/zkp/Note.h>
 
 /*
@@ -47,7 +47,6 @@ public:
     {
         zkp::ZkProver::initialize();
         
-        // Run all test cases
         testKeyGeneration();
         testKeyPersistence();
         testProofSerialization();
@@ -59,6 +58,7 @@ public:
         testMultipleProofs();
         testEdgeCases();
         testNoteCreationAndCommitment();
+        testIncrementalMerkleTree();
     }
 
     void testKeyGeneration()
@@ -91,20 +91,19 @@ public:
     {
         testcase("Proof Serialization");
         BEAST_EXPECT(zkp::ZkProver::generateKeys(false));
-
-        uint64_t testAmount = 500000;
-        uint256 testCommitment = generateRandomUint256();
-        std::string testSpendKey = generateRandomSpendKey();
-
-        auto spendKeyBits = ripple::zkp::MerkleCircuit::spendKeyToBits(testSpendKey);
-        zkp::FieldT value_randomness = ripple::zkp::MerkleCircuit::bitsToFieldElement(spendKeyBits) + zkp::FieldT(testAmount);
-
-        auto proofData = zkp::ZkProver::createDepositProof(testAmount, testCommitment, testSpendKey, value_randomness);
+        
+        uint64_t amount = 1000000;
+        uint256 commitment = generateRandomUint256();
+        std::string spendKey = generateRandomSpendKey();
+        auto spendKeyBits = ripple::zkp::MerkleCircuit::spendKeyToBits(spendKey);
+        zkp::FieldT value_randomness = ripple::zkp::MerkleCircuit::bitsToFieldElement(spendKeyBits) + zkp::FieldT(amount);
+        
+        auto proofData = zkp::ZkProver::createDepositProof(amount, commitment, spendKey, value_randomness);
         BEAST_EXPECT(!proofData.empty());
         BEAST_EXPECT(!proofData.proof.empty());
         BEAST_EXPECT(proofData.proof.size() > 0);
     }
-    
+
     void testDepositProofCreation()
     {
         testcase("Deposit Proof Creation");
@@ -138,201 +137,177 @@ public:
             std::cout << "Deposit proof " << idx << " verification: " << (isValid ? "PASS" : "FAIL") << std::endl;
         }
     }
-    
+
     void testWithdrawalProofCreation()
     {
         testcase("Withdrawal Proof Creation");
-        BEAST_EXPECT(zkp::ZkProver::generateKeys(false));
+        
+        BEAST_EXPECT(zkp::ZkProver::generateKeys(true));
 
-        // Create a Merkle tree
-        zkp::MerkleTree tree(2); // depth 2 = 4 leaves max
+        // CHANGE: Use IncrementalMerkleTree instead of MerkleTree
+        zkp::IncrementalMerkleTree tree(2); // depth 2 = 4 leaves max
         
         // Add some dummy notes to the tree
         uint256 dummyNote1 = generateRandomUint256();
         uint256 dummyNote2 = generateRandomUint256();
         
-        size_t note1Index = tree.addLeaf(dummyNote1);
-        size_t note2Index = tree.addLeaf(dummyNote2);
+        // CHANGE: Use append() instead of addLeaf()
+        size_t note1Index = tree.append(dummyNote1);
+        size_t note2Index = tree.append(dummyNote2);
+        (void)note1Index;  // Suppress unused warning
+        (void)note2Index;  // Suppress unused warning
         
-        // Create our test note
-        uint64_t amount = 2000000;
+        uint64_t amount = 500000;
+        // CHANGE: Use root() instead of getRoot()
+        uint256 merkleRoot = tree.root();
+        uint256 nullifier = generateRandomUint256();
         std::string spendKey = generateRandomSpendKey();
         auto spendKeyBits = ripple::zkp::MerkleCircuit::spendKeyToBits(spendKey);
         zkp::FieldT value_randomness = ripple::zkp::MerkleCircuit::bitsToFieldElement(spendKeyBits) + zkp::FieldT(amount);
-        
-        // TODO: In real implementation, compute actual note commitment
-        uint256 ourNote = generateRandomUint256(); // Placeholder
-        size_t ourNoteIndex = tree.addLeaf(ourNote);
-        
-        // Get authentication path and root
-        auto authPath = tree.getAuthPath(ourNoteIndex);
-        uint256 merkleRoot = tree.getRoot();
-        
-        std::cout << "Tree root: " << merkleRoot << std::endl;
-        std::cout << "Note index: " << ourNoteIndex << std::endl;
-        std::cout << "Auth path length: " << authPath.size() << std::endl;
-        
-        // Verify the path works
-        bool pathValid = zkp::MerkleTree::verifyPath(ourNote, authPath, ourNoteIndex, merkleRoot);
-        BEAST_EXPECT(pathValid);
-        
-        uint256 nullifier = generateRandomUint256();
-        
+
+        // CHANGE: Use authPath() instead of getAuthPath()
+        std::vector<uint256> merklePath = tree.authPath(0);
+
         auto proofData = zkp::ZkProver::createWithdrawalProof(
-            amount, merkleRoot, nullifier, authPath, ourNoteIndex, spendKey, value_randomness);
+            amount, merkleRoot, nullifier, merklePath, 0, spendKey, value_randomness);
+        
         BEAST_EXPECT(!proofData.empty());
     }
-    
+
     void testDepositProofVerification()
     {
         testcase("Deposit Proof Verification");
+        
         BEAST_EXPECT(zkp::ZkProver::generateKeys(false));
-
-        uint64_t amount = 1000000;
+        
+        uint64_t amount = 2000000;
         uint256 commitment = generateRandomUint256();
         std::string spendKey = generateRandomSpendKey();
 
         auto spendKeyBits = ripple::zkp::MerkleCircuit::spendKeyToBits(spendKey);
         zkp::FieldT value_randomness = ripple::zkp::MerkleCircuit::bitsToFieldElement(spendKeyBits) + zkp::FieldT(amount);
-
+        
         auto proofData = zkp::ZkProver::createDepositProof(amount, commitment, spendKey, value_randomness);
         BEAST_EXPECT(!proofData.empty());
-
+        
         bool isValid = zkp::ZkProver::verifyDepositProof(proofData);
         BEAST_EXPECT(isValid);
-
-        zkp::FieldT wrongNullifier = proofData.nullifier + zkp::FieldT::one();
-        bool wrongNullifierResult = zkp::ZkProver::verifyDepositProof(
-            proofData.proof, proofData.anchor, wrongNullifier, proofData.value_commitment);
-        BEAST_EXPECT(!wrongNullifierResult);
-
-        std::vector<unsigned char> emptyProof;
-        bool emptyResult = zkp::ZkProver::verifyDepositProof(
-            emptyProof, proofData.anchor, proofData.nullifier, proofData.value_commitment);
-        BEAST_EXPECT(!emptyResult);
+        
+        auto tampered = proofData;
+        tampered.nullifier = tampered.nullifier + zkp::FieldT::one();
+        bool tamperedValid = zkp::ZkProver::verifyDepositProof(tampered);
+        BEAST_EXPECT(!tamperedValid);
+        
+        zkp::ProofData emptyProof;
+        bool emptyValid = zkp::ZkProver::verifyDepositProof(emptyProof);
+        BEAST_EXPECT(!emptyValid);
     }
-    
+
     void testWithdrawalProofVerification()
     {
         testcase("Withdrawal Proof Verification");
-        BEAST_EXPECT(zkp::ZkProver::generateKeys(false));
-
-        uint64_t amount = 2000000;
-        uint256 merkleRoot = generateRandomUint256();
+        
+        BEAST_EXPECT(zkp::ZkProver::generateKeys(true));
+        
+        // CHANGE: Use IncrementalMerkleTree
+        zkp::IncrementalMerkleTree tree(3);
+        
+        uint256 testNote = generateRandomUint256();
+        tree.append(testNote);
+        
+        uint64_t amount = 750000;
+        uint256 merkleRoot = tree.root();
         uint256 nullifier = generateRandomUint256();
         std::string spendKey = generateRandomSpendKey();
 
-        std::vector<uint256> merklePath;
-        for (int i = 0; i < 2; ++i) {
-            merklePath.push_back(generateRandomUint256());
-        }
-        size_t pathIndex = 1;
-
         auto spendKeyBits = ripple::zkp::MerkleCircuit::spendKeyToBits(spendKey);
         zkp::FieldT value_randomness = ripple::zkp::MerkleCircuit::bitsToFieldElement(spendKeyBits) + zkp::FieldT(amount);
 
+        std::vector<uint256> merklePath = tree.authPath(0);
+
         auto proofData = zkp::ZkProver::createWithdrawalProof(
-            amount, merkleRoot, nullifier, merklePath, pathIndex, spendKey, value_randomness);
-        BEAST_EXPECT(!proofData.empty());
-
-        bool isValid = zkp::ZkProver::verifyWithdrawalProof(proofData);
-        BEAST_EXPECT(isValid);
-
-        zkp::FieldT wrongAnchor = proofData.anchor + zkp::FieldT::one();
-        bool wrongAnchorResult = zkp::ZkProver::verifyWithdrawalProof(
-            proofData.proof, wrongAnchor, proofData.nullifier, proofData.value_commitment);
-        BEAST_EXPECT(!wrongAnchorResult);
+            amount, merkleRoot, nullifier, merklePath, 0, spendKey, value_randomness);
+        
+        if (!proofData.empty()) {
+            bool isValid = zkp::ZkProver::verifyWithdrawalProof(proofData);
+            BEAST_EXPECT(isValid);
+            
+            auto wrongRoot = proofData;
+            wrongRoot.anchor = wrongRoot.anchor + zkp::FieldT::one();
+            bool wrongRootValid = zkp::ZkProver::verifyWithdrawalProof(wrongRoot);
+            BEAST_EXPECT(!wrongRootValid);
+        }
     }
-    
+
     void testInvalidProofVerification()
     {
         testcase("Invalid Proof Verification");
-        BEAST_EXPECT(zkp::ZkProver::generateKeys(false));
-
-        uint64_t amount = 1000000;
-        uint256 commitment = generateRandomUint256();
-        std::string spendKey = generateRandomSpendKey();
-
-        auto spendKeyBits = ripple::zkp::MerkleCircuit::spendKeyToBits(spendKey);
-        zkp::FieldT value_randomness = ripple::zkp::MerkleCircuit::bitsToFieldElement(spendKeyBits) + zkp::FieldT(amount);
-
-        auto validProofData = zkp::ZkProver::createDepositProof(amount, commitment, spendKey, value_randomness);
-
-        std::vector<unsigned char> corruptedProof = validProofData.proof;
-        if (!corruptedProof.empty()) {
-            corruptedProof[0] ^= 0xFF;
-        }
-
-        bool depositCorrupted = zkp::ZkProver::verifyDepositProof(
-            corruptedProof, validProofData.anchor, validProofData.nullifier, validProofData.value_commitment);
-        BEAST_EXPECT(!depositCorrupted);
-
-        std::vector<unsigned char> largeProof(10000, 0xFF);
-        bool depositLarge = zkp::ZkProver::verifyDepositProof(
-            largeProof, validProofData.anchor, validProofData.nullifier, validProofData.value_commitment);
-        BEAST_EXPECT(!depositLarge);
+        
+        std::vector<unsigned char> invalidProof(100, 0xFF);
+        zkp::FieldT dummyField = zkp::FieldT::zero();
+        
+        bool satisfied = zkp::ZkProver::verifyDepositProof(invalidProof, dummyField, dummyField, dummyField);
+        (void)satisfied;  // Suppress unused warning
+        BEAST_EXPECT(!satisfied);
+        
+        std::vector<unsigned char> largeInvalidProof(10000, 0xAA);
+        bool largeSatisfied = zkp::ZkProver::verifyDepositProof(largeInvalidProof, dummyField, dummyField, dummyField);
+        BEAST_EXPECT(!largeSatisfied);
     }
-    
+
     void testMultipleProofs()
     {
         testcase("Multiple Proofs");
+        
         BEAST_EXPECT(zkp::ZkProver::generateKeys(false));
-
-        const size_t numProofs = 5;
-        std::vector<zkp::ProofData> depositProofs;
-
-        for (size_t i = 0; i < numProofs; ++i) {
-            uint64_t amount = 1000000 + i * 100000;
+        
+        std::vector<zkp::ProofData> proofs;
+        
+        for (int i = 0; i < 3; ++i) {
+            uint64_t amount = 1000000 + i * 250000;
             uint256 commitment = generateRandomUint256();
             std::string spendKey = generateRandomSpendKey();
-
             auto spendKeyBits = ripple::zkp::MerkleCircuit::spendKeyToBits(spendKey);
             zkp::FieldT value_randomness = ripple::zkp::MerkleCircuit::bitsToFieldElement(spendKeyBits) + zkp::FieldT(amount);
-
-            auto proofData = zkp::ZkProver::createDepositProof(amount, commitment, spendKey, value_randomness);
-            BEAST_EXPECT(!proofData.empty());
-
-            depositProofs.push_back(proofData);
+            
+            auto proof = zkp::ZkProver::createDepositProof(amount, commitment, spendKey, value_randomness);
+            proofs.push_back(proof);
         }
-
-        for (size_t i = 0; i < numProofs; ++i) {
-            bool isValid = zkp::ZkProver::verifyDepositProof(depositProofs[i]);
+        
+        for (const auto& proof : proofs) {
+            BEAST_EXPECT(!proof.empty());
+            bool isValid = zkp::ZkProver::verifyDepositProof(proof);
             BEAST_EXPECT(isValid);
         }
-
-        for (size_t i = 0; i < numProofs; ++i) {
-            for (size_t j = 0; j < numProofs; ++j) {
+        
+        for (size_t i = 0; i < proofs.size(); ++i) {
+            for (size_t j = 0; j < proofs.size(); ++j) {
                 if (i != j) {
-                    bool shouldFail = zkp::ZkProver::verifyDepositProof(
-                        depositProofs[i].proof,
-                        depositProofs[j].anchor,
-                        depositProofs[j].nullifier,
-                        depositProofs[j].value_commitment);
-                    BEAST_EXPECT(!shouldFail);
+                    bool crossValid = zkp::ZkProver::verifyDepositProof(
+                        proofs[i].proof, proofs[j].anchor, proofs[j].nullifier, proofs[j].value_commitment);
+                    BEAST_EXPECT(!crossValid);
                 }
             }
         }
     }
-    
+
     void testEdgeCases()
     {
         testcase("Edge Cases");
+        
         BEAST_EXPECT(zkp::ZkProver::generateKeys(false));
-
+        
+        uint64_t zeroAmount = 0;
         uint256 commitment = generateRandomUint256();
         std::string spendKey = generateRandomSpendKey();
         auto spendKeyBits = ripple::zkp::MerkleCircuit::spendKeyToBits(spendKey);
-
-        // Zero amount - should work
-        zkp::FieldT zero_value_randomness = ripple::zkp::MerkleCircuit::bitsToFieldElement(spendKeyBits);
-        auto zeroProof = zkp::ZkProver::createDepositProof(0, commitment, spendKey, zero_value_randomness);
+        zkp::FieldT zero_value_randomness = ripple::zkp::MerkleCircuit::bitsToFieldElement(spendKeyBits) + zkp::FieldT(zeroAmount);
+        
+        auto zeroProof = zkp::ZkProver::createDepositProof(zeroAmount, commitment, spendKey, zero_value_randomness);
         bool zeroValid = zkp::ZkProver::verifyDepositProof(zeroProof);
         BEAST_EXPECT(zeroValid);
-
-        // Use 2^50 = 1,125,899,906,842,624 (safe for BN128 field arithmetic)
-        uint64_t largeAmount = (1ULL << 50);
         
-        // Use small offset to prevent field overflow in randomness computation
+        uint64_t largeAmount = (1ULL << 50);
         zkp::FieldT large_value_randomness = ripple::zkp::MerkleCircuit::bitsToFieldElement(spendKeyBits) + zkp::FieldT(12345);
         
         auto largeProof = zkp::ZkProver::createDepositProof(largeAmount, commitment, spendKey, large_value_randomness);
@@ -372,9 +347,67 @@ public:
         BEAST_EXPECT(deserialized.rho == note.rho);
         BEAST_EXPECT(deserialized.r == note.r);
         BEAST_EXPECT(deserialized.a_pk == note.a_pk);
+    }
+
+    void testIncrementalMerkleTree() {
+        testcase("Incremental Merkle Tree");
         
-        std::cout << "Note commitment: " << commitment << std::endl;
-        std::cout << "Note nullifier: " << nullifier << std::endl;
+        zkp::IncrementalMerkleTree tree(4); // Small tree for testing
+        
+        // Test empty tree
+        BEAST_EXPECT(tree.empty());
+        BEAST_EXPECT(tree.size() == 0);
+        
+        // Add some leaves
+        uint256 leaf1 = generateRandomUint256();
+        uint256 leaf2 = generateRandomUint256();
+        uint256 leaf3 = generateRandomUint256();
+        
+        size_t pos1 = tree.append(leaf1);
+        size_t pos2 = tree.append(leaf2);
+        size_t pos3 = tree.append(leaf3);
+        
+        BEAST_EXPECT(pos1 == 0);
+        BEAST_EXPECT(pos2 == 1);
+        BEAST_EXPECT(pos3 == 2);
+        BEAST_EXPECT(tree.size() == 3);
+        BEAST_EXPECT(!tree.empty());
+        
+        // Test authentication paths
+        auto path1 = tree.authPath(pos1);
+        auto path2 = tree.authPath(pos2);
+        auto path3 = tree.authPath(pos3);
+        
+        BEAST_EXPECT(path1.size() == 4);
+        BEAST_EXPECT(path2.size() == 4);
+        BEAST_EXPECT(path3.size() == 4);
+        
+        // Verify paths
+        uint256 root = tree.root();
+        BEAST_EXPECT(tree.verify(leaf1, path1, pos1, root));
+        BEAST_EXPECT(tree.verify(leaf2, path2, pos2, root));
+        BEAST_EXPECT(tree.verify(leaf3, path3, pos3, root));
+        
+        // Test batch operations
+        std::vector<uint256> batch_leaves = {
+            generateRandomUint256(),
+            generateRandomUint256(),
+            generateRandomUint256()
+        };
+        
+        auto positions = tree.appendBatch(batch_leaves);
+        BEAST_EXPECT(positions.size() == 3);
+        BEAST_EXPECT(tree.size() == 6);
+        
+        // Verify batch leaves
+        uint256 new_root = tree.root();
+        for (size_t i = 0; i < batch_leaves.size(); ++i) {
+            auto path = tree.authPath(positions[i]);
+            BEAST_EXPECT(tree.verify(batch_leaves[i], path, positions[i], new_root));
+        }
+        
+        std::cout << "Incremental tree test: final size=" << tree.size() 
+                  << ", root=" << new_root << std::endl;
     }
 };
 

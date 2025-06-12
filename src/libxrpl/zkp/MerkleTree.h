@@ -1,54 +1,68 @@
-#pragma once
+// #pragma once
 
-#include <vector>
-#include <array>
-#include <string>
-#include <xrpl/basics/base_uint.h>
+// #include "IncrementalMerkleTree.h"
+// #include <xrpl/basics/base_uint.h>
+// #include <vector>
 
-namespace ripple {
-namespace zkp {
+// namespace ripple {
+// namespace zkp {
 
-/**
- * Merkle Tree implementation
- * Uses SHA256 for internal hash computations
- */
-class MerkleTree {
-public:
-    explicit MerkleTree(size_t depth);
+// /**
+//  * Merkle Tree implementation
+//  * Uses SHA256 for internal hash computations
+//  */
+// class MerkleTree {
+// public:
+//     explicit MerkleTree(size_t depth = 32) : tree_(depth) {}
     
-    // Add a leaf and return its index
-    size_t addLeaf(const uint256& leaf);
+//     // Legacy interface
+//     size_t addLeaf(const uint256& leaf) {
+//         return tree_.append(leaf);
+//     }
     
-    // Get authentication path for a leaf
-    std::vector<uint256> getAuthPath(size_t leafIndex) const;
+//     uint256 getRoot() const {
+//         return tree_.root();
+//     }
     
-    // Get current root
-    uint256 getRoot() const;
+//     std::vector<uint256> getAuthPath(size_t position) const {
+//         return tree_.authPath(position);
+//     }
     
-    // Get tree depth
-    size_t getDepth() const { return depth_; }
+//     static bool verifyPath(
+//         const uint256& leaf,
+//         const std::vector<uint256>& path,
+//         size_t position,
+//         const uint256& root) {
+//         IncrementalMerkleTree temp(path.size());
+//         return temp.verify(leaf, path, position, root);
+//     }
     
-    // Get number of leaves
-    size_t getNumLeaves() const { return leaves_.size(); }
+//     size_t size() const { return tree_.size(); }
+//     bool empty() const { return tree_.empty(); }
     
-    // Verify an authentication path
-    static bool verifyPath(
-        const uint256& leaf,
-        const std::vector<uint256>& path,
-        size_t index,
-        const uint256& root);
+//     // New incremental features
+//     std::vector<size_t> addLeavesParallel(const std::vector<uint256>& leaves) {
+//         return tree_.appendBatch(leaves);
+//     }
     
-    // Compute SHA256 of two 256-bit values
-    static uint256 sha256_compress(const uint256& left, const uint256& right);
+//     void optimize() {
+//         tree_.precomputeNodes(tree_.size());
+//     }
+    
+//     // Persistence
+//     std::vector<uint8_t> serialize() const {
+//         return tree_.serialize();
+//     }
+    
+//     static MerkleTree deserialize(const std::vector<uint8_t>& data) {
+//         MerkleTree wrapper(32);
+//         wrapper.tree_ = IncrementalMerkleTree::deserialize(data);
+//         return wrapper;
+//     }
 
-private:
-    size_t depth_;
-    std::vector<uint256> leaves_;
-    std::vector<std::vector<uint256>> tree_; // tree_[level][index]
-    
-    void updatePath(size_t leafIndex);
-    uint256 computeRoot() const;
-};
+// private:
+//     IncrementalMerkleTree tree_;
+// };
 
-} // namespace zkp
-} // namespace ripple
+// } // namespace zkp
+// } // namespace ripple

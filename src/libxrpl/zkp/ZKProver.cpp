@@ -1,5 +1,6 @@
 #include "ZKProver.h"
 #include "circuits/MerkleCircuit.h"
+#include "IncrementalMerkleTree.h"
 #include "Note.h"
 #include <fstream>
 #include <iostream>
@@ -11,7 +12,83 @@
 namespace ripple {
 namespace zkp {
 
-// Static members
+class TreeManager {
+private:
+    static std::unique_ptr<IncrementalMerkleTree> commitment_tree_;
+    static std::string tree_path_;
+    
+public:
+    static void initialize(const std::string& dataPath = "/tmp/rippled_commitment_tree") {
+        tree_path_ = dataPath;
+        
+        // Try to load existing tree
+        std::ifstream file(tree_path_, std::ios::binary);
+        if (file.good()) {
+            std::vector<uint8_t> data((std::istreambuf_iterator<char>(file)),
+                                    std::istreambuf_iterator<char>());
+            commitment_tree_ = std::make_unique<IncrementalMerkleTree>(
+                IncrementalMerkleTree::deserialize(data));
+            
+            std::cout << "Loaded commitment tree with " << commitment_tree_->size() 
+                      << " leaves" << std::endl;
+        } else {
+            commitment_tree_ = std::make_unique<IncrementalMerkleTree>(32);
+            std::cout << "Created new commitment tree" << std::endl;
+        }
+    }
+    
+    static size_t addCommitment(const uint256& commitment) {
+        if (!commitment_tree_) {
+            initialize();
+        }
+        
+        size_t position = commitment_tree_->append(commitment);
+        
+        // Periodically save tree state
+        if (position % 100 == 0) {
+            saveTree();
+        }
+        
+        return position;
+    }
+    
+    static uint256 getRoot() {
+        if (!commitment_tree_) {
+            initialize();
+        }
+        return commitment_tree_->root();
+    }
+    
+    static std::vector<uint256> getAuthPath(size_t position) {
+        if (!commitment_tree_) {
+            initialize();
+        }
+        return commitment_tree_->authPath(position);
+    }
+    
+    static void saveTree() {
+        if (!commitment_tree_) return;
+        
+        auto data = commitment_tree_->serialize();
+        std::ofstream file(tree_path_, std::ios::binary);
+        file.write(reinterpret_cast<const char*>(data.data()), data.size());
+        
+        std::cout << "Saved commitment tree state" << std::endl;
+    }
+    
+    static void optimizeTree() {
+        if (!commitment_tree_) return;
+        
+        commitment_tree_->precomputeNodes(commitment_tree_->size());
+        std::cout << "Optimized commitment tree" << std::endl;
+    }
+};
+
+// Static member definitions
+std::unique_ptr<IncrementalMerkleTree> TreeManager::commitment_tree_;
+std::string TreeManager::tree_path_;
+
+// Static members for ZkProver
 bool ZkProver::isInitialized = false;
 std::shared_ptr<libsnark::r1cs_gg_ppzksnark_proving_key<DefaultCurve>> ZkProver::depositProvingKey;
 std::shared_ptr<libsnark::r1cs_gg_ppzksnark_verification_key<DefaultCurve>> ZkProver::depositVerificationKey;
@@ -25,9 +102,10 @@ std::shared_ptr<MerkleCircuit> ZkProver::withdrawalCircuit;
 void ZkProver::initialize() {
     if (!isInitialized) {
         libff::alt_bn128_pp::init_public_params();
+        TreeManager::initialize();
         isInitialized = true;
-        std::cout << "Initializing ZkProver..." << std::endl;
-        generateKeys(true);  // Force regeneration
+        std::cout << "Initializing ZkProver with incremental tree..." << std::endl;
+        generateKeys(true);
         saveKeys("/tmp/rippled_zkp_keys");
         // if (!loadKeys("/tmp/rippled_zkp_keys")) {
         //     generateKeys(true);
@@ -232,13 +310,19 @@ ProofData ZkProver::createDepositProof(
             return {};
         }
         
+        // Add commitment to incremental tree
+        size_t position = TreeManager::addCommitment(commitment);
+        uint256 currentRoot = TreeManager::getRoot();
+        
+        std::cout << "Added commitment at position " << position 
+                  << " with root " << currentRoot << std::endl;
+        
+        // Create Note structure
         Note note;
         note.value = amount;
         
-        // Convert spendKey to uint256 for consistency
         uint256 a_sk = {};
         auto spendKeyBits = MerkleCircuit::spendKeyToBits(spendKey);
-        // Convert bits to uint256
         for (size_t i = 0; i < std::min(spendKeyBits.size(), size_t(256)); ++i) {
             if (spendKeyBits[i]) {
                 size_t byteIndex = i / 8;
@@ -249,14 +333,10 @@ ProofData ZkProver::createDepositProof(
             }
         }
         
-        // Generate deterministic rho and r from spend key and amount
-        note.rho = a_sk; // Use spend key as rho base
-        note.r = generateRandomUint256(); // Random commitment randomness
+        note.rho = a_sk;
+        note.r = generateRandomUint256();
+        note.a_pk = generateRandomUint256();
         
-        // Generate a_pk from spend key (simplified)
-        note.a_pk = generateRandomUint256(); // In real implementation, derive from a_sk
-        
-        // The commitment parameter should match our note's actual commitment
         uint256 actual_commitment = note.commitment();
         
         std::cout << "=== DEPOSIT PROOF WITH NOTE STRUCTURE ===" << std::endl;
@@ -269,26 +349,19 @@ ProofData ZkProver::createDepositProof(
         
         // Convert to bits for circuit
         std::vector<bool> commitmentBits = uint256ToBits(actual_commitment);
-        std::vector<bool> rootBits = commitmentBits; // For deposits, dummy root
+        std::vector<bool> rootBits = uint256ToBits(currentRoot);
         
         // Use value_randomness as vcm_r
         uint256 vcm_r = fieldElementToUint256(value_randomness);
         
-        // Generate witness using new Note structure
         auto witness = depositCircuit->generateDepositWitness(
-            note,           // The complete note structure
-            a_sk,           // Spend key as uint256
-            vcm_r,          // Value commitment randomness
-            commitmentBits, // Leaf
-            rootBits        // Root
-        );
+            note, a_sk, vcm_r, commitmentBits, rootBits);
         
         // Extract computed values from circuit
         FieldT public_anchor = depositCircuit->getAnchor();
         FieldT public_nullifier = depositCircuit->getNullifier();
         FieldT public_value_commitment = depositCircuit->getValueCommitment();
         
-        // Create primary input
         std::vector<FieldT> primary_input;
         primary_input.push_back(public_anchor);
         primary_input.push_back(public_nullifier);
