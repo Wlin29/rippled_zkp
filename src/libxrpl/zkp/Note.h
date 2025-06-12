@@ -1,48 +1,80 @@
 #pragma once
-#include <libxrpl/zkp/circuits/MerkleCircuit.h>
-#include <xrpl/protocol/UintTypes.h>  // ADD THIS - for uint256
-#include <openssl/sha.h>
-#include <random>
-#include <optional>  // ADD THIS - for std::optional
+
+#include <xrpl/basics/base_uint.h>
+#include <libff/algebra/curves/alt_bn128/alt_bn128_pp.hpp>
+#include <vector>
+#include <string>
+#include <array>
+
+// Forward declare MerkleCircuit to avoid circular dependency
+namespace ripple { namespace zkp { class MerkleCircuit; } }
 
 namespace ripple {
 namespace zkp {
 
+using DefaultCurve = libff::alt_bn128_pp;
+using FieldT = libff::Fr<DefaultCurve>;
+
 /**
- * Zcash-style Note structure (Sapling/Orchard compatible)
- * Based on ZCash Protocol Specification Section 4.1.2
+ * Note structure
+ * A note contains:
+ * - value: the amount of the note (uint64_t)
+ * - rho: uniqueness randomizer (prevents double-spending) (uint256)
+ * - r: commitment randomness (for hiding) (uint256)
+ * - a_pk: paying key (spend authority) (uint256)
  */
 struct Note {
-    // Core note data
-    uint64_t value;                    // Note value in atomic units
-    FieldT rho;                       // Nullifier seed (random 32 bytes)
-    FieldT r;                         // Randomness for commitment (random 32 bytes)
-    std::vector<bool> a_pk;           // Address public key (256 bits)
+    uint64_t value;          // Amount in the note
+    uint256 rho;             // Uniqueness randomizer (32 bytes)
+    uint256 r;               // Commitment randomness (32 bytes)
+    uint256 a_pk;            // Paying key (32 bytes)
     
-    // Constructor
-    Note() : value(0), rho(FieldT::zero()), r(FieldT::zero()), a_pk(256, false) {}
+    Note() = default;
     
-    Note(uint64_t val, const FieldT& rho_val, const FieldT& r_val, const std::vector<bool>& pk)
-        : value(val), rho(rho_val), r(r_val), a_pk(pk) {}
+    Note(uint64_t val, const uint256& uniqueness, const uint256& randomness, const uint256& payingKey)
+        : value(val), rho(uniqueness), r(randomness), a_pk(payingKey) {}
     
     /**
-     * Compute note commitment using Zcash formula:
-     * cm = SHA256(a_pk || value || rho || r)
-     * This is the value stored as a leaf in the Merkle tree
+     * Compute the note commitment using commitment scheme:
+     * cm = SHA256(value || rho || r || a_pk)
      */
-    uint256 computeCommitment() const;
+    uint256 commitment() const;
     
     /**
-     * Compute nullifier using Zcash formula:
-     * nf = SHA256(a_sk || rho)
-     * Used to prevent double-spending
+     * Alternative name for commitment()
      */
-    uint256 computeNullifier(const std::vector<bool>& a_sk) const;
+    uint256 computeCommitment() const { return commitment(); }
     
     /**
-     * Create a new note with random parameters
+     * Compute the nullifier using nullifier derivation:
+     * nf = SHA256(a_sk || rho) where a_sk is the spend key corresponding to a_pk
      */
-    static Note createRandom(uint64_t value, const std::vector<bool>& recipient_pk);
+    uint256 nullifier(const uint256& a_sk) const;
+    
+    /**
+     * Alternative name for nullifier() 
+     */
+    uint256 computeNullifier(const uint256& a_sk) const { return nullifier(a_sk); }
+    
+    /**
+     * Convert note to bits for circuit input
+     */
+    std::vector<bool> toBits() const;
+    
+    /**
+     * Create note from bits
+     */
+    static Note fromBits(const std::vector<bool>& bits);
+    
+    /**
+     * Generate a random note for testing
+     */
+    static Note random(uint64_t value);
+    
+    /**
+     * Create a random note with specific recipient (needed by test)
+     */
+    static Note createRandom(uint64_t value, const std::vector<bool>& recipient_a_pk);
     
     /**
      * Serialize note for storage/transmission (encrypted)
@@ -66,7 +98,7 @@ struct Note {
 };
 
 /**
- * Zcash-style Address Key Pair
+ * Address Key Pair
  * Represents a shielded address with viewing and spending capabilities
  */
 struct AddressKeyPair {
@@ -83,55 +115,34 @@ struct AddressKeyPair {
     static AddressKeyPair generate();
     
     /**
-     * Derive public key from secret key: a_pk = SHA256(a_sk)
+     * Derive public key from secret key using SHA256
      */
     void derivePublicKey();
     
     /**
-     * Derive incoming viewing key: ivk = SHA256(a_sk || "ivk")
+     * Derive viewing key from secret key using SHA256
      */
     void deriveViewingKey();
     
     /**
-     * Get the shielded address hash (for public reference)
+     * Get address hash for identification
      */
     uint256 getAddressHash() const;
     
     /**
-     * Check if this key pair can spend a note
+     * Check if this keypair can spend the given note
      */
     bool canSpend(const Note& note) const;
     
     /**
-     * Serialize key pair for wallet storage
+     * Serialize keypair for storage
      */
     std::vector<uint8_t> serialize() const;
     
     /**
-     * Deserialize from wallet storage
+     * Deserialize keypair from storage
      */
     static AddressKeyPair deserialize(const std::vector<uint8_t>& data);
-};
-
-/**
- * Note Plaintext - unencrypted note data for transmission
- * Used when sending notes to recipients
- */
-struct NotePlaintext {
-    Note note;
-    std::vector<uint8_t> memo;  // 512-byte memo field
-    
-    /**
-     * Encrypt note for recipient
-     */
-    std::vector<uint8_t> encrypt(const std::vector<bool>& recipient_pk) const;
-    
-    /**
-     * Decrypt note with viewing key
-     */
-    static std::optional<NotePlaintext> decrypt(
-        const std::vector<uint8_t>& ciphertext,
-        const std::vector<bool>& viewing_key);
 };
 
 } // namespace zkp

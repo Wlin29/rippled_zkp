@@ -13,7 +13,7 @@ namespace zkp {
 using DefaultCurve = libff::alt_bn128_pp;
 using FieldT = libff::Fr<DefaultCurve>;
 
-// NEW: Structure to hold proof + public inputs
+// Structure to hold proof + public inputs
 struct ProofData {
     std::vector<unsigned char> proof;
     FieldT anchor;           // PUBLIC: merkle root
@@ -46,12 +46,12 @@ public:
     static std::shared_ptr<MerkleCircuit> depositCircuit;
     static std::shared_ptr<MerkleCircuit> withdrawalCircuit;
 
-    // UPDATED: Proof creation returns ProofData (proof + public inputs)
+    // Proof creation returns ProofData (proof + public inputs)
     static ProofData createDepositProof(
         uint64_t amount,
         const uint256& commitment,
         const std::string& spendKey,
-        const FieldT& value_randomness // NEW PARAM
+        const FieldT& value_randomness
     );
 
     static ProofData createWithdrawalProof(
@@ -61,7 +61,7 @@ public:
         const std::vector<uint256>& merklePath,
         size_t pathIndex,
         const std::string& spendKey,
-        const FieldT& value_randomness // NEW PARAM
+        const FieldT& value_randomness
     );
 
     // Verification with individual parameters
@@ -91,6 +91,10 @@ public:
     // Utility functions
     static std::vector<bool> uint256ToBits(const uint256& input);
     static uint256 bitsToUint256(const std::vector<bool>& bits);
+    
+    // NEW: Helper functions
+    static uint256 fieldElementToUint256(const FieldT& element);
+    static uint256 generateRandomUint256();
 
 private:
     static std::shared_ptr<libsnark::r1cs_gg_ppzksnark_proving_key<DefaultCurve>> depositProvingKey;

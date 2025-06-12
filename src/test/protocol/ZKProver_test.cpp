@@ -107,7 +107,7 @@ public:
     
     void testDepositProofCreation()
     {
-        testcase("Zcash-Style Deposit Proof Creation");
+        testcase("Deposit Proof Creation");
         BEAST_EXPECT(zkp::ZkProver::generateKeys(false));
 
         for (size_t idx : {0, 1, 2}) {
@@ -117,25 +117,25 @@ public:
             auto spendKeyBits = ripple::zkp::MerkleCircuit::spendKeyToBits(spendKey);
             zkp::FieldT value_randomness = ripple::zkp::MerkleCircuit::bitsToFieldElement(spendKeyBits) + zkp::FieldT(amount);
 
-            std::cout << "=== CREATING ZCASH DEPOSIT PROOF " << idx << " ===" << std::endl;
+            std::cout << "=== CREATING DEPOSIT PROOF " << idx << " ===" << std::endl;
             
-            // CREATE REAL ZCASH NOTE
+            // CREATE NOTE
             auto recipient = zkp::AddressKeyPair::generate();
-            auto zcash_note = zkp::Note::createRandom(amount, recipient.a_pk);
+            auto note = zkp::Note::createRandom(amount, recipient.a_pk);
             
-            // COMPUTE REAL ZCASH COMMITMENT
-            uint256 zcash_commitment = zcash_note.computeCommitment();
+            // COMPUTE COMMITMENT
+            uint256 commitment = note.computeCommitment();
             
-            std::cout << "Created Zcash note with commitment: " << zcash_commitment << std::endl;
+            std::cout << "Created note with commitment: " << commitment << std::endl;
 
-            auto proofData = zkp::ZkProver::createDepositProof(amount, zcash_commitment, spendKey, value_randomness);
+            auto proofData = zkp::ZkProver::createDepositProof(amount, commitment, spendKey, value_randomness);
             BEAST_EXPECT(!proofData.empty());
             
             // VERIFY THE PROOF
             bool isValid = zkp::ZkProver::verifyDepositProof(proofData);
             BEAST_EXPECT(isValid);
             
-            std::cout << "Zcash deposit proof " << idx << " verification: " << (isValid ? "PASS" : "FAIL") << std::endl;
+            std::cout << "Deposit proof " << idx << " verification: " << (isValid ? "PASS" : "FAIL") << std::endl;
         }
     }
     
@@ -360,7 +360,8 @@ public:
         BEAST_EXPECT(commitment != uint256{});
         
         // Compute nullifier
-        auto nullifier = note.computeNullifier(recipient.a_sk);
+        uint256 a_sk_uint256 = zkp::MerkleCircuit::bitsToUint256(recipient.a_sk);
+        auto nullifier = note.computeNullifier(a_sk_uint256);
         BEAST_EXPECT(nullifier != uint256{});
         
         // Test serialization

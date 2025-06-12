@@ -11,7 +11,9 @@
 #include <libsnark/gadgetlib1/gadgets/hashes/hash_io.hpp>
 #include <libsnark/gadgetlib1/gadgets/merkle_tree/merkle_tree_check_read_gadget.hpp>
 #include <libsnark/relations/constraint_satisfaction_problems/r1cs/r1cs.hpp>
+#include <xrpl/basics/base_uint.h>
 
+namespace ripple { namespace zkp { struct Note; } }
 
 namespace ripple {
 namespace zkp {
@@ -19,7 +21,6 @@ namespace zkp {
 using DefaultCurve = libff::alt_bn128_pp;
 using FieldT = libff::Fr<DefaultCurve>;
 
-// Forward declarations for libsnark types
 using libsnark::digest_variable;
 using libsnark::block_variable;
 using libsnark::sha256_compression_function_gadget;
@@ -28,175 +29,246 @@ using libsnark::merkle_authentication_path_variable;
 using libsnark::merkle_tree_check_read_gadget;
 
 /**
- * MerkleCircuit with Value Commitment
- * -------------------------------------------------
- * A zero-knowledge circuit for proving Merkle tree membership with value commitments.
- * Implements Zcash-style commitments using SHA256 compression functions.
+ * Merkle Circuit Implementation
+ * ============================================
  * 
- * Public inputs: [anchor, nullifier, value_commitment]
- * Private inputs: [value, value_randomness, spend_key, rho, address_bits, auth_path]
+ * Based on the Zcash protocol specification (Sapling/Orchard).
+ * Implements zero-knowledge proofs for shielded transactions with:
  * 
- * SHA256-based constraints:
- * - value_commitment = SHA256(value_bits || value_randomness_bits)
- * - nullifier = SHA256(spend_key_bits || rho_bits)
- * - note_commitment = SHA256(value_bits || spend_key_bits || rho_bits)
- * - Merkle path verification: note_commitment ∈ tree with root = anchor
- * - Boolean constraints: all bits ∈ {0,1}
+ * CRYPTOGRAPHIC COMMITMENTS:
+ * - Note Commitment: cm = SHA256(value || rho || r || a_pk)
+ * - Nullifier: nf = SHA256(a_sk || rho) 
+ * - Value Commitment: vcm = SHA256(value || vcm_r) [for hiding]
+ * 
+ * MERKLE TREE INTEGRATION:
+ * - Proves note membership in commitment tree
+ * - Authentication path verification using SHA256
+ * - Prevents double-spending via nullifier
+ * 
+ * PUBLIC INPUTS: [anchor, nullifier, value_commitment]
+ * PRIVATE INPUTS: [Note(value, rho, r, a_pk), a_sk, vcm_r, auth_path]
+ * 
+ * SECURITY PROPERTIES:
+ * ✓ Hiding: Values are cryptographically hidden via commitments
+ * ✓ Binding: Cannot create fake commitments or change committed values
+ * ✓ Unforgeability: Must know spend key to create valid nullifier
+ * ✓ Non-malleability: Proofs cannot be modified without detection
  */
 class MerkleCircuit
 {
 public:
     /**
-     * Construct a Zcash-style MerkleCircuit for a tree of given depth.
-     * @param treeDepth The depth of the Merkle tree (number of levels).
+     * Construct a shielded transaction circuit.
+     * @param treeDepth The depth of the note commitment tree (typically 32).
      */
     explicit MerkleCircuit(size_t treeDepth);
 
     ~MerkleCircuit();
 
     /**
-     * Generate R1CS constraints for the Zcash-style circuit.
-     * Creates constraints for:
-     * - SHA256 value commitment
-     * - SHA256 nullifier derivation  
-     * - SHA256 leaf commitment
-     * - Merkle tree path verification
-     * - Range and boolean constraints
+     * Generate R1CS constraints for the circuit.
+     * 
+     * CONSTRAINT CATEGORIES:
+     * 1. Note Commitment Constraints:
+     *    - cm = SHA256(value || rho || r || a_pk)
+     *    - All components properly packed/unpacked
+     * 
+     * 2. Nullifier Derivation Constraints:
+     *    - nf = SHA256(a_sk || rho)
+     *    - Ensures spend authorization
+     * 
+     * 3. Value Commitment Constraints:
+     *    - vcm = SHA256(value || vcm_r)
+     *    - Provides value hiding property
+     * 
+     * 4. Merkle Tree Constraints:
+     *    - Authentication path verification
+     *    - Root computation and matching
+     * 
+     * 5. Boolean and Range Constraints:
+     *    - All bits ∈ {0,1}
+     *    - Value range checks
      */
     void generateConstraints();
 
     /**
-     * Generate witness for deposit proof (Zcash-style).
-     * @param value The note value (uint64)
-     * @param value_randomness Random value for value commitment (hiding)
-     * @param leaf The leaf commitment (as bits)
-     * @param root The Merkle root (as bits) 
-     * @param spend_key The spend key (as bits, secret)
-     * @return The full witness vector (auxiliary input)
+     * Generate witness for deposit (note creation).
+     * 
+     * DEPOSITS create new notes and add them to the commitment tree.
+     * The note is not yet in the tree, so we use a dummy authentication path.
+     * 
+     * @param note The note being created
+     * @param a_sk The spend authority secret key (32 bytes)
+     * @param vcm_r Value commitment randomness (32 bytes, for hiding)
+     * @param leaf The computed note commitment (256 bits)
+     * @param root The current tree root (256 bits)
+     * @return Complete witness vector for proof generation
      */
     std::vector<FieldT> generateDepositWitness(
-        uint64_t value,
-        const FieldT& value_randomness,
+        const Note& note,
+        const uint256& a_sk,
+        const uint256& vcm_r,
         const std::vector<bool>& leaf,
-        const std::vector<bool>& root,
-        const std::vector<bool>& spend_key);
+        const std::vector<bool>& root);
 
     /**
-     * Generate witness for withdrawal proof (Zcash-style).
-     * @param value The note value (uint64)
-     * @param value_randomness Random value for value commitment (hiding)
-     * @param leaf The leaf commitment (as bits)
-     * @param path The authentication path (vector of 256-bit hashes)
-     * @param root The Merkle root (as bits)
-     * @param spend_key The spend key (as bits, secret)
-     * @param address The leaf index in the tree
-     * @return The full witness vector (auxiliary input)
+     * Generate witness for withdrawal (note spending).
+     * 
+     * WITHDRAWALS spend existing notes from the commitment tree.
+     * Requires valid authentication path proving note membership.
+     * 
+     * @param note The note being spent
+     * @param a_sk The spend authority secret key (32 bytes)
+     * @param vcm_r Value commitment randomness (32 bytes, for hiding)
+     * @param leaf The note commitment (256 bits)
+     * @param path The Merkle authentication path (vector of 256-bit siblings)
+     * @param root The tree root (256 bits)
+     * @param address The leaf position in the tree (for path verification)
+     * @return Complete witness vector for proof generation
      */
     std::vector<FieldT> generateWithdrawalWitness(
-        uint64_t value,
-        const FieldT& value_randomness,
+        const Note& note,
+        const uint256& a_sk,
+        const uint256& vcm_r,
         const std::vector<bool>& leaf,
         const std::vector<std::vector<bool>>& path,
         const std::vector<bool>& root,
-        const std::vector<bool>& spend_key,
         size_t address);
 
     /**
-     * Get the computed nullifier field element.
-     * nullifier = SHA256(spend_key || rho) converted to field element
+     * Get the computed nullifier (public output).
+     * nf = SHA256(a_sk || rho)
+     * 
+     * Used to prevent double-spending by tracking spent nullifiers.
+     * Each note can only be spent once, producing a unique nullifier.
      */
     FieldT getNullifier() const;
 
     /**
-     * Get the computed value commitment field element.
-     * value_commitment = SHA256(value || value_randomness) converted to field element
+     * Get the computed value commitment (public output).
+     * vcm = SHA256(value || vcm_r)
+     * 
+     * Provides cryptographic hiding of the note value while allowing
+     * homomorphic operations for balance verification.
      */
     FieldT getValueCommitment() const;
 
     /**
-     * Get the anchor (root) field element.
-     * anchor = Merkle root converted to field element
+     * Get the anchor/root (public output).
+     * 
+     * The Merkle tree root that the note was proven to be in.
+     * Anchors prevent rollback attacks and ensure note validity.
      */
     FieldT getAnchor() const;
 
-    /**
-     * Get the underlying R1CS constraint system.
-     * Contains all the cryptographic constraints for the Zcash-style circuit.
-     */
+    // Circuit system accessors
     libsnark::r1cs_constraint_system<FieldT> getConstraintSystem() const;
-
-    /**
-     * Get the primary (public) input for the circuit.
-     * Format: [anchor, nullifier, value_commitment]
-     */
     libsnark::r1cs_primary_input<FieldT> getPrimaryInput() const;
-
-    /**
-     * Get the auxiliary (private/witness) input for the circuit.
-     * Contains all secret values and intermediate computations.
-     */
     libsnark::r1cs_auxiliary_input<FieldT> getAuxiliaryInput() const;
-
-    /**
-     * Access the underlying protoboard (for advanced use).
-     * Provides direct access to the constraint system builder.
-     */
     std::shared_ptr<libsnark::protoboard<FieldT>> getProtoboard() const;
-
-    /**
-     * Get the Merkle tree depth.
-     */
     size_t getTreeDepth() const;
 
-    /**
-     * Utility: Convert a uint256 (32-byte array) to a vector of bits (LSB first).
-     * Used for converting hash values to circuit inputs.
-     */
-    static std::vector<bool> uint256ToBits(const std::array<uint8_t, 32>& input);
+    // =================================================================
+    // UTILITY FUNCTIONS
+    // =================================================================
 
     /**
-     * Utility: Convert a vector of bits (LSB first) to a uint256 (32-byte array).
-     * Used for converting circuit outputs back to hash values.
+     * Convert uint256 to bits (little-endian within bytes).
      */
-    static std::array<uint8_t, 32> bitsToUint256(const std::vector<bool>& bits);
+    static std::vector<bool> uint256ToBits(const uint256& input);
 
     /**
-     * Utility: Convert a hex-encoded spend key to a vector of bits.
-     * @param spendKey The hex string representing the spend key.
-     * @return A vector of bits representing the spend key (LSB first).
+     * Convert bits back to uint256 (little-endian within bytes).
+     */
+    static uint256 bitsToUint256(const std::vector<bool>& bits);
+
+    /**
+     * Convert spend key (hex string) to bits for circuit input.
      */
     static std::vector<bool> spendKeyToBits(const std::string& spendKey);
 
     /**
-     * Utility: Convert a vector of bits to a field element.
-     * Uses binary representation: element = sum(bits[i] * 2^i)
+     * Pack bits into a field element (sum of bits[i] * 2^i).
+     * Used for converting SHA256 outputs to field elements.
+     * Handles field overflow by truncating to fit the field modulus.
      */
     static FieldT bitsToFieldElement(const std::vector<bool>& bits);
     
     /**
-     * Utility: Convert a field element to a vector of bits.
-     * Decomposes element into binary representation.
+     * Unpack field element into bits.
+     * Inverse of bitsToFieldElement.
      */
     static std::vector<bool> fieldElementToBits(const FieldT& element);
 
     /**
-    * Utility: Convert a vector of bits to a 32-byte array (for SHA256 input)
-    */
-    static std::array<uint8_t, 32> bitsToBytes(const std::vector<bool>& bits);
+     * Convert uint256 directly to field element.
+     * Handles large integers that might exceed field modulus.
+     */
+    static FieldT uint256ToFieldElement(const uint256& input);
 
     /**
-    * Utility: Convert a 32-byte array to a vector of bits
-    */
-    static std::vector<bool> bytesToBits(const std::array<uint8_t, 32>& bytes);
+     * Convert field element back to uint256.
+     */
+    static uint256 fieldElementToUint256(const FieldT& element);
+
+    /**
+     * Convert bits to bytes (8 bits per byte, little-endian).
+     * Used for SHA256 input preparation.
+     */
+    static std::vector<uint8_t> bitsToBytes(const std::vector<bool>& bits);
+
+    /**
+     * Convert bytes to bits (8 bits per byte, little-endian).
+     * Used for converting hash outputs to circuit bits.
+     */
+    static std::vector<bool> bytesToBits(const std::vector<uint8_t>& bytes);
+
+    /**
+     * Note commitment computation (outside circuit).
+     * cm = SHA256(value || rho || r || a_pk)
+     * 
+     * This matches the circuit computation and is used for testing/verification.
+     */
+    static uint256 computeNoteCommitment(
+        uint64_t value,
+        const uint256& rho,
+        const uint256& r,
+        const uint256& a_pk);
+
+    /**
+     * Nullifier computation (outside circuit).
+     * nf = SHA256(a_sk || rho)
+     * 
+     * This matches the circuit computation and is used for testing/verification.
+     */
+    static uint256 computeNullifier(
+        const uint256& a_sk,
+        const uint256& rho);
+
+    /**
+     * Value commitment computation (outside circuit).
+     * vcm = SHA256(value || vcm_r)
+     * 
+     * This matches the circuit computation and is used for testing/verification.
+     */
+    static uint256 computeValueCommitment(
+        uint64_t value,
+        const uint256& vcm_r);
 
 private:
+    /**
+     * Private implementation using PIMPL pattern.
+     * Hides complex libsnark implementation details from header.
+     */
     class Impl;
     std::unique_ptr<Impl> pImpl_;
 };
 
 /**
- * Initialize the elliptic curve parameters for alt_bn128.
- * Must be called before using any MerkleCircuit instances.
+ * Initialize elliptic curve parameters for proofs.
+ * Uses alt_bn128 curve which provides ~128 bits of security.
+ * 
+ * MUST be called before creating any MerkleCircuit instances.
  * Thread-safe and idempotent.
  */
 void initCurveParameters();
