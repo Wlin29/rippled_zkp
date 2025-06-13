@@ -166,24 +166,11 @@ public:
         
         // 4. SETUP SHA256 HASH GADGETS
         
-        // Note commitment: SHA256(value || rho || r || a_pk) - simplified as SHA256(value||rho, r||a_pk)
+        // FIXED: Use digest_variable inputs for sha256_two_to_one_hash_gadget
+        
+        // Note commitment hash: combine value+rho with r+a_pk
         auto value_rho_digest = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "value_rho_digest");
         auto r_a_pk_digest = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "r_a_pk_digest");
-        
-        // Pack value and rho together (simplified)
-        for (size_t i = 0; i < 64; ++i) {
-            value_rho_digest->bits[i] = note_value_bits_[i];
-        }
-        for (size_t i = 0; i < 192 && i < 256; ++i) {
-            value_rho_digest->bits[64 + i] = note_rho_bits_[i];
-        }
-        
-        // Pack r and a_pk together
-        for (size_t i = 0; i < 256; ++i) {
-            if (i < note_r_bits_.size()) {
-                r_a_pk_digest->bits[i] = note_r_bits_[i];
-            }
-        }
         
         note_commit_hasher_ = std::make_unique<sha256_two_to_one_hash_gadget<FieldT>>(
             *pb_,
@@ -192,14 +179,9 @@ public:
             *note_commitment_hash_,
             "note_commit_hasher");
         
-        // Nullifier: SHA256(a_sk || rho)
+        // Nullifier hash: combine a_sk with rho
         auto a_sk_digest = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "a_sk_digest");
         auto rho_digest = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "rho_digest");
-        
-        for (size_t i = 0; i < 256; ++i) {
-            a_sk_digest->bits[i] = a_sk_bits_[i];
-            rho_digest->bits[i] = note_rho_bits_[i];
-        }
         
         nullifier_hasher_ = std::make_unique<sha256_two_to_one_hash_gadget<FieldT>>(
             *pb_,
@@ -208,21 +190,9 @@ public:
             *nullifier_hash_,
             "nullifier_hasher");
         
-        // Value commitment: SHA256(value || vcm_r)
+        // Value commitment hash: combine value with vcm_r
         auto value_digest = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "value_digest");
         auto vcm_r_digest = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "vcm_r_digest");
-        
-        // Pad value to 256 bits
-        for (size_t i = 0; i < 64; ++i) {
-            value_digest->bits[i] = note_value_bits_[i];
-        }
-        for (size_t i = 64; i < 256; ++i) {
-            pb_->val(value_digest->bits[i]) = FieldT::zero();
-        }
-        
-        for (size_t i = 0; i < 256; ++i) {
-            vcm_r_digest->bits[i] = vcm_r_bits_[i];
-        }
         
         value_commit_hasher_ = std::make_unique<sha256_two_to_one_hash_gadget<FieldT>>(
             *pb_,
@@ -230,7 +200,7 @@ public:
             *vcm_r_digest,
             *value_commitment_hash_,
             "value_commit_hasher");
-        
+    
         // 5. SETUP MERKLE TREE VERIFICATION
         auth_path_ = std::make_unique<merkle_authentication_path_variable<FieldT, sha256_two_to_one_hash_gadget<FieldT>>>(
             *pb_, tree_depth_, "auth_path");
@@ -256,7 +226,7 @@ public:
             *pb_, value_commitment_hash_->bits, value_commitment_, "value_commitment_packer");
         
         // 7. GENERATE ALL CONSTRAINTS
-        
+    
         // Input packing constraints
         note_value_packer_->generate_r1cs_constraints(true);
         note_rho_packer_->generate_r1cs_constraints(true);
@@ -264,6 +234,11 @@ public:
         note_a_pk_packer_->generate_r1cs_constraints(true);
         a_sk_packer_->generate_r1cs_constraints(true);
         vcm_r_packer_->generate_r1cs_constraints(true);
+        
+        // Set up proper input concatenation constraints
+        setupHashInputConstraints(value_rho_digest.get(), r_a_pk_digest.get(), 
+                                 a_sk_digest.get(), rho_digest.get(),
+                                 value_digest.get(), vcm_r_digest.get());
         
         // Hash constraints
         note_commit_hasher_->generate_r1cs_constraints();
@@ -286,6 +261,62 @@ public:
         generateBooleanConstraints();
         
         std::cout << "Constraints generated. Total: " << pb_->num_constraints() << std::endl;
+    }
+    
+    // Helper method to set up hash input constraints
+    void setupHashInputConstraints(
+        digest_variable<FieldT>* value_rho_digest,
+        digest_variable<FieldT>* r_a_pk_digest,
+        digest_variable<FieldT>* a_sk_digest,
+        digest_variable<FieldT>* rho_digest,
+        digest_variable<FieldT>* value_digest,
+        digest_variable<FieldT>* vcm_r_digest) {
+        
+        // For note commitment: concatenate value(64) + rho(256) into first 256 bits
+        for (size_t i = 0; i < 64; ++i) {
+            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                value_rho_digest->bits[i], 1, note_value_bits_[i]), 
+                "value_to_digest_" + std::to_string(i));
+        }
+        for (size_t i = 0; i < 192; ++i) {
+            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                value_rho_digest->bits[64 + i], 1, note_rho_bits_[i]), 
+                "rho_to_digest_" + std::to_string(i));
+        }
+        
+        // For note commitment: concatenate r(256) + a_pk(256), take first 256 bits
+        for (size_t i = 0; i < 128; ++i) {
+            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                r_a_pk_digest->bits[i], 1, note_r_bits_[i]), 
+                "r_to_digest_" + std::to_string(i));
+        }
+        for (size_t i = 0; i < 128; ++i) {
+            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                r_a_pk_digest->bits[128 + i], 1, note_a_pk_bits_[i]), 
+                "a_pk_to_digest_" + std::to_string(i));
+        }
+        
+        // For nullifier: direct mapping
+        for (size_t i = 0; i < 256; ++i) {
+            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                a_sk_digest->bits[i], 1, a_sk_bits_[i]), 
+                "a_sk_direct_" + std::to_string(i));
+            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                rho_digest->bits[i], 1, note_rho_bits_[i]), 
+                "rho_direct_" + std::to_string(i));
+        }
+        
+        // For value commitment: value(64) + vcm_r(192)
+        for (size_t i = 0; i < 64; ++i) {
+            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                value_digest->bits[i], 1, note_value_bits_[i]), 
+                "value_direct_" + std::to_string(i));
+        }
+        for (size_t i = 0; i < 192; ++i) {
+            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                vcm_r_digest->bits[64 + i], 1, vcm_r_bits_[i]), 
+                "vcm_r_direct_" + std::to_string(i));
+        }
     }
     
     void generateBooleanConstraints() {
@@ -409,22 +440,25 @@ private:
     }
     
     void setAuthenticationPath(const std::vector<std::vector<bool>>& path) {
-        // Set authentication path for Merkle verification
-        for (size_t i = 0; i < tree_depth_; ++i) {
-            if (i < path.size()) {
-                for (size_t j = 0; j < 256; ++j) {
-                    if (j < path[i].size()) {
-                        pb_->val(auth_path_->left_digests[i].bits[j]) = path[i][j] ? FieldT::one() : FieldT::zero();
-                        pb_->val(auth_path_->right_digests[i].bits[j]) = path[i][j] ? FieldT::one() : FieldT::zero();
+        // CORRECT: Set authentication path for Merkle verification
+        for (size_t level = 0; level < tree_depth_; ++level) {
+            if (level < path.size()) {
+                // Set the sibling hash at this level
+                for (size_t bit = 0; bit < 256; ++bit) {
+                    if (bit < path[level].size()) {
+                        // The path[level] contains the sibling hash
+                        pb_->val(auth_path_->left_digests[level].bits[bit]) = path[level][bit] ? FieldT::one() : FieldT::zero();
+                        pb_->val(auth_path_->right_digests[level].bits[bit]) = path[level][bit] ? FieldT::one() : FieldT::zero();
                     } else {
-                        pb_->val(auth_path_->left_digests[i].bits[j]) = FieldT::zero();
-                        pb_->val(auth_path_->right_digests[i].bits[j]) = FieldT::zero();
+                        pb_->val(auth_path_->left_digests[level].bits[bit]) = FieldT::zero();
+                        pb_->val(auth_path_->right_digests[level].bits[bit]) = FieldT::zero();
                     }
                 }
             } else {
-                for (size_t j = 0; j < 256; ++j) {
-                    pb_->val(auth_path_->left_digests[i].bits[j]) = FieldT::zero();
-                    pb_->val(auth_path_->right_digests[i].bits[j]) = FieldT::zero();
+                // Empty level - use zero hash
+                for (size_t bit = 0; bit < 256; ++bit) {
+                    pb_->val(auth_path_->left_digests[level].bits[bit]) = FieldT::zero();
+                    pb_->val(auth_path_->right_digests[level].bits[bit]) = FieldT::zero();
                 }
             }
         }

@@ -59,6 +59,7 @@ public:
         testEdgeCases();
         testNoteCreationAndCommitment();
         testIncrementalMerkleTree();
+        testMerkleVerificationEnforcement();
     }
 
     void testKeyGeneration()
@@ -408,6 +409,52 @@ public:
         
         std::cout << "Incremental tree test: final size=" << tree.size() 
                   << ", root=" << new_root << std::endl;
+    }
+
+    void testMerkleVerificationEnforcement() {
+        testcase("Merkle Verification Enforcement");
+        
+        BEAST_EXPECT(zkp::ZkProver::generateKeys(true));
+        
+        // Create a valid tree with a real note
+        zkp::IncrementalMerkleTree tree(4);
+        uint256 realLeaf = generateRandomUint256();
+        size_t position = tree.append(realLeaf);
+        
+        uint256 validRoot = tree.root();
+        std::vector<uint256> validPath = tree.authPath(position);
+        
+        // Test 1: Valid withdrawal should work
+        uint64_t amount = 1000000;
+        uint256 nullifier = generateRandomUint256();
+        std::string spendKey = generateRandomSpendKey();
+        auto spendKeyBits = ripple::zkp::MerkleCircuit::spendKeyToBits(spendKey);
+        zkp::FieldT value_randomness = ripple::zkp::MerkleCircuit::bitsToFieldElement(spendKeyBits);
+        
+        auto validProof = zkp::ZkProver::createWithdrawalProof(
+            amount, validRoot, nullifier, validPath, position, spendKey, value_randomness);
+        
+        bool validResult = zkp::ZkProver::verifyWithdrawalProof(validProof);
+        BEAST_EXPECT(validResult);
+        
+        // Test 2: Invalid path should FAIL (but might not due to bug)
+        std::vector<uint256> invalidPath(validPath.size());
+        for (auto& node : invalidPath) {
+            node = generateRandomUint256(); // Random garbage
+        }
+        
+        auto invalidProof = zkp::ZkProver::createWithdrawalProof(
+            amount, validRoot, nullifier, invalidPath, position, spendKey, value_randomness);
+        
+        bool invalidResult = zkp::ZkProver::verifyWithdrawalProof(invalidProof);
+        
+        // This SHOULD fail, but might pass if Merkle verification is broken
+        if (invalidResult) {
+            std::cout << "CRITICAL BUG: Invalid Merkle path accepted!" << std::endl;
+            BEAST_EXPECT(false); // This should not happen
+        } else {
+            std::cout << "Good: Invalid Merkle path properly rejected" << std::endl;
+        }
     }
 };
 
