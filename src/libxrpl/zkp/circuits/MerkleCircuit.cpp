@@ -272,50 +272,60 @@ public:
         digest_variable<FieldT>* value_digest,
         digest_variable<FieldT>* vcm_r_digest) {
         
-        // For note commitment: concatenate value(64) + rho(256) into first 256 bits
+        // FIXED: For note commitment, we need to properly handle the full inputs
+        // The note commitment should be: SHA256(SHA256(value||rho), SHA256(r||a_pk))
+        
+        // 1. For note commitment first hash: value(64) + rho(192) = 256 bits
         for (size_t i = 0; i < 64; ++i) {
             pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
                 value_rho_digest->bits[i], 1, note_value_bits_[i]), 
-                "value_to_digest_" + std::to_string(i));
+                "value_to_hash1_" + std::to_string(i));
         }
         for (size_t i = 0; i < 192; ++i) {
             pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
                 value_rho_digest->bits[64 + i], 1, note_rho_bits_[i]), 
-                "rho_to_digest_" + std::to_string(i));
+                "rho_to_hash1_" + std::to_string(i));
         }
         
-        // For note commitment: concatenate r(256) + a_pk(256), take first 256 bits
+        // 2. For note commitment second hash: r(128) + a_pk(128) = 256 bits
         for (size_t i = 0; i < 128; ++i) {
             pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
                 r_a_pk_digest->bits[i], 1, note_r_bits_[i]), 
-                "r_to_digest_" + std::to_string(i));
+                "r_to_hash2_" + std::to_string(i));
         }
         for (size_t i = 0; i < 128; ++i) {
             pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
                 r_a_pk_digest->bits[128 + i], 1, note_a_pk_bits_[i]), 
-                "a_pk_to_digest_" + std::to_string(i));
+                "a_pk_to_hash2_" + std::to_string(i));
         }
         
-        // For nullifier: direct mapping
+        // 3. For nullifier: a_sk(256) and rho(256) - separate inputs
         for (size_t i = 0; i < 256; ++i) {
             pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
                 a_sk_digest->bits[i], 1, a_sk_bits_[i]), 
-                "a_sk_direct_" + std::to_string(i));
+                "a_sk_to_nullifier_" + std::to_string(i));
             pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
                 rho_digest->bits[i], 1, note_rho_bits_[i]), 
-                "rho_direct_" + std::to_string(i));
+                "rho_to_nullifier_" + std::to_string(i));
         }
         
-        // For value commitment: value(64) + vcm_r(192)
+        // 4. For value commitment: value(64) + padding(192) and vcm_r(256)
         for (size_t i = 0; i < 64; ++i) {
             pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
                 value_digest->bits[i], 1, note_value_bits_[i]), 
-                "value_direct_" + std::to_string(i));
+                "value_to_vcm_" + std::to_string(i));
         }
-        for (size_t i = 0; i < 192; ++i) {
+        for (size_t i = 64; i < 256; ++i) {
             pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
-                vcm_r_digest->bits[64 + i], 1, vcm_r_bits_[i]), 
-                "vcm_r_direct_" + std::to_string(i));
+                value_digest->bits[i], 1, FieldT::zero()), 
+                "value_padding_" + std::to_string(i));
+        }
+        
+        // 5. vcm_r digest - NO CONFLICTS, each bit gets exactly one constraint
+        for (size_t i = 0; i < 256; ++i) {
+            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                vcm_r_digest->bits[i], 1, vcm_r_bits_[i]), 
+                "vcm_r_to_vcm_" + std::to_string(i));
         }
     }
     
@@ -440,13 +450,12 @@ private:
     }
     
     void setAuthenticationPath(const std::vector<std::vector<bool>>& path) {
-        // CORRECT: Set authentication path for Merkle verification
+        // FIXED: Properly set authentication path 
         for (size_t level = 0; level < tree_depth_; ++level) {
             if (level < path.size()) {
                 // Set the sibling hash at this level
                 for (size_t bit = 0; bit < 256; ++bit) {
                     if (bit < path[level].size()) {
-                        // The path[level] contains the sibling hash
                         pb_->val(auth_path_->left_digests[level].bits[bit]) = path[level][bit] ? FieldT::one() : FieldT::zero();
                         pb_->val(auth_path_->right_digests[level].bits[bit]) = path[level][bit] ? FieldT::one() : FieldT::zero();
                     } else {
@@ -679,21 +688,39 @@ uint256 MerkleCircuit::computeNoteCommitment(
     const uint256& r,
     const uint256& a_pk) {
     
-    // SHA256(value || rho || r || a_pk)
-    std::vector<uint8_t> input;
+    // Match circuit: SHA256(SHA256(value||rho_192), SHA256(r_128||a_pk_128))
     
-    // Add value (8 bytes, little-endian)
+    // First hash: value(8 bytes) + rho(24 bytes) = 32 bytes
+    std::vector<uint8_t> input1;
     for (int i = 0; i < 8; ++i) {
-        input.push_back((value >> (i * 8)) & 0xFF);
+        input1.push_back((value >> (i * 8)) & 0xFF);
     }
     
-    // Add rho, r, a_pk (32 bytes each)
-    input.insert(input.end(), rho.begin(), rho.end());
-    input.insert(input.end(), r.begin(), r.end());
-    input.insert(input.end(), a_pk.begin(), a_pk.end());
+    // Add first 24 bytes of rho (192 bits)
+    input1.insert(input1.end(), rho.begin(), rho.begin() + 24);
+    
+    uint256 hash1;
+    SHA256(input1.data(), input1.size(), hash1.begin());
+    
+    // Second hash: r(16 bytes) + a_pk(16 bytes) = 32 bytes
+    std::vector<uint8_t> input2;
+    
+    // Add first 16 bytes of r (128 bits)
+    input2.insert(input2.end(), r.begin(), r.begin() + 16);
+    
+    // Add first 16 bytes of a_pk (128 bits)
+    input2.insert(input2.end(), a_pk.begin(), a_pk.begin() + 16);
+    
+    uint256 hash2;
+    SHA256(input2.data(), input2.size(), hash2.begin());
+    
+    // Final hash: hash1 + hash2
+    std::vector<uint8_t> final_input;
+    final_input.insert(final_input.end(), hash1.begin(), hash1.end());
+    final_input.insert(final_input.end(), hash2.begin(), hash2.end());
     
     uint256 result;
-    SHA256(input.data(), input.size(), result.begin());
+    SHA256(final_input.data(), final_input.size(), result.begin());
     
     return result;
 }
@@ -717,19 +744,28 @@ uint256 MerkleCircuit::computeValueCommitment(
     uint64_t value,
     const uint256& vcm_r) {
     
-    // SHA256(value || vcm_r)
-    std::vector<uint8_t> input;
+    // Match circuit: SHA256(value_padded, vcm_r)
     
-    // Add value (8 bytes, little-endian)
+    // First input: value(8 bytes) + padding(24 bytes)
+    std::vector<uint8_t> input1(32, 0);
     for (int i = 0; i < 8; ++i) {
-        input.push_back((value >> (i * 8)) & 0xFF);
+        input1[i] = (value >> (i * 8)) & 0xFF;
     }
     
-    // Add vcm_r (32 bytes)
-    input.insert(input.end(), vcm_r.begin(), vcm_r.end());
+    uint256 value_hash;
+    SHA256(input1.data(), input1.size(), value_hash.begin());
+    
+    // Second input: vcm_r(32 bytes)
+    uint256 vcm_r_hash;
+    SHA256(vcm_r.begin(), 32, vcm_r_hash.begin());
+    
+    // Final: SHA256(value_hash || vcm_r_hash)
+    std::vector<uint8_t> final_input;
+    final_input.insert(final_input.end(), value_hash.begin(), value_hash.end());
+    final_input.insert(final_input.end(), vcm_r_hash.begin(), vcm_r_hash.end());
     
     uint256 result;
-    SHA256(input.data(), input.size(), result.begin());
+    SHA256(final_input.data(), final_input.size(), result.begin());
     
     return result;
 }

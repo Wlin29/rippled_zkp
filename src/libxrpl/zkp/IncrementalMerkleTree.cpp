@@ -99,45 +99,33 @@ uint256 IncrementalMerkleTree::computeRoot(size_t upToPosition) const {
         return empty_hashes_[depth_];
     }
     
-    // Build the tree bottom-up by processing all positions
-    std::vector<std::vector<uint256>> tree_levels(depth_ + 1);
+    // Simple and correct approach: rebuild tree level by level
+    std::vector<uint256> current_level;
     
-    // Level 0: Add all leaves
+    // Collect all leaves
     for (size_t pos = 0; pos < upToPosition; ++pos) {
-        tree_levels[0].push_back(getNode(0, pos));
+        current_level.push_back(getNode(0, pos));
     }
     
-    // Pad with empty hashes to next power of 2
-    size_t level_size = upToPosition;
-    while (level_size & (level_size - 1)) { // Not power of 2
-        tree_levels[0].push_back(empty_hashes_[0]);
-        level_size++;
-    }
-    
-    // Build each level
+    // Build tree level by level
     for (size_t level = 0; level < depth_; ++level) {
-        size_t current_size = tree_levels[level].size();
-        if (current_size == 0) {
-            tree_levels[level + 1].push_back(empty_hashes_[level + 1]);
-            continue;
-        }
+        if (current_level.size() <= 1) break;
         
-        // Pair up nodes and hash them
-        for (size_t i = 0; i < current_size; i += 2) {
-            uint256 left = tree_levels[level][i];
-            uint256 right = (i + 1 < current_size) ? 
-                tree_levels[level][i + 1] : empty_hashes_[level];
+        std::vector<uint256> next_level;
+        
+        // Process pairs
+        for (size_t i = 0; i < current_level.size(); i += 2) {
+            uint256 left = current_level[i];
+            uint256 right = (i + 1 < current_level.size()) ? 
+                current_level[i + 1] : empty_hashes_[level];
             
-            tree_levels[level + 1].push_back(hash(left, right));
+            next_level.push_back(hash(left, right));
         }
         
-        // If we have only one node at the top level, that's our root
-        if (tree_levels[level + 1].size() == 1) {
-            return tree_levels[level + 1][0];
-        }
+        current_level = std::move(next_level);
     }
     
-    return tree_levels[depth_][0];
+    return current_level.empty() ? empty_hashes_[depth_] : current_level[0];
 }
 
 std::vector<uint256> IncrementalMerkleTree::authPath(size_t position) const {
