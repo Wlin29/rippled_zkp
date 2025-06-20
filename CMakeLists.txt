@@ -103,11 +103,15 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 include_directories(dependencies)
 # link_directories(/usr/local/lib)
 link_directories(${CMAKE_CURRENT_SOURCE_DIR}/dependencies/depends/ate-pairing)
-add_library(libff_profiling_stub STATIC external/libsnark/depends/libff/libff/common/libff_profiling_stub.cpp)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/external/libsnark)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/external/libsnark/depends/libfqfft)
+add_subdirectory(external/libsnark)
+# add_library(libff_profiling_stub STATIC external/libsnark/depends/libff/libff/common/libff_profiling_stub.cpp)
 
 
 target_link_libraries(ripple_libs INTERFACE
-  -l:libsnark.a
+  snark                    # CMake target for libsnark ( -l:libsnark.a)
+  ff                       # CMake target for libff ( -l:libff.a) Making the code cleaner and better in practice
   ed25519::ed25519
   lz4::lz4
   OpenSSL::Crypto
@@ -115,13 +119,11 @@ target_link_libraries(ripple_libs INTERFACE
   secp256k1::secp256k1
   soci::soci
   SQLite::SQLite3
-  -l:libff.a
-  libff_profiling_stub
-  -lgmp
-  -lgmpxx
-  -l:libzm.a
+  gmp                      # or -lgmp 
+  gmpxx                    # or -lgmpxx 
+  -l:libzm.a              # is there no target??
 )
-
+message(STATUS "Successfully linked ripple_libs with snark and ff libraries.")
 # Work around changes to Conan recipe for now.
 if(TARGET nudb::core)
   set(nudb nudb::core)
