@@ -72,13 +72,13 @@ private:
     std::unique_ptr<digest_variable<FieldT>> computed_root_;
     
     // ===== SHA256 GADGETS =====
-    std::unique_ptr<libsnark::sha256_compression_function_gadget<FieldT>> note_commit_hasher_;
-    std::unique_ptr<libsnark::sha256_compression_function_gadget<FieldT>> nullifier_hasher_;
-    std::unique_ptr<libsnark::sha256_compression_function_gadget<FieldT>> value_commit_hasher_;
+    std::unique_ptr<libsnark::sha256_two_to_one_hash_gadget<FieldT>> note_commit_hasher_;
+    std::unique_ptr<libsnark::sha256_two_to_one_hash_gadget<FieldT>> nullifier_hasher_;
+    std::unique_ptr<libsnark::sha256_two_to_one_hash_gadget<FieldT>> value_commit_hasher_;
     
     // ===== MERKLE TREE GADGETS =====
-    std::unique_ptr<merkle_authentication_path_variable<FieldT, libsnark::sha256_compression_function_gadget<FieldT>>> auth_path_;
-    std::unique_ptr<merkle_tree_check_read_gadget<FieldT, libsnark::sha256_compression_function_gadget<FieldT>>> merkle_verifier_;
+    std::unique_ptr<merkle_authentication_path_variable<FieldT, libsnark::sha256_two_to_one_hash_gadget<FieldT>>> auth_path_;
+    std::unique_ptr<merkle_tree_check_read_gadget<FieldT, libsnark::sha256_two_to_one_hash_gadget<FieldT>>> merkle_verifier_;
     
     // ===== PACKING GADGETS =====
     std::unique_ptr<packing_gadget<FieldT>> note_value_packer_;
@@ -164,46 +164,48 @@ public:
         computed_root_ = std::make_unique<digest_variable<FieldT>>(
             *pb_, 256, "computed_root");
         
-        // 4. SETUP SHA256 HASH GADGETS - FIXED TO USE SINGLE INPUT HASHER
-        
-        // Note commitment: SHA256(value||rho||r||a_pk) - 512-bit input
-        pb_variable_array<FieldT> note_commitment_input;
-        note_commitment_input.allocate(*pb_, 512, "note_commitment_input");
-        
-        note_commit_hasher_ = std::make_unique<libsnark::sha256_compression_function_gadget<FieldT>>(
-            *pb_, 
-            libsnark::SHA256_default_IV(*pb_),
-            note_commitment_input,
+        // 4. SETUP SHA256 HASH GADGETS
+
+        // Create digest variables for hash inputs
+        std::unique_ptr<digest_variable<FieldT>> note_value_digest_;
+        std::unique_ptr<digest_variable<FieldT>> note_rho_digest_;
+        std::unique_ptr<digest_variable<FieldT>> a_sk_digest_;
+        std::unique_ptr<digest_variable<FieldT>> vcm_r_digest_;
+
+        note_value_digest_ = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "note_value_digest");
+        note_rho_digest_ = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "note_rho_digest");
+        a_sk_digest_ = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "a_sk_digest");
+        vcm_r_digest_ = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "vcm_r_digest");
+
+        // Note commitment: SHA256(value_digest||rho_digest)
+        note_commit_hasher_ = std::make_unique<libsnark::sha256_two_to_one_hash_gadget<FieldT>>(
+            *pb_,
+            *note_value_digest_,   // Left digest
+            *note_rho_digest_,     // Right digest  
             *note_commitment_hash_,
             "note_commit_hasher");
-        
-        // Nullifier: SHA256(a_sk||rho) - 512-bit input  
-        pb_variable_array<FieldT> nullifier_input;
-        nullifier_input.allocate(*pb_, 512, "nullifier_input");
-        
-        nullifier_hasher_ = std::make_unique<libsnark::sha256_compression_function_gadget<FieldT>>(
+
+        // Nullifier: SHA256(a_sk_digest||rho_digest)
+        nullifier_hasher_ = std::make_unique<libsnark::sha256_two_to_one_hash_gadget<FieldT>>(
             *pb_,
-            libsnark::SHA256_default_IV(*pb_),
-            nullifier_input,
+            *a_sk_digest_,         // Left digest
+            *note_rho_digest_,     // Right digest
             *nullifier_hash_,
             "nullifier_hasher");
-        
-        // Value commitment: SHA256(value||vcm_r) - 512-bit input
-        pb_variable_array<FieldT> value_commitment_input;
-        value_commitment_input.allocate(*pb_, 512, "value_commitment_input");
-        
-        value_commit_hasher_ = std::make_unique<libsnark::sha256_compression_function_gadget<FieldT>>(
+
+        // Value commitment: SHA256(value_digest||vcm_r_digest)
+        value_commit_hasher_ = std::make_unique<libsnark::sha256_two_to_one_hash_gadget<FieldT>>(
             *pb_,
-            libsnark::SHA256_default_IV(*pb_),
-            value_commitment_input,
+            *note_value_digest_,   // Left digest
+            *vcm_r_digest_,        // Right digest
             *value_commitment_hash_,
             "value_commit_hasher");
     
         // 5. SETUP MERKLE TREE VERIFICATION
-        auth_path_ = std::make_unique<merkle_authentication_path_variable<FieldT, libsnark::sha256_compression_function_gadget<FieldT>>>(
+        auth_path_ = std::make_unique<merkle_authentication_path_variable<FieldT, libsnark::sha256_two_to_one_hash_gadget<FieldT>>>(
             *pb_, tree_depth_, "auth_path");
         
-        merkle_verifier_ = std::make_unique<merkle_tree_check_read_gadget<FieldT, libsnark::sha256_compression_function_gadget<FieldT>>>(
+        merkle_verifier_ = std::make_unique<merkle_tree_check_read_gadget<FieldT, libsnark::sha256_two_to_one_hash_gadget<FieldT>>>(
             *pb_,
             tree_depth_,
             address_bits_,
@@ -233,8 +235,7 @@ public:
         a_sk_packer_->generate_r1cs_constraints(true);
         vcm_r_packer_->generate_r1cs_constraints(true);
         
-        // Setup hash input constraints - FIXED
-        setupHashInputConstraints(note_commitment_input, nullifier_input, value_commitment_input);
+        // setupHashInputConstraints(note_commitment_input, nullifier_input, value_commitment_input);
         
         // Hash constraints
         note_commit_hasher_->generate_r1cs_constraints();
