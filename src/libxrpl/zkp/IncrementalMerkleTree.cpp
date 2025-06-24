@@ -179,7 +179,29 @@ uint256 IncrementalMerkleTree::root() const {
         return empty_hashes_[depth_];
     }
     
-    return computeRoot(next_position_);
+    // Get any leaf and its authentication path
+    uint256 leaf = getNode(0, 0);  // Use first leaf
+    auto path = authPath(0);       // Get its authentication path
+    
+    uint256 current = leaf;
+    size_t current_pos = 0;
+    
+    // Follow the path up using IDENTICAL logic to verify()
+    for (size_t level = 0; level < depth_; ++level) {
+        uint256 sibling = path[level];
+        
+        if (current_pos & 1) {
+            // Current is right child, sibling is left
+            current = hash(sibling, current);
+        } else {
+            // Current is left child, sibling is right
+            current = hash(current, sibling);
+        }
+        
+        current_pos >>= 1;
+    }
+    
+    return current;
 }
 
 std::vector<uint256> IncrementalMerkleTree::authPath(size_t position) const {
