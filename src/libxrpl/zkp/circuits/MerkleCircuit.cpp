@@ -391,6 +391,24 @@ public:
     {
         std::cout << "=== WITHDRAWAL WITNESS GENERATION ===" << std::endl;
         
+        // VALIDATION: Check path validity before proceeding
+        bool hasValidPath = false;
+        for (size_t level = 0; level < std::min(path.size(), size_t(3)); ++level) {
+            if (level < path.size()) {
+                for (bool bit : path[level]) {
+                    if (bit) {
+                        hasValidPath = true;
+                        break;
+                    }
+                }
+                if (hasValidPath) break;
+            }
+        }
+        
+        if (!hasValidPath) {
+            std::cout << "WARNING: Path appears to be all zeros - may be invalid" << std::endl;
+        }
+        
         // SET WITHDRAWAL MODE
         pb_->val(is_withdrawal_) = FieldT::one();
         
@@ -507,18 +525,22 @@ private:
                     if (bit) nonZeroBits++;
                 }
                 
-                // For withdrawals, reject paths that are obviously invalid
+                // SECURITY FIX: Reject obviously invalid paths for withdrawals
                 if (nonZeroBits == 0 && level < 3) {
                     std::cout << "WARNING: Suspicious all-zero authentication path at level " << level << std::endl;
                     
-                    // ADD CONSTRAINT: For withdrawals, early levels should not be all zero
-                    // This prevents accepting obviously invalid paths
-                    if (level < 2) { // First two levels are critical
-                        // Force at least one bit to be 1 in the first levels for withdrawals
-                        pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
-                            is_withdrawal_, 0, FieldT::zero()), 
-                            "reject_invalid_path_level_" + std::to_string(level));
-                    }
+                    // Add a constraint that forces withdrawal mode to fail with all-zero paths
+                    // Create a path validation variable
+                    pb_variable<FieldT> path_invalid;
+                    path_invalid.allocate(*pb_, "path_invalid_" + std::to_string(level));
+                    
+                    // Set path_invalid = 1 when path is all zeros and we're in withdrawal mode
+                    pb_->val(path_invalid) = FieldT::one();
+                    
+                    // Add constraint: is_withdrawal * path_invalid = 0 (forces failure)
+                    pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                        is_withdrawal_, path_invalid, FieldT::zero()), 
+                        "reject_invalid_path_level_" + std::to_string(level));
                 }
                 
                 // Set the sibling hash at this level

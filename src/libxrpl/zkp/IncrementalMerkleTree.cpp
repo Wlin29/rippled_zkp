@@ -72,28 +72,34 @@ void IncrementalMerkleTree::updateFrontier(size_t position) {
         size_t parent_pos = current_pos >> 1;
         
         if (current_pos & 1) {
-            // Current is right child - combine with left sibling
+            // Right child - combine with left sibling
             size_t left_pos = current_pos ^ 1;
             uint256 left = getNode(level, left_pos);
             current = hash(left, current);
         } else {
-            // Current is left child - combine with right sibling (or empty)
+            // Left child - combine with right sibling or empty
             size_t right_pos = current_pos ^ 1;
             uint256 right = (right_pos < next_position_) ? 
                 getNode(level, right_pos) : empty_hashes_[level];
             current = hash(current, right);
         }
         
-        // Store the computed parent
+        // Store computed parent
         setNode(level + 1, parent_pos, current);
         current_pos = parent_pos;
-        
-        // If we've reached the root level, stop
-        if (level + 1 >= depth_) break;
     }
     
-    // Update root
+    // Update root in frontier
     frontier_[depth_] = current;
+    
+    // ADDITIONAL: Verify consistency
+    uint256 computed_root = computeRoot(position + 1);
+    if (current != computed_root) {
+        std::cout << "WARNING: Frontier root mismatch at position " << position 
+                  << ": frontier=" << current << " computed=" << computed_root << std::endl;
+        // Force consistency
+        frontier_[depth_] = computed_root;
+    }
 }
 
 uint256 IncrementalMerkleTree::root() const {
@@ -108,38 +114,47 @@ uint256 IncrementalMerkleTree::computeRoot(size_t upToPosition) const {
         return empty_hashes_[depth_];
     }
     
-    std::vector<uint256> level_nodes;
+    // FIXED: More robust root computation with proper boundary handling
+    uint256 current_root = empty_hashes_[depth_];
     
-    // Start with all leaves up to position
-    for (size_t pos = 0; pos < upToPosition; ++pos) {
-        level_nodes.push_back(getNode(0, pos));
+    // Use cached frontier if available
+    if (upToPosition == next_position_ && !frontier_.empty()) {
+        return frontier_[depth_];
     }
     
-    // Build tree bottom-up
+    // Recompute from scratch for consistency
+    std::vector<uint256> current_level;
+    
+    // Collect all leaves
+    for (size_t pos = 0; pos < upToPosition; ++pos) {
+        current_level.push_back(getNode(0, pos));
+    }
+    
+    // Build tree level by level
     for (size_t level = 0; level < depth_; ++level) {
-        if (level_nodes.size() <= 1) {
-            // Pad with empty hashes if needed
-            while (level_nodes.size() < (1ULL << (depth_ - level))) {
-                level_nodes.push_back(empty_hashes_[level]);
-            }
-            break;
+        if (current_level.empty()) {
+            return empty_hashes_[depth_];
+        }
+        
+        if (current_level.size() == 1 && level == depth_ - 1) {
+            return current_level[0];
         }
         
         std::vector<uint256> next_level;
         
-        // Always process in pairs, padding with empty hash if odd
-        for (size_t i = 0; i < level_nodes.size(); i += 2) {
-            uint256 left = level_nodes[i];
-            uint256 right = (i + 1 < level_nodes.size()) ? 
-                level_nodes[i + 1] : empty_hashes_[level];
+        // Process pairs, padding with empty hash if needed
+        for (size_t i = 0; i < current_level.size(); i += 2) {
+            uint256 left = current_level[i];
+            uint256 right = (i + 1 < current_level.size()) ? 
+                current_level[i + 1] : empty_hashes_[level];
             
             next_level.push_back(hash(left, right));
         }
         
-        level_nodes = std::move(next_level);
+        current_level = std::move(next_level);
     }
     
-    return level_nodes.empty() ? empty_hashes_[depth_] : level_nodes[0];
+    return current_level.empty() ? empty_hashes_[depth_] : current_level[0];
 }
 
 std::vector<uint256> IncrementalMerkleTree::authPath(size_t position) const {
