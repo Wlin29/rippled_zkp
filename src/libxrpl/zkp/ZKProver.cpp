@@ -99,7 +99,7 @@ void ZkProver::initialize() {
         libff::alt_bn128_pp::init_public_params();
         TreeManager::initialize();
         isInitialized = true;
-        std::cout << "Initializing ZkProver with unified circuit..." << std::endl;
+        std::cout << "Initializing ZkProver with the circuit..." << std::endl;
         
         if (!loadKeys("/tmp/rippled_zkp_keys")) {
             generateKeys(true);
@@ -109,10 +109,10 @@ void ZkProver::initialize() {
 }
 
 bool ZkProver::generateKeys(bool forceRegeneration) {
-    std::cout << "Starting unified key generation..." << std::endl;
+    std::cout << "Starting key generation..." << std::endl;
     
     if (!forceRegeneration && provingKey && verificationKey && unifiedCircuit) {
-        std::cout << "Unified keys already exist, skipping generation." << std::endl;
+        std::cout << "keys already exist, skipping generation." << std::endl;
         return true;
     }
     
@@ -120,7 +120,7 @@ bool ZkProver::generateKeys(bool forceRegeneration) {
         std::cout << "Initializing curve parameters..." << std::endl;
         libff::alt_bn128_pp::init_public_params();
         
-        std::cout << "Creating unified MerkleCircuit..." << std::endl;
+        std::cout << "Creating MerkleCircuit..." << std::endl;
         unifiedCircuit = std::make_shared<MerkleCircuit>(32);  // Standard depth
         
         std::cout << "Generating constraints..." << std::endl;
@@ -130,37 +130,37 @@ bool ZkProver::generateKeys(bool forceRegeneration) {
         auto cs = unifiedCircuit->getConstraintSystem();
         std::cout << "Circuit has " << cs.num_constraints() << " constraints" << std::endl;
         
-        std::cout << "Running unified key generator..." << std::endl;
+        std::cout << "Running key generator..." << std::endl;
         auto keypair = libsnark::r1cs_gg_ppzksnark_generator<DefaultCurve>(cs);
         
         provingKey = std::make_shared<libsnark::r1cs_gg_ppzksnark_proving_key<DefaultCurve>>(std::move(keypair.pk));
         verificationKey = std::make_shared<libsnark::r1cs_gg_ppzksnark_verification_key<DefaultCurve>>(std::move(keypair.vk));
         
-        std::cout << "Unified keys generated successfully!" << std::endl;
+        std::cout << "Keys generated successfully!" << std::endl;
         return true;
         
     } catch (const std::exception& e) {
-        std::cerr << "Error generating unified keys: " << e.what() << std::endl;
+        std::cerr << "Error generating keys: " << e.what() << std::endl;
         return false;
     } catch (...) {
-        std::cerr << "Unknown error generating unified keys" << std::endl;
+        std::cerr << "Unknown error generating keys" << std::endl;
         return false;
     }
 }
 
 bool ZkProver::saveKeys(const std::string& basePath) {
     try {
-        // Save unified keys
+        // Save keys
         if (provingKey) {
             std::ofstream pk_file(basePath + "_pk", std::ios::binary);
             pk_file << *provingKey;
-            std::cout << "Saved unified proving key" << std::endl;
+            std::cout << "Saved proving key" << std::endl;
         }
         
         if (verificationKey) {
             std::ofstream vk_file(basePath + "_vk", std::ios::binary);
             vk_file << *verificationKey;
-            std::cout << "Saved unified verification key" << std::endl;
+            std::cout << "Saved verification key" << std::endl;
         }
         
         return true;
@@ -172,7 +172,7 @@ bool ZkProver::saveKeys(const std::string& basePath) {
 
 bool ZkProver::loadKeys(const std::string& basePath) {
     try {
-        // Load unified keys
+        // Load keys
         std::ifstream pk_file(basePath + "_pk", std::ios::binary);
         std::ifstream vk_file(basePath + "_vk", std::ios::binary);
         
@@ -183,10 +183,10 @@ bool ZkProver::loadKeys(const std::string& basePath) {
             pk_file >> *provingKey;
             vk_file >> *verificationKey;
             
-            std::cout << "Loaded unified keys with " << provingKey->constraint_system.num_constraints() << " constraints" << std::endl;
+            std::cout << "Loaded keys with " << provingKey->constraint_system.num_constraints() << " constraints" << std::endl;
             
             // Create circuit that matches the loaded keys
-            std::cout << "Creating unified circuit to match loaded keys..." << std::endl;
+            std::cout << "Creating circuit to match loaded keys..." << std::endl;
             unifiedCircuit = std::make_shared<MerkleCircuit>(32);
             unifiedCircuit->generateConstraints();
             
@@ -195,17 +195,17 @@ bool ZkProver::loadKeys(const std::string& basePath) {
             auto key_cs = provingKey->constraint_system;
             
             if (circuit_cs.num_constraints() != key_cs.num_constraints()) {
-                std::cerr << "ERROR: Unified circuit constraint count (" << circuit_cs.num_constraints() 
+                std::cerr << "ERROR: circuit constraint count (" << circuit_cs.num_constraints() 
                           << ") doesn't match key constraint count (" << key_cs.num_constraints() << ")" << std::endl;
                 
                 // Force key regeneration
-                std::cout << "Regenerating unified keys due to mismatch..." << std::endl;
+                std::cout << "Regenerating keys due to mismatch..." << std::endl;
                 return generateKeys(true);
             }
             
             return true;
         } else {
-            std::cout << "No existing unified keys found" << std::endl;
+            std::cout << "No existing keys found" << std::endl;
             return false;
         }
         
@@ -223,7 +223,7 @@ ProofData ZkProver::createDepositProof(
 {
     try {
         if (!provingKey || !unifiedCircuit) {
-            std::cerr << "Unified proving key or circuit not available" << std::endl;
+            std::cerr << "Proving key or circuit not available" << std::endl;
             return {};
         }
         
@@ -231,7 +231,7 @@ ProofData ZkProver::createDepositProof(
         size_t position = TreeManager::addCommitment(commitment);
         uint256 currentRoot = TreeManager::getRoot();
         
-        std::cout << "=== DEPOSIT PROOF WITH UNIFIED CIRCUIT ===" << std::endl;
+        std::cout << "=== DEPOSIT PROOF ===" << std::endl;
         std::cout << "Added commitment at position " << position 
                   << " with root " << currentRoot << std::endl;
         
@@ -268,11 +268,11 @@ ProofData ZkProver::createDepositProof(
         // Use value_randomness as vcm_r
         uint256 vcm_r = fieldElementToUint256(value_randomness);
         
-        // Use unified circuit for deposit witness
+        // Use circuit for deposit witness
         auto witness = unifiedCircuit->generateDepositWitness(
             note, a_sk, vcm_r, commitmentBits, rootBits);
         
-        // Extract computed values from unified circuit
+        // Extract computed values from circuit
         FieldT public_anchor = unifiedCircuit->getAnchor();
         FieldT public_nullifier = unifiedCircuit->getNullifier();
         FieldT public_value_commitment = unifiedCircuit->getValueCommitment();
@@ -286,7 +286,7 @@ ProofData ZkProver::createDepositProof(
         std::cout << "Generated nullifier: " << public_nullifier << std::endl;
         std::cout << "Generated value_commitment: " << public_value_commitment << std::endl;
         
-        // Generate proof using unified proving key
+        // Generate proof using proving key
         auto proof = libsnark::r1cs_gg_ppzksnark_prover<DefaultCurve>(
             *provingKey, primary_input, witness);
         
@@ -320,11 +320,11 @@ ProofData ZkProver::createWithdrawalProof(
 {
     try {
         if (!provingKey || !unifiedCircuit) {
-            std::cerr << "Unified proving key or circuit not available" << std::endl;
+            std::cerr << "Proving key or circuit not available" << std::endl;
             return {};
         }
         
-        std::cout << "=== WITHDRAWAL PROOF WITH UNIFIED CIRCUIT ===" << std::endl;
+        std::cout << "=== WITHDRAWAL PROOF ===" << std::endl;
         
         Note note;
         note.value = amount;
@@ -370,7 +370,7 @@ ProofData ZkProver::createWithdrawalProof(
         // Use value_randomness as vcm_r
         uint256 vcm_r = fieldElementToUint256(value_randomness);
         
-        // Use unified circuit for withdrawal witness
+        // Use circuit for withdrawal witness
         auto witness = unifiedCircuit->generateWithdrawalWitness(
             note,       // The complete note structure
             a_sk,       // Spend key as uint256
@@ -394,7 +394,7 @@ ProofData ZkProver::createWithdrawalProof(
         primary_input.push_back(public_nullifier);
         primary_input.push_back(public_value_commitment);
         
-        // Generate proof using unified proving key
+        // Generate proof using proving key
         auto proof = libsnark::r1cs_gg_ppzksnark_prover<DefaultCurve>(
             *provingKey, primary_input, witness);
         
@@ -440,13 +440,13 @@ bool ZkProver::verifyDepositProof(
         primary_input.push_back(nullifier);
         primary_input.push_back(value_commitment);
 
-        std::cout << "=== DEPOSIT PROOF VERIFICATION (UNIFIED) ===" << std::endl;
+        std::cout << "=== DEPOSIT PROOF VERIFICATION ===" << std::endl;
         std::cout << "Anchor: " << anchor << std::endl;
         std::cout << "Nullifier: " << nullifier << std::endl;
         std::cout << "Value commitment: " << value_commitment << std::endl;
-        std::cout << "Using unified verification key" << std::endl;
+        std::cout << "Using verification key" << std::endl;
         
-        // Verify using unified verification key
+        // Verify using verification key
         bool verification_result = libsnark::r1cs_gg_ppzksnark_verifier_strong_IC<DefaultCurve>(
             *verificationKey, primary_input, proof);
         
@@ -484,10 +484,10 @@ bool ZkProver::verifyWithdrawalProof(
         primary_input.push_back(nullifier);
         primary_input.push_back(value_commitment);
         
-        std::cout << "=== WITHDRAWAL PROOF VERIFICATION (UNIFIED) ===" << std::endl;
+        std::cout << "=== WITHDRAWAL PROOF VERIFICATION ===" << std::endl;
         std::cout << "Using unified verification key" << std::endl;
         
-        // Verify using unified verification key (same as deposits)
+        // Verify using verification key (same as deposits)
         bool verification_result = libsnark::r1cs_gg_ppzksnark_verifier_strong_IC<DefaultCurve>(
             *verificationKey, primary_input, proof);
             

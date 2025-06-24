@@ -450,40 +450,51 @@ public:
     void testMerkleVerificationEnforcement() {
         testcase("Merkle Verification Enforcement");
         
-        // USE EXISTING UNIFIED KEYS - don't regenerate!
-        BEAST_EXPECT(zkp::ZkProver::generateKeys(false));
+        // Test parameters
+        uint64_t amount = 1000000;
+        std::string spendKey = generateRandomSpendKey();
         
-        // Create a valid tree with a real note
-        zkp::IncrementalMerkleTree tree(4);
-        uint256 realLeaf = generateRandomUint256();
-        size_t position = tree.append(realLeaf);
+        auto spendKeyBits = ripple::zkp::MerkleCircuit::spendKeyToBits(spendKey);
+        zkp::FieldT value_randomness = ripple::zkp::MerkleCircuit::bitsToFieldElement(spendKeyBits) + zkp::FieldT(amount);
         
+        // Create a simple tree for testing
+        zkp::IncrementalMerkleTree tree(20);
+        uint256 leaf = generateRandomUint256();
+        size_t position = tree.append(leaf);
         uint256 validRoot = tree.root();
+        
+        // Create nullifier
+        uint256 nullifier = generateRandomUint256();
+        
+        // Get valid authentication path
         std::vector<uint256> validPath = tree.authPath(position);
         
-        // Test 1: Valid withdrawal should work
-        uint64_t amount = 1000000;
-        uint256 nullifier = generateRandomUint256();
-        std::string spendKey = generateRandomSpendKey();
-        auto spendKeyBits = ripple::zkp::MerkleCircuit::spendKeyToBits(spendKey);
-        zkp::FieldT value_randomness = ripple::zkp::MerkleCircuit::bitsToFieldElement(spendKeyBits);
-        
-        std::cout << "=== MERKLE VERIFICATION ENFORCEMENT (UNIFIED CIRCUIT) ===" << std::endl;
-        std::cout << "Testing valid and invalid Merkle paths with unified circuit" << std::endl;
-        
+        // Test 1: Valid proof should succeed
         auto validProof = zkp::ZkProver::createWithdrawalProof(
             amount, validRoot, nullifier, validPath, position, spendKey, value_randomness);
         
         bool validResult = false;
         if (!validProof.empty()) {
             validResult = zkp::ZkProver::verifyWithdrawalProof(validProof);
-            BEAST_EXPECT(validResult);
         }
         
-        // Test 2: Invalid path should FAIL with unified circuit
+        BEAST_EXPECT(validResult);
+        std::cout << "Valid Merkle path: " << (validResult ? "PASS" : "FAIL") << std::endl;
+
+        // Test 2: Create truly invalid path
         std::vector<uint256> invalidPath(validPath.size());
-        for (auto& node : invalidPath) {
-            node = generateRandomUint256(); // Random garbage
+        for (size_t i = 0; i < invalidPath.size(); ++i) {
+            if (i < 2) {
+                // Make first two levels obviously wrong but not all zeros
+                invalidPath[i] = generateRandomUint256();
+                // Ensure they're not accidentally correct
+                if (invalidPath[i] == validPath[i]) {
+                    invalidPath[i] = validPath[i] + uint256{1};
+                }
+            } else {
+                // Use empty hashes for higher levels
+                invalidPath[i] = uint256{};
+            }
         }
         
         auto invalidProof = zkp::ZkProver::createWithdrawalProof(
@@ -494,16 +505,27 @@ public:
             invalidResult = zkp::ZkProver::verifyWithdrawalProof(invalidProof);
         }
         
-        // This SHOULD fail
+        // This MUST fail - if it passes, we have a security bug
+        BEAST_EXPECT(!invalidResult);
+        
         if (invalidResult) {
             std::cout << "CRITICAL BUG: Invalid Merkle path accepted!" << std::endl;
-            BEAST_EXPECT(false); // This should not happen
         } else {
-            std::cout << "Good: Unified circuit properly rejected invalid Merkle path" << std::endl;
-            BEAST_EXPECT(true);
+            std::cout << "Good: Invalid Merkle path properly rejected" << std::endl;
         }
         
-        std::cout << "Merkle verification (unified): valid=" << validResult << ", invalid=" << invalidResult << std::endl;
+        // Test 3: Invalid root should fail
+        uint256 invalidRoot = generateRandomUint256();
+        auto invalidRootProof = zkp::ZkProver::createWithdrawalProof(
+            amount, invalidRoot, nullifier, validPath, position, spendKey, value_randomness);
+        
+        bool invalidRootResult = false;
+        if (!invalidRootProof.empty()) {
+            invalidRootResult = zkp::ZkProver::verifyWithdrawalProof(invalidRootProof);
+        }
+        
+        BEAST_EXPECT(!invalidRootResult);
+        std::cout << "Invalid root: " << (invalidRootResult ? "FAIL" : "PASS") << std::endl;
     }
     
     void testUnifiedCircuitBehavior() {
@@ -548,20 +570,21 @@ public:
             
             // Cross-verification should fail (different public inputs)
             bool crossDeposit = zkp::ZkProver::verifyDepositProof(
-                withdrawalProof.proof, withdrawalProof.anchor, withdrawalProof.nullifier, withdrawalProof.value_commitment);
+                withdrawalProof.proof, depositProof.anchor, depositProof.nullifier, depositProof.value_commitment);
             bool crossWithdrawal = zkp::ZkProver::verifyWithdrawalProof(
-                depositProof.proof, depositProof.anchor, depositProof.nullifier, depositProof.value_commitment);
+                depositProof.proof, withdrawalProof.anchor, withdrawalProof.nullifier, withdrawalProof.value_commitment);
             
             BEAST_EXPECT(!crossDeposit);
             BEAST_EXPECT(!crossWithdrawal);
             
+            bool crossVerificationProperlyRejected = (!crossDeposit && !crossWithdrawal);
+            
             std::cout << "Unified circuit results:" << std::endl;
             std::cout << "  - Deposit proof verification: " << (depositValid ? "PASS" : "FAIL") << std::endl;
             std::cout << "  - Withdrawal proof verification: " << (withdrawalValid ? "PASS" : "FAIL") << std::endl;
-            std::cout << "  - Cross-verification properly rejected: " << (!crossDeposit && !crossWithdrawal ? "PASS" : "FAIL") << std::endl;
+            std::cout << "  - Cross-verification properly rejected: " << (crossVerificationProperlyRejected ? "PASS" : "FAIL") << std::endl;
             
-            // Verify they use the same constraint system
-            std::cout << "  - Both proofs use same unified verification key: YES" << std::endl;
+            BEAST_EXPECT(crossVerificationProperlyRejected);
             
         } else {
             std::cout << "Withdrawal proof creation failed" << std::endl;

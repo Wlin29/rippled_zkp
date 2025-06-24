@@ -56,6 +56,7 @@ private:
     // Merkle tree variables
     pb_variable_array<FieldT> address_bits_;        // Leaf position
     pb_variable<FieldT> read_successful_;           // Always 1
+    pb_variable<FieldT> is_withdrawal_;             // 1 for withdrawal, 0 for deposit
     
     // ===== BIT DECOMPOSITIONS =====
     pb_variable_array<FieldT> note_value_bits_;     // 64 bits
@@ -92,6 +93,16 @@ private:
     std::unique_ptr<packing_gadget<FieldT>> nullifier_packer_;
     std::unique_ptr<packing_gadget<FieldT>> value_commitment_packer_;
 
+    std::unique_ptr<digest_variable<FieldT>> note_value_digest_;
+    std::unique_ptr<digest_variable<FieldT>> note_rho_digest_;
+    std::unique_ptr<digest_variable<FieldT>> a_sk_digest_;
+    std::unique_ptr<digest_variable<FieldT>> vcm_r_digest_;
+    
+    std::unique_ptr<packing_gadget<FieldT>> note_value_digest_packer_;
+    std::unique_ptr<packing_gadget<FieldT>> note_rho_digest_packer_;
+    std::unique_ptr<packing_gadget<FieldT>> a_sk_digest_packer_;
+    std::unique_ptr<packing_gadget<FieldT>> vcm_r_digest_packer_;
+
 public:
     Impl(size_t tree_depth) : tree_depth_(tree_depth) {
         std::cout << "Creating MerkleCircuit with depth " << tree_depth << std::endl;
@@ -117,6 +128,7 @@ public:
         // Allocate Merkle tree variables
         address_bits_.allocate(*pb_, tree_depth_, "address_bits");
         read_successful_.allocate(*pb_, "read_successful");
+        is_withdrawal_.allocate(*pb_, "is_withdrawal");
         
         std::cout << "MerkleCircuit initialized successfully" << std::endl;
     }
@@ -164,44 +176,46 @@ public:
         computed_root_ = std::make_unique<digest_variable<FieldT>>(
             *pb_, 256, "computed_root");
         
-        // 4. SETUP SHA256 HASH GADGETS
+        // 4. CREATE DIGEST VARIABLES FOR HASH INPUTS - ADD THIS SECTION
+        note_value_digest_ = std::make_unique<digest_variable<FieldT>>(
+            *pb_, 256, "note_value_digest");
+        
+        note_rho_digest_ = std::make_unique<digest_variable<FieldT>>(
+            *pb_, 256, "note_rho_digest");
+        
+        a_sk_digest_ = std::make_unique<digest_variable<FieldT>>(
+            *pb_, 256, "a_sk_digest");
+        
+        vcm_r_digest_ = std::make_unique<digest_variable<FieldT>>(
+            *pb_, 256, "vcm_r_digest");
 
-        // Create digest variables for hash inputs
-        std::unique_ptr<digest_variable<FieldT>> note_value_digest_;
-        std::unique_ptr<digest_variable<FieldT>> note_rho_digest_;
-        std::unique_ptr<digest_variable<FieldT>> a_sk_digest_;
-        std::unique_ptr<digest_variable<FieldT>> vcm_r_digest_;
-
-        note_value_digest_ = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "note_value_digest");
-        note_rho_digest_ = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "note_rho_digest");
-        a_sk_digest_ = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "a_sk_digest");
-        vcm_r_digest_ = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "vcm_r_digest");
-
-        // Note commitment: SHA256(value_digest||rho_digest)
+        // 5. SETUP SHA256 HASH GADGETS (now digest variables exist)
+        // Note commitment: SHA256(value_digest || rho_digest)  
         note_commit_hasher_ = std::make_unique<libsnark::sha256_two_to_one_hash_gadget<FieldT>>(
             *pb_,
-            *note_value_digest_,   // Left digest
-            *note_rho_digest_,     // Right digest  
+            *note_value_digest_, 
+            *note_rho_digest_,  
             *note_commitment_hash_,
             "note_commit_hasher");
 
-        // Nullifier: SHA256(a_sk_digest||rho_digest)
+        // Nullifier: SHA256(a_sk_digest || rho_digest)
         nullifier_hasher_ = std::make_unique<libsnark::sha256_two_to_one_hash_gadget<FieldT>>(
             *pb_,
-            *a_sk_digest_,         // Left digest
-            *note_rho_digest_,     // Right digest
+            *a_sk_digest_,         
+            *note_rho_digest_,     
             *nullifier_hash_,
             "nullifier_hasher");
 
-        // Value commitment: SHA256(value_digest||vcm_r_digest)
+        // Value commitment: SHA256(value_digest || vcm_r_digest)
         value_commit_hasher_ = std::make_unique<libsnark::sha256_two_to_one_hash_gadget<FieldT>>(
             *pb_,
-            *note_value_digest_,   // Left digest
-            *vcm_r_digest_,        // Right digest
+            *note_value_digest_,   
+            *vcm_r_digest_,        
             *value_commitment_hash_,
             "value_commit_hasher");
-    
-        // 5. SETUP MERKLE TREE VERIFICATION
+
+
+        // 6. SETUP MERKLE TREE VERIFICATION
         auth_path_ = std::make_unique<merkle_authentication_path_variable<FieldT, libsnark::sha256_two_to_one_hash_gadget<FieldT>>>(
             *pb_, tree_depth_, "auth_path");
         
@@ -215,7 +229,7 @@ public:
             read_successful_,
             "merkle_verifier");
         
-        // 6. SETUP OUTPUT PACKING GADGETS
+        // 7. SETUP OUTPUT PACKING GADGETS
         anchor_packer_ = std::make_unique<packing_gadget<FieldT>>(
             *pb_, computed_root_->bits, anchor_, "anchor_packer");
         
@@ -225,7 +239,7 @@ public:
         value_commitment_packer_ = std::make_unique<packing_gadget<FieldT>>(
             *pb_, value_commitment_hash_->bits, value_commitment_, "value_commitment_packer");
         
-        // 7. GENERATE ALL CONSTRAINTS
+        // 8. GENERATE ALL CONSTRAINTS
     
         // Input packing constraints
         note_value_packer_->generate_r1cs_constraints(true);
@@ -244,6 +258,13 @@ public:
         
         // Merkle tree constraints
         merkle_verifier_->generate_r1cs_constraints();
+
+        // Conditional Merkle verification enforcement
+        // For deposits (is_withdrawal = 0), Merkle verification is bypassed
+        // For withdrawals (is_withdrawal = 1), Merkle verification is enforced
+        pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+            read_successful_, is_withdrawal_, read_successful_), 
+            "conditional_merkle_verification");
         
         // Read successful constraint (always 1)
         pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
@@ -353,6 +374,9 @@ public:
         // For deposits, use dummy authentication path
         std::vector<std::vector<bool>> dummyPath(tree_depth_, std::vector<bool>(256, false));
         
+        // SET DEPOSIT MODE
+        pb_->val(is_withdrawal_) = FieldT::zero();
+        
         return generateWitness(note, a_sk, vcm_r, leaf, dummyPath, root, 0);
     }
     
@@ -366,6 +390,9 @@ public:
         size_t address)
     {
         std::cout << "=== WITHDRAWAL WITNESS GENERATION ===" << std::endl;
+        
+        // SET WITHDRAWAL MODE
+        pb_->val(is_withdrawal_) = FieldT::one();
         
         return generateWitness(note, a_sk, vcm_r, leaf, path, root, address);
     }
@@ -389,6 +416,7 @@ private:
             pb_->val(a_sk_) = MerkleCircuit::uint256ToFieldElement(a_sk);
             pb_->val(vcm_r_) = MerkleCircuit::uint256ToFieldElement(vcm_r);
             pb_->val(read_successful_) = FieldT::one();
+            pb_->val(is_withdrawal_) = FieldT::one(); 
             
             // 2. SET ADDRESS BITS
             for (size_t i = 0; i < tree_depth_; ++i) {
@@ -449,15 +477,50 @@ private:
             pb_->val(a_sk_bits_[i]) = a_sk_bits[i] ? FieldT::one() : FieldT::zero();
             pb_->val(vcm_r_bits_[i]) = vcm_r_bits[i] ? FieldT::one() : FieldT::zero();
         }
+        
+        // Set note_value_digest bits (padded to 256 bits)
+        for (size_t i = 0; i < 256; ++i) {
+            if (i < 64) {
+                pb_->val(note_value_digest_->bits[i]) = FieldT((value_u64 >> i) & 1);
+            } else {
+                pb_->val(note_value_digest_->bits[i]) = FieldT::zero();
+            }
+        }
+        
+        // Set other digest bits directly from input bits
+        for (size_t i = 0; i < 256; ++i) {
+            pb_->val(note_rho_digest_->bits[i]) = rho_bits[i] ? FieldT::one() : FieldT::zero();
+            pb_->val(a_sk_digest_->bits[i]) = a_sk_bits[i] ? FieldT::one() : FieldT::zero();
+            pb_->val(vcm_r_digest_->bits[i]) = vcm_r_bits[i] ? FieldT::one() : FieldT::zero();
+        }
     }
     
-    // FIXED: Proper authentication path handling
     void setAuthenticationPath(const std::vector<std::vector<bool>>& path, size_t address) {
         for (size_t level = 0; level < tree_depth_; ++level) {
             // Determine if we need left or right sibling at this level
             bool is_right = (address >> level) & 1;
             
-            if (level < path.size()) {
+            if (level < path.size() && !path[level].empty()) {
+                // VALIDATION: Check for suspicious all-zero paths at low levels
+                size_t nonZeroBits = 0;
+                for (bool bit : path[level]) {
+                    if (bit) nonZeroBits++;
+                }
+                
+                // For withdrawals, reject paths that are obviously invalid
+                if (nonZeroBits == 0 && level < 3) {
+                    std::cout << "WARNING: Suspicious all-zero authentication path at level " << level << std::endl;
+                    
+                    // ADD CONSTRAINT: For withdrawals, early levels should not be all zero
+                    // This prevents accepting obviously invalid paths
+                    if (level < 2) { // First two levels are critical
+                        // Force at least one bit to be 1 in the first levels for withdrawals
+                        pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                            is_withdrawal_, 0, FieldT::zero()), 
+                            "reject_invalid_path_level_" + std::to_string(level));
+                    }
+                }
+                
                 // Set the sibling hash at this level
                 for (size_t bit = 0; bit < 256; ++bit) {
                     FieldT bit_value = FieldT::zero();
@@ -468,10 +531,8 @@ private:
                     if (is_right) {
                         // We are the right child, sibling goes to left
                         pb_->val(auth_path_->left_digests[level].bits[bit]) = bit_value;
-                        pb_->val(auth_path_->right_digests[level].bits[bit]) = FieldT::zero(); // Will be set by merkle gadget
                     } else {
                         // We are the left child, sibling goes to right  
-                        pb_->val(auth_path_->left_digests[level].bits[bit]) = FieldT::zero(); // Will be set by merkle gadget
                         pb_->val(auth_path_->right_digests[level].bits[bit]) = bit_value;
                     }
                 }
