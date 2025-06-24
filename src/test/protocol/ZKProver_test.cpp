@@ -62,6 +62,7 @@ public:
         testIncrementalMerkleTree();
         testMerkleVerificationEnforcement();
         testUnifiedCircuitBehavior();
+        testWithdrawalProofIncrementalMerkleTree();
     }
 
     void testKeyGeneration()
@@ -619,6 +620,41 @@ public:
         } else {
             std::cout << "Withdrawal proof creation failed" << std::endl;
         }
+    }
+    
+    void testWithdrawalProofIncrementalMerkleTree() {
+        testcase("Withdrawal Proof using Incremental Merkle Tree");
+        
+        zkp::IncrementalMerkleTree tree(4);
+        
+        // Add test notes
+        uint256 note1 = generateRandomUint256();
+        uint256 note2 = generateRandomUint256();
+        uint256 note3 = generateRandomUint256();
+        
+        size_t pos1 = tree.append(note1);
+        size_t pos2 = tree.append(note2);
+        size_t pos3 = tree.append(note3);
+        
+        // Use tree's root and authentication paths
+        uint256 validRoot = tree.root();
+        std::vector<uint256> validPath = tree.authPath(pos2);
+        
+        uint64_t amount = 1000000;
+        uint256 nullifier = generateRandomUint256();
+        std::string spendKey = generateRandomSpendKey();
+        auto spendKeyBits = ripple::zkp::MerkleCircuit::spendKeyToBits(spendKey);
+        zkp::FieldT value_randomness = ripple::zkp::MerkleCircuit::bitsToFieldElement(spendKeyBits) + zkp::FieldT(amount);
+        
+        // Test withdrawal with tree-generated data
+        auto validProof = zkp::ZkProver::createWithdrawalProof(
+            amount, validRoot, nullifier, validPath, pos2, spendKey, value_randomness);
+            
+        bool validResult = zkp::ZkProver::verifyWithdrawalProof(validProof);
+        BEAST_EXPECT(validResult);
+        
+        std::cout << "Incremental Merkle Tree withdrawal test: " 
+                << (validResult ? "PASS" : "FAIL") << std::endl;
     }
 };
 
