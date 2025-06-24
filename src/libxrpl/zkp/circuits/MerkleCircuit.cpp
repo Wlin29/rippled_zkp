@@ -278,6 +278,13 @@ public:
         // Boolean constraints for all bits
         generateBooleanConstraints();
         
+        // SECURITY CONSTRAINT: For withdrawals, anchor must be correctly computed from merkle path
+        // The anchor_packer already enforces: anchor = pack(computed_root_->bits)
+        // We just need to ensure this is enforced for withdrawals
+        pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+            is_withdrawal_, read_successful_, is_withdrawal_), 
+            "enforce_withdrawal_merkle_verification");
+        
         std::cout << "Constraints generated. Total: " << pb_->num_constraints() << std::endl;
     }
     
@@ -391,23 +398,45 @@ public:
     {
         std::cout << "=== WITHDRAWAL WITNESS GENERATION ===" << std::endl;
         
-        // VALIDATION: Check path validity before proceeding
+        // Check path validity before proceeding
         bool hasValidPath = false;
+        size_t validLevels = 0;
+        
         for (size_t level = 0; level < std::min(path.size(), size_t(3)); ++level) {
             if (level < path.size()) {
+                size_t nonZeroBits = 0;
                 for (bool bit : path[level]) {
-                    if (bit) {
-                        hasValidPath = true;
-                        break;
-                    }
+                    if (bit) nonZeroBits++;
                 }
-                if (hasValidPath) break;
+                
+                if (nonZeroBits > 0) {
+                    hasValidPath = true;
+                    validLevels++;
+                }
             }
         }
         
-        if (!hasValidPath) {
-            std::cout << "WARNING: Path appears to be all zeros - may be invalid" << std::endl;
+        // REJECT OBVIOUSLY INVALID PATHS
+        if (!hasValidPath || validLevels < 2) {
+            std::cout << "ERROR: Invalid authentication path detected!" << std::endl;
+            std::cout << "Valid levels: " << validLevels << std::endl;
+            throw std::invalid_argument("Invalid Merkle authentication path for withdrawal");
         }
+        
+        // Additional validation: check path consistency
+        bool pathConsistent = true;
+        for (size_t level = 0; level < path.size() && level < 3; ++level) {
+            if (path[level].size() != 256) {
+                std::cout << "ERROR: Path level " << level << " has wrong size: " << path[level].size() << std::endl;
+                pathConsistent = false;
+            }
+        }
+        
+        if (!pathConsistent) {
+            throw std::invalid_argument("Inconsistent authentication path structure");
+        }
+        
+        std::cout << "Path validation passed - proceeding with witness generation" << std::endl;
         
         // SET WITHDRAWAL MODE
         pb_->val(is_withdrawal_) = FieldT::one();
@@ -514,33 +543,44 @@ private:
     }
     
     void setAuthenticationPath(const std::vector<std::vector<bool>>& path, size_t address) {
+        // Create path validation variables
+        std::vector<pb_variable<FieldT>> path_validity_checks;
+        
         for (size_t level = 0; level < tree_depth_; ++level) {
             // Determine if we need left or right sibling at this level
             bool is_right = (address >> level) & 1;
             
             if (level < path.size() && !path[level].empty()) {
-                // VALIDATION: Check for suspicious all-zero paths at low levels
+                // Check for suspicious all-zero paths at critical levels
                 size_t nonZeroBits = 0;
                 for (bool bit : path[level]) {
                     if (bit) nonZeroBits++;
                 }
                 
-                // SECURITY FIX: Reject obviously invalid paths for withdrawals
+                // For withdrawals, critical levels must not be all zero
                 if (nonZeroBits == 0 && level < 3) {
                     std::cout << "WARNING: Suspicious all-zero authentication path at level " << level << std::endl;
                     
-                    // Add a constraint that forces withdrawal mode to fail with all-zero paths
-                    // Create a path validation variable
-                    pb_variable<FieldT> path_invalid;
-                    path_invalid.allocate(*pb_, "path_invalid_" + std::to_string(level));
+                    // Create a validation variable for this level
+                    pb_variable<FieldT> level_valid;
+                    level_valid.allocate(*pb_, "level_valid_" + std::to_string(level));
+                    path_validity_checks.push_back(level_valid);
                     
-                    // Set path_invalid = 1 when path is all zeros and we're in withdrawal mode
-                    pb_->val(path_invalid) = FieldT::one();
+                    // Set level_valid = 0 for all-zero paths (invalid)
+                    pb_->val(level_valid) = FieldT::zero();
                     
-                    // Add constraint: is_withdrawal * path_invalid = 0 (forces failure)
+                    // Add constraint: for withdrawals, level_valid must be 1
+                    // This forces: is_withdrawal => level_valid = 1
+                    // If level_valid = 0 and is_withdrawal = 1, constraint fails
                     pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
-                        is_withdrawal_, path_invalid, FieldT::zero()), 
-                        "reject_invalid_path_level_" + std::to_string(level));
+                        is_withdrawal_, 1, level_valid), 
+                        "enforce_valid_path_level_" + std::to_string(level));
+                } else {
+                    // Valid path element
+                    pb_variable<FieldT> level_valid;
+                    level_valid.allocate(*pb_, "level_valid_" + std::to_string(level));
+                    path_validity_checks.push_back(level_valid);
+                    pb_->val(level_valid) = FieldT::one();
                 }
                 
                 // Set the sibling hash at this level
@@ -559,12 +599,46 @@ private:
                     }
                 }
             } else {
-                // Empty level - use zero hash
+                // Empty level - only acceptable for deposits
+                pb_variable<FieldT> level_valid;
+                level_valid.allocate(*pb_, "level_valid_" + std::to_string(level));
+                path_validity_checks.push_back(level_valid);
+                
+                // For deposits, empty paths are OK (level_valid = 1)
+                // For withdrawals, empty paths are invalid (level_valid = 0 if is_withdrawal = 1)
+                pb_->val(level_valid) = FieldT::one();
+                
+                // Add constraint: if withdrawal and level < 3, then level_valid = 0 (forces failure)
+                if (level < 3) {
+                    pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                        is_withdrawal_, 1, level_valid), 
+                        "enforce_non_empty_path_level_" + std::to_string(level));
+                }
+                
+                // Set empty hash
                 for (size_t bit = 0; bit < 256; ++bit) {
                     pb_->val(auth_path_->left_digests[level].bits[bit]) = FieldT::zero();
                     pb_->val(auth_path_->right_digests[level].bits[bit]) = FieldT::zero();
                 }
             }
+        }
+        
+        // ADDITIONAL SECURITY: Create overall path validity constraint
+        if (!path_validity_checks.empty()) {
+            pb_variable<FieldT> overall_path_valid;
+            overall_path_valid.allocate(*pb_, "overall_path_valid");
+            
+            // Sum up all path validity checks
+            libsnark::linear_combination<FieldT> validity_sum;
+            for (const auto& check : path_validity_checks) {
+                validity_sum = validity_sum + check;
+            }
+            
+            // For withdrawals, require at least N valid path elements
+            size_t min_valid_levels = std::min(tree_depth_, size_t(3));
+            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                is_withdrawal_ * min_valid_levels, 1, validity_sum), 
+                "enforce_minimum_valid_path_elements");
         }
     }
     

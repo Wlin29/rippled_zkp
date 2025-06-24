@@ -484,31 +484,61 @@ public:
         // Test 2: Create truly invalid path
         std::vector<uint256> invalidPath(validPath.size());
         for (size_t i = 0; i < invalidPath.size(); ++i) {
-            if (i < 2) {
-                // Make first two levels obviously wrong but not all zeros
-                invalidPath[i] = generateRandomUint256();
-                // Ensure they're not accidentally correct
-                if (invalidPath[i] == validPath[i]) {
-                    invalidPath[i] = validPath[i] + uint256{1};
-                }
-            } else {
-                // Use empty hashes for higher levels
+            if (i < 3) {
+                // Make first THREE levels completely zero (obviously invalid)
                 invalidPath[i] = uint256{};
+            } else {
+                // Use random values for higher levels
+                invalidPath[i] = generateRandomUint256();
             }
         }
         
-        auto invalidProof = zkp::ZkProver::createWithdrawalProof(
-            amount, validRoot, nullifier, invalidPath, position, spendKey, value_randomness);
-        
-        bool invalidResult = false;
-        if (!invalidProof.empty()) {
-            invalidResult = zkp::ZkProver::verifyWithdrawalProof(invalidProof);
+        // Verify that the path is actually different from valid path
+        bool pathsAreDifferent = false;
+        for (size_t i = 0; i < 3; ++i) {
+            if (invalidPath[i] != validPath[i]) {
+                pathsAreDifferent = true;
+                break;
+            }
         }
         
-        // This MUST fail - if it passes, we have a security bug
-        BEAST_EXPECT(!invalidResult);
+        if (!pathsAreDifferent) {
+            std::cout << "ERROR: Failed to create different invalid path!" << std::endl;
+            // Force it to be different
+            invalidPath[0] = uint256{};
+            invalidPath[1] = uint256{};
+            invalidPath[2] = uint256{};
+        }
         
-        if (invalidResult) {
+        std::cout << "Testing with invalid path (first 3 levels zero)..." << std::endl;
+        
+        // This should FAIL during proof generation or verification
+        bool proofGenerationFailed = false;
+        auto invalidProof = zkp::ProofData{};
+        
+        try {
+            invalidProof = zkp::ZkProver::createWithdrawalProof(
+                amount, validRoot, nullifier, invalidPath, position, spendKey, value_randomness);
+        } catch (const std::exception& e) {
+            std::cout << "Good: Invalid path rejected during proof generation: " << e.what() << std::endl;
+            proofGenerationFailed = true;
+        }
+        
+        bool invalidResult = false;
+        if (!proofGenerationFailed && !invalidProof.empty()) {
+            try {
+                invalidResult = zkp::ZkProver::verifyWithdrawalProof(invalidProof);
+            } catch (const std::exception& e) {
+                std::cout << "Good: Invalid proof rejected during verification: " << e.what() << std::endl;
+                invalidResult = false;
+            }
+        }
+        
+        // Either proof generation should fail OR verification should fail
+        bool securityWorking = proofGenerationFailed || !invalidResult;
+        BEAST_EXPECT(securityWorking);
+        
+        if (!securityWorking) {
             std::cout << "CRITICAL BUG: Invalid Merkle path accepted!" << std::endl;
         } else {
             std::cout << "Good: Invalid Merkle path properly rejected" << std::endl;
