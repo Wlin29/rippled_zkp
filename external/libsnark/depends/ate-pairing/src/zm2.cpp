@@ -3641,11 +3641,14 @@ void Fp::setModulo(const mie::Vuint& p, int mode, bool useMulx, bool definedBN_S
 		const size_t codeSize = PageSize * 9;
 		const size_t dataSize = PageSize * 1;
 
+		#if defined(__x86_64__) || defined(_M_X64)
+		// Only use Xbyak on x86_64
 		static std::vector<Xbyak::uint8> buf;
 		buf.resize(codeSize + dataSize + PageSize);
 		Xbyak::uint8 *const codeAddr = Xbyak::CodeArray::getAlignedAddress(&buf[0], PageSize);
 		Xbyak::CodeArray::protect(codeAddr, codeSize, true);
 		s_data = Xbyak::CastTo<Data*>(codeAddr + codeSize);
+		
 
 //		printf("codeAddr=%p, dataAddr=%p\n", codeAddr, s_data);
 		if ((size_t)codeAddr & 0xffffffff00000000ULL || (size_t)s_data & 0xffffffff00000000ULL) {
@@ -3671,7 +3674,7 @@ void Fp::setModulo(const mie::Vuint& p, int mode, bool useMulx, bool definedBN_S
 			Fp::Dbl::pNTbl_[h].setDirect(pN >> h);
 		}
 		setTablesForDiv(p);
-
+		
 		// setup code
 		static PairingCode code(codeSize, codeAddr);
 		code.init(p_, mode, useMulx);
@@ -3683,9 +3686,11 @@ void Fp::setModulo(const mie::Vuint& p, int mode, bool useMulx, bool definedBN_S
 			}
 		}
 		return;
+		#endif
 	} catch (std::exception& e) {
 		fprintf(stderr, "setModulo ERR:%s\n", e.what());
 	}
 	::exit(1);
+	
 }
 

@@ -58,9 +58,9 @@ void _polynomial_xgcd(const std::vector<FieldT> &a, const std::vector<FieldT> &b
     _polynomial_division(V1, R, V3, b);
 
     FieldT lead_coeff = G.back().inverse();
-    std::transform(G.begin(), G.end(), G.begin(), std::bind1st(std::multiplies<FieldT>(), lead_coeff));
-    std::transform(U.begin(), U.end(), U.begin(), std::bind1st(std::multiplies<FieldT>(), lead_coeff));
-    std::transform(V1.begin(), V1.end(), V1.begin(), std::bind1st(std::multiplies<FieldT>(), lead_coeff));
+    std::transform(G.begin(), G.end(), G.begin(), [&](const FieldT& x){ return lead_coeff * x; });
+    std::transform(U.begin(), U.end(), U.begin(), [&](const FieldT& x){ return lead_coeff * x; });
+    std::transform(V1.begin(), V1.end(), V1.begin(), [&](const FieldT& x){ return lead_coeff * x; });
 
     g = G;
     u = U;

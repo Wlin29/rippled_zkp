@@ -137,6 +137,11 @@ pkg_check_modules(
   libcrypto
 )
 
+# Detect macOS and disable procps if on Apple
+if(APPLE)
+  set(WITH_PROCPS OFF)
+endif()
+
 if("${WITH_PROCPS}")
   pkg_check_modules(
     PROCPS

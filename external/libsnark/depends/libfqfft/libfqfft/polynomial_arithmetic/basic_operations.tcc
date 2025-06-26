@@ -148,7 +148,7 @@ void _polynomial_multiplication_on_fft(std::vector<FieldT> &c, const std::vector
 #endif
 
     const FieldT sconst = FieldT(n).inverse();
-    std::transform(c.begin(), c.end(), c.begin(), std::bind1st(std::multiplies<FieldT>(), sconst));
+    std::transform(c.begin(), c.end(), c.begin(), [&](const FieldT& x){ return sconst * x; });
     _condense(c);
 }
 
