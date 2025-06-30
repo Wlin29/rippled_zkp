@@ -384,3 +384,18 @@ TYPED_SFIELD(sfZKProof,            VL,         60)
 TYPED_SFIELD(sfCommitment,         UINT256,    61)
 TYPED_SFIELD(sfNullifier,          UINT256,    62)
 TYPED_SFIELD(sfCommitments,        UINT256,    63)
+
+TYPED_SFIELD(sfValueCommitment,    VL,         64)  // Cryptographic commitment hiding amount
+TYPED_SFIELD(sfMerkleRoot,         UINT256,    65)  // Tree root for withdrawal proofs
+TYPED_SFIELD(sfAuthPath,           VL,         66)  // Merkle authentication path
+TYPED_SFIELD(sfNullifierHash,      UINT256,    67)  // Hash of nullifier for double-spend prevention
+TYPED_SFIELD(sfSpendKey,           VL,         68)  // Spending key (for proof generation, not storage)
+TYPED_SFIELD(sfRandomness,         UINT256,    69)  // Note randomness value
+TYPED_SFIELD(sfNoteValue,          UINT64,     70)  // Note value (private)
+TYPED_SFIELD(sfTreeDepth,          UINT32,     71)  // Merkle tree depth
+TYPED_SFIELD(sfLeafIndex,          UINT64,     72)  // Position in Merkle tree
+TYPED_SFIELD(sfProofType,          UINT8,      73)  // 0 = deposit, 1 = withdrawal
+TYPED_SFIELD(sfAnchor,             UINT256,    74)  // Tree anchor for proof verification
+TYPED_SFIELD(sfCreatedTime,        UINT32,     75)  // Timestamp when commitment created
+TYPED_SFIELD(sfShieldedBalance,    AMOUNT,     76)  // Shielded pool balance
+TYPED_SFIELD(sfTimestamp,          UINT32,     77) // Timestamp for the note creation or spending

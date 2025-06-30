@@ -1,10 +1,12 @@
 #include "ZkWithdraw.h"
-#include "ShieldedMerkleTree.h"
+#include "ZKProver.h"
 #include <xrpld/ledger/ApplyViewImpl.h>
 #include <xrpl/protocol/Feature.h>
 #include <xrpl/protocol/Indexes.h>
 #include <xrpl/protocol/jss.h>
 #include <xrpl/protocol/TxFlags.h>
+#include <xrpl/protocol/STTx.h>
+#include <xrpl/basics/Log.h>
 
 namespace ripple {
 
@@ -31,14 +33,65 @@ inline Keylet shielded_pool()
 NotTEC
 ZkWithdraw::preflight(PreflightContext const& ctx)
 {
+    // Check if zero-knowledge privacy feature is enabled
     if (!ctx.rules.enabled(featureZeroKnowledgePrivacy))
+    {
+        JLOG(ctx.j.debug()) << "ZK Privacy feature not enabled";
         return temDISABLED;
+    }
 
-    // if (ctx.tx.getFlags() & tfUniversalMask)
-    //     return temINVALID_FLAG;
-
+    // Validate required fields are present
     if (!ctx.tx.isFieldPresent(sfZKProof))
+    {
+        JLOG(ctx.j.debug()) << "Missing ZKProof field";
         return temMALFORMED;
+    }
+
+    if (!ctx.tx.isFieldPresent(sfNullifier))
+    {
+        JLOG(ctx.j.debug()) << "Missing Nullifier field";
+        return temMALFORMED;
+    }
+
+    if (!ctx.tx.isFieldPresent(sfMerkleRoot))
+    {
+        JLOG(ctx.j.debug()) << "Missing MerkleRoot field";
+        return temMALFORMED;
+    }
+
+    if (!ctx.tx.isFieldPresent(sfValueCommitment))
+    {
+        JLOG(ctx.j.debug()) << "Missing ValueCommitment field";
+        return temMALFORMED;
+    }
+
+    if (!ctx.tx.isFieldPresent(sfDestination))
+    {
+        JLOG(ctx.j.debug()) << "Missing Destination field";
+        return temMALFORMED;
+    }
+
+    if (!ctx.tx.isFieldPresent(sfAmount))
+    {
+        JLOG(ctx.j.debug()) << "Missing Amount field";
+        return temMALFORMED;
+    }
+
+    // Validate amount is positive XRP
+    auto const amount = ctx.tx.getFieldAmount(sfAmount);
+    if (!amount.native() || amount <= beast::zero)
+    {
+        JLOG(ctx.j.debug()) << "Invalid withdrawal amount";
+        return temBAD_AMOUNT;
+    }
+
+    // Basic validation of ZK proof length
+    auto const zkProofBlob = ctx.tx.getFieldVL(sfZKProof);
+    if (zkProofBlob.empty() || zkProofBlob.size() > 10000) // Reasonable size limits
+    {
+        JLOG(ctx.j.debug()) << "Invalid ZK proof size: " << zkProofBlob.size();
+        return temMALFORMED;
+    }
 
     return preflight2(ctx);
 }
@@ -46,54 +99,222 @@ ZkWithdraw::preflight(PreflightContext const& ctx)
 TER
 ZkWithdraw::preclaim(PreclaimContext const& ctx)
 {
-    // Keylet poolKeylet = keylet::shielded_pool();
-    
-    // Use read instead of peek
-    // auto shieldedPoolSLE = ctx.view.read(poolKeylet);
-    // if (!shieldedPoolSLE)
-    //     return tecNO_ENTRY;
+    // Initialize ZK system if not already done
+    if (!zkp::ZkProver::isInitialized)
+    {
+        zkp::ZkProver::initialize();
+    }
 
-    // Deserialize the Merkle tree
-    // SerialIter sit(shieldedPoolSLE->getFieldVL(sfMerkleTree));
-    // auto tree = ShieldedMerkleTree::deserialize(sit);
+    // Check if nullifier has already been used (prevent double-spending)
+    auto const nullifier = ctx.tx.getFieldH256(sfNullifier);
+    auto nullifierKeylet = keylet::nullifier(nullifier);
     
+    if (ctx.view.exists(nullifierKeylet))
+    {
+        JLOG(ctx.j.warn()) << "Nullifier already used: " << nullifier;
+        return tecDUPLICATE;
+    }
+
+    // Verify the zero-knowledge proof
+    if (!verifyZkProof(ctx))
+    {
+        JLOG(ctx.j.warn()) << "ZK proof verification failed";
+        return temBAD_PROOF;
+    }
+
+    // Check shielded pool has sufficient balance
+    Keylet poolKeylet = keylet::shielded_pool();
+    auto shieldedPoolSLE = ctx.view.read(poolKeylet);
+    
+    if (!shieldedPoolSLE)
+    {
+        JLOG(ctx.j.warn()) << "Shielded pool does not exist";
+        return tecNO_ENTRY;
+    }
+
+    auto const withdrawalAmount = ctx.tx.getFieldAmount(sfAmount);
+    auto const poolBalance = shieldedPoolSLE->getFieldAmount(sfBalance);
+    
+    if (poolBalance < withdrawalAmount)
+    {
+        JLOG(ctx.j.warn()) << "Insufficient balance in shielded pool. Pool: " 
+                          << poolBalance << ", Requested: " << withdrawalAmount;
+        return tecINSUFFICIENT_FUNDS;
+    }
+
     return tesSUCCESS;
 }
 
 TER
 ZkWithdraw::doApply()
 {
-    // Verify the proof
-    if (!verifyProof())
+    // Get withdrawal details from transaction
+    auto const& tx = ctx_.tx;
+    auto const destination = tx.getAccountID(sfDestination);
+    auto const amount = tx.getFieldAmount(sfAmount);
+    auto const nullifier = tx.getFieldH256(sfNullifier);
+
+    JLOG(j_.info()) << "Processing ZK withdrawal: " << amount.getText() 
+                    << " to " << toBase58(destination);
+
+    // Update shielded pool balance
+    Keylet poolKeylet = keylet::shielded_pool();
+    auto shieldedPoolSLE = view().peek(poolKeylet);
+    
+    if (!shieldedPoolSLE)
     {
-        return temBAD_PROOF;
+        JLOG(j_.error()) << "Shielded pool SLE not found during apply";
+        return tecINTERNAL;
     }
 
-    // Get withdrawal details
-    const auto& tx = ctx_.tx;
-    const auto destination = tx.getAccountID(sfDestination);
-    const auto amount = tx.getFieldAmount(sfAmount);
+    // Decrease pool balance
+    auto currentBalance = shieldedPoolSLE->getFieldAmount(sfBalance);
+    auto newBalance = currentBalance - amount;
+    
+    if (newBalance < beast::zero)
+    {
+        JLOG(j_.error()) << "Pool balance would go negative";
+        return tecINSUFFICIENT_FUNDS;
+    }
+    
+    shieldedPoolSLE->setFieldAmount(sfBalance, newBalance);
+    view().update(shieldedPoolSLE);
 
-    // Transfer XRP from shielded pool to the destination
-    // (Assume you have a function to handle this, or implement as needed)
-    // Example: TER result = view().send(xrpAccount(), destination, amount.xrp().drops());
-    // if (!isTesSuccess(result))
-    //     return result;
+    JLOG(j_.debug()) << "Updated pool balance from " << currentBalance.getText() 
+                     << " to " << newBalance.getText();
 
-    // Record nullifier to prevent double spending
-    auto nullifierKeylet = keylet::nullifier(tx.getFieldH256(sfNullifier));
+    // Record nullifier to prevent double-spending
+    auto nullifierKeylet = keylet::nullifier(nullifier);
     auto nullifierSLE = std::make_shared<SLE>(nullifierKeylet);
-    nullifierSLE->setFieldH256(sfNullifier, tx.getFieldH256(sfNullifier));
+    nullifierSLE->setFieldH256(sfNullifier, nullifier);
+    nullifierSLE->setFieldU32(sfTimestamp, view().parentCloseTime().time_since_epoch().count());
     view().insert(nullifierSLE);
+
+    JLOG(j_.debug()) << "Recorded nullifier: " << nullifier;
+
+    // Transfer XRP to destination account
+    TER transferResult = transferXRP(destination, amount);
+    if (!isTesSuccess(transferResult))
+    {
+        JLOG(j_.error()) << "Failed to transfer XRP to destination: " << transferResult;
+        return transferResult;
+    }
+
+    JLOG(j_.info()) << "ZK withdrawal completed successfully. "
+                    << "Amount: " << amount.getText() 
+                    << ", Destination: " << toBase58(destination)
+                    << ", Nullifier: " << nullifier;
 
     return tesSUCCESS;
 }
 
 bool
-ZkWithdraw::verifyProof()
+ZkWithdraw::verifyZkProof(PreclaimContext const& ctx)
 {
-    // Implement proper ZK proof verification
-    return true;
+    try {
+        // Extract transaction data
+        auto const& tx = ctx.tx;
+        auto const zkProofBlob = tx.getFieldVL(sfZKProof);
+        auto const merkleRoot = tx.getFieldH256(sfMerkleRoot);
+        auto const nullifier = tx.getFieldH256(sfNullifier);
+        auto const valueCommitmentBlob = tx.getFieldVL(sfValueCommitment);
+        auto const amount = tx.getFieldAmount(sfAmount);
+
+        JLOG(ctx.j.debug()) << "Verifying ZK proof for withdrawal of " << amount.getText();
+        JLOG(ctx.j.trace()) << "Merkle root: " << merkleRoot;
+        JLOG(ctx.j.trace()) << "Nullifier: " << nullifier;
+
+        // Convert proof data to vector
+        std::vector<unsigned char> proofData(zkProofBlob.begin(), zkProofBlob.end());
+
+        // Convert merkle root to FieldT
+        zkp::FieldT anchor = zkp::MerkleCircuit::uint256ToFieldElement(merkleRoot);
+
+        // Convert nullifier to FieldT  
+        zkp::FieldT nullifierField = zkp::MerkleCircuit::uint256ToFieldElement(nullifier);
+
+        // Convert value commitment blob to FieldT
+        zkp::FieldT valueCommitmentField;
+        if (valueCommitmentBlob.size() >= 32) {
+            uint256 vcHash;
+            std::memcpy(vcHash.begin(), valueCommitmentBlob.data(), 32);
+            valueCommitmentField = zkp::MerkleCircuit::uint256ToFieldElement(vcHash);
+        } else {
+            JLOG(ctx.j.warn()) << "Invalid value commitment size: " << valueCommitmentBlob.size();
+            return false;
+        }
+
+        JLOG(ctx.j.trace()) << "Anchor field: " << anchor;
+        JLOG(ctx.j.trace()) << "Nullifier field: " << nullifierField;  
+        JLOG(ctx.j.trace()) << "Value commitment field: " << valueCommitmentField;
+
+        // Verify the zero-knowledge proof
+        bool verificationResult = zkp::ZkProver::verifyWithdrawalProof(
+            proofData,
+            anchor,
+            nullifierField,
+            valueCommitmentField
+        );
+
+        JLOG(ctx.j.debug()) << "ZK proof verification result: " 
+                           << (verificationResult ? "PASS" : "FAIL");
+
+        return verificationResult;
+
+    } catch (std::exception const& e) {
+        JLOG(ctx.j.error()) << "Exception during ZK proof verification: " << e.what();
+        return false;
+    } catch (...) {
+        JLOG(ctx.j.error()) << "Unknown exception during ZK proof verification";
+        return false;
+    }
+}
+
+TER
+ZkWithdraw::transferXRP(AccountID const& destination, STAmount const& amount)
+{
+    try {
+        // Get or create destination account
+        auto const destinationKeylet = keylet::account(destination);
+        auto destinationSLE = view().peek(destinationKeylet);
+
+        if (!destinationSLE)
+        {
+            // Create account if it doesn't exist (assuming we have permission)
+            auto const reserve = view().fees().accountReserve(0);
+            if (amount < reserve)
+            {
+                JLOG(j_.warn()) << "Cannot create account: insufficient amount for reserve";
+                return tecNO_DST_INSUF_XRP;
+            }
+
+            destinationSLE = std::make_shared<SLE>(destinationKeylet);
+            destinationSLE->setAccountID(sfAccount, destination);
+            destinationSLE->setFieldAmount(sfBalance, amount);
+            
+            view().insert(destinationSLE);
+            
+            JLOG(j_.info()) << "Created new account for destination: " << toBase58(destination);
+        }
+        else
+        {
+            // Add amount to existing account
+            auto currentBalance = destinationSLE->getFieldAmount(sfBalance);
+            auto newBalance = currentBalance + amount;
+            
+            destinationSLE->setFieldAmount(sfBalance, newBalance);
+            view().update(destinationSLE);
+            
+            JLOG(j_.debug()) << "Updated destination balance from " << currentBalance.getText()
+                            << " to " << newBalance.getText();
+        }
+
+        return tesSUCCESS;
+
+    } catch (std::exception const& e) {
+        JLOG(j_.error()) << "Exception during XRP transfer: " << e.what();
+        return tecINTERNAL;
+    }
 }
 
 } // namespace ripple

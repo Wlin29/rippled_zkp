@@ -562,7 +562,7 @@ public:
     void testUnifiedCircuitBehavior() {
         testcase("Unified Circuit Behavior Verification");
         
-        // USE EXISTING UNIFIED KEYS - don't regenerate!
+        // USE EXISTING KEYS - don't regenerate
         BEAST_EXPECT(zkp::ZkProver::generateKeys(false));
         
         // Create both deposit and withdrawal proofs using same unified circuit
