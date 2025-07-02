@@ -855,27 +855,49 @@ uint256 MerkleCircuit::computeNoteCommitment(
     uint64_t value,
     const uint256& rho,
     const uint256& r,
-    const uint256& a_pk) {
+    const uint256& a_pk)
+{
+    std::vector<uint8_t> input;
     
-    // Match circuit: SHA256(value(64)||rho(256)||r(128)||a_pk(64)) = 512 bits total
-    std::vector<uint8_t> input(64); // 512 bits = 64 bytes
+    // Total input: 64 + 256 + 256 + 256 = 832 bits = 104 bytes
+    // But SHA256 works with 512-bit blocks, so we need to be careful
     
-    // value: 64 bits = 8 bytes
+    // Layout: [value:64][rho:256][r:256][a_pk:256] = 832 bits
+    input.reserve(104);
+    
+    // Value: 64 bits (8 bytes) - little endian
     for (int i = 0; i < 8; ++i) {
-        input[i] = (value >> (i * 8)) & 0xFF;
+        input.push_back(static_cast<uint8_t>((value >> (i * 8)) & 0xFF));
     }
     
-    // rho: 256 bits = 32 bytes
-    std::memcpy(&input[8], rho.begin(), 32);
+    // Rho: 256 bits (32 bytes) - as stored in uint256
+    for (int i = 0; i < 32; ++i) {
+        input.push_back(rho.data()[i]);
+    }
     
-    // r: 128 bits = 16 bytes (first 16 bytes of r)
-    std::memcpy(&input[40], r.begin(), 16);
+    // R: 256 bits (32 bytes) - as stored in uint256
+    for (int i = 0; i < 32; ++i) {
+        input.push_back(r.data()[i]);
+    }
     
-    // a_pk: 64 bits = 8 bytes (first 8 bytes of a_pk)
-    std::memcpy(&input[56], a_pk.begin(), 8);
+    // A_pk: 256 bits (32 bytes) - as stored in uint256
+    for (int i = 0; i < 32; ++i) {
+        input.push_back(a_pk.data()[i]);
+    }
     
+    // Debug output
+    std::cout << "Note commitment input:" << std::endl;
+    std::cout << "  Value: " << value << std::endl;
+    std::cout << "  Rho: " << rho << std::endl;
+    std::cout << "  R: " << r << std::endl;
+    std::cout << "  A_pk: " << a_pk << std::endl;
+    std::cout << "  Input size: " << input.size() << " bytes" << std::endl;
+    
+    // Compute SHA256
     uint256 result;
     SHA256(input.data(), input.size(), result.begin());
+    
+    std::cout << "  Computed commitment: " << result << std::endl;
     
     return result;
 }
