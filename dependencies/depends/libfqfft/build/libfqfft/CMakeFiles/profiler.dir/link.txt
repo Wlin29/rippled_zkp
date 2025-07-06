@@ -1,0 +1,1 @@
+/usr/bin/c++  -std=c++11 -Wall -Wextra -Wfatal-errors -pthread -ggdb3 -O2 -march=native -mtune=native -O2 -g -DNDEBUG -rdynamic -fopenmp CMakeFiles/profiler.dir/profiling/profile/profile.cpp.o -o /home/wlin/rippled/external/libsnark/depends/libfqfft/profiler  ../depends/libff/libff/libff.a -lgmp -lgmpxx -lprocps /usr/lib/x86_64-linux-gnu/libgmp.so ../depends/libzm.a 
