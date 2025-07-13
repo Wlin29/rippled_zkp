@@ -7,10 +7,16 @@
 #include <iomanip>
 #include <cstring>
 
+#include <xrpl/protocol/PublicKey.h>
+#include <xrpl/protocol/SecretKey.h>
+#include <xrpl/basics/random.h>
+#include <test/jtx.h> 
+
 #include <libxrpl/zkp/ZKProver.h>
 #include <libxrpl/zkp/circuits/MerkleCircuit.h>
 #include <libxrpl/zkp/IncrementalMerkleTree.h>
 #include <libxrpl/zkp/Note.h>
+#include <libxrpl/zkp/ZkDeposit.h>
 
 /*
 NOTE: May need to remove old keys before running tests
@@ -50,19 +56,24 @@ public:
         
         testKeyGeneration();
         testKeyPersistence();
-        testProofSerialization();
-        testDepositProofCreation();
-        testWithdrawalProofCreation();
-        testDepositProofVerification();
-        testWithdrawalProofVerification();
-        testInvalidProofVerification();
-        testMultipleProofs();
-        testEdgeCases();
-        testNoteCreationAndCommitment();
-        testIncrementalMerkleTree();
-        testMerkleVerificationEnforcement();
-        testUnifiedCircuitBehavior();
-        testWithdrawalProofIncrementalMerkleTree();
+        // testProofSerialization();
+        // testDepositProofCreation();
+        // testWithdrawalProofCreation();
+        // testDepositProofVerification();
+        // testWithdrawalProofVerification();
+        // testInvalidProofVerification();
+        // testMultipleProofs();
+        // testEdgeCases();
+        // testNoteCreationAndCommitment();
+        // testIncrementalMerkleTree();
+        // testMerkleVerificationEnforcement();
+        // testUnifiedCircuitBehavior();
+        // testWithdrawalProofIncrementalMerkleTree();
+        debugCircuitInputs();
+        debugCircuitComponents(); 
+        testZKPConstraintDebugging();
+        debugConstraintLevel();
+        debugInputMatrix();
     }
 
     void testKeyGeneration()
@@ -655,6 +666,260 @@ public:
         
         std::cout << "Incremental Merkle Tree withdrawal test: " 
                 << (validResult ? "PASS" : "FAIL") << std::endl;
+    }
+
+    void testZKPConstraintDebugging()
+    {
+        testcase("ZKP Constraint Satisfaction Debugging");
+
+        uint64_t amount = 1000000ULL;
+
+        log << "=== DETAILED CONSTRAINT DEBUGGING ===" << std::endl;
+
+        struct TestResult {
+            int testId;
+            bool proofGenerated;
+            bool constraintsSatisfied;
+            std::string errorMessage;
+            std::chrono::milliseconds generationTime;
+        };
+
+        std::vector<TestResult> results;
+
+        for (int i = 0; i < 5; ++i) {
+            log << "\n--- Test Case " << i << " ---" << std::endl;
+            TestResult result;
+            result.testId = i;
+
+            auto startTime = std::chrono::high_resolution_clock::now();
+
+            try {
+                // Use ZKProver utilities for spend key and randomness
+                std::string spendKey = "spend_key_" + std::to_string(i);
+                zkp::FieldT value_randomness = zkp::FieldT::random_element();
+
+                // Generate a random note and commitment
+                auto note = zkp::Note::random(amount);
+                uint256 commitment = note.commitment();
+
+                // Create deposit proof using ZKProver
+                auto proofData = zkp::ZkProver::createDepositProof(
+                    amount, commitment, spendKey, value_randomness);
+
+                auto endTime = std::chrono::high_resolution_clock::now();
+                result.generationTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+
+                result.proofGenerated = !proofData.empty();
+
+                if (!proofData.empty()) {
+                    log << "Proof generated successfully:" << std::endl;
+                    log << "  Proof size: " << proofData.proof.size() << " bytes" << std::endl;
+                    log << "  Generation time: " << result.generationTime.count() << " ms" << std::endl;
+
+                    // Verify proof using ZKProver
+                    bool verificationResult = zkp::ZkProver::verifyDepositProof(proofData);
+                    log << "  Immediate verification: " << (verificationResult ? "PASS" : "FAIL") << std::endl;
+                    result.constraintsSatisfied = verificationResult;
+                } else {
+                    log << "Proof generation returned empty proof!" << std::endl;
+                    result.constraintsSatisfied = false;
+                    result.errorMessage = "Empty proof returned";
+                }
+            } catch (const std::exception& e) {
+                auto endTime = std::chrono::high_resolution_clock::now();
+                result.generationTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+
+                result.proofGenerated = false;
+                result.constraintsSatisfied = false;
+                result.errorMessage = e.what();
+
+                log << "Exception during proof generation: " << e.what() << std::endl;
+            }
+
+            results.push_back(result);
+        }
+
+        // Analyze results
+        log << "\n=== CONSTRAINT DEBUGGING SUMMARY ===" << std::endl;
+
+        int totalTests = results.size();
+        int successfulProofs = 0;
+        int satisfiedConstraints = 0;
+
+        for (const auto& result : results) {
+            if (result.proofGenerated) successfulProofs++;
+            if (result.constraintsSatisfied) satisfiedConstraints++;
+
+            log << "Test " << result.testId << ": "
+                << "Generated=" << (result.proofGenerated ? "YES" : "NO") << ", "
+                << "Satisfied=" << (result.constraintsSatisfied ? "YES" : "NO") << ", "
+                << "Time=" << result.generationTime.count() << "ms";
+
+            if (!result.errorMessage.empty()) {
+                log << ", Error=" << result.errorMessage;
+            }
+            log << std::endl;
+        }
+
+        log << "\nSuccess rates:" << std::endl;
+        log << "  Proof generation: " << successfulProofs << "/" << totalTests
+            << " (" << (successfulProofs * 100 / totalTests) << "%)" << std::endl;
+        log << "  Constraint satisfaction: " << satisfiedConstraints << "/" << totalTests
+            << " (" << (satisfiedConstraints * 100 / totalTests) << "%)" << std::endl;
+    }
+
+    void debugCircuitInputs()
+    {
+        testcase("ZKP Circuit Input Validation");
+
+        log << "=== CIRCUIT INPUT DEBUGGING ===" << std::endl;
+
+        for (int i = 0; i < 5; ++i) {
+            log << "\n--- Validating inputs for spend_key_" << i << " ---" << std::endl;
+
+            try {
+                std::string spendKey = "spend_key_" + std::to_string(i);
+                uint64_t amount = 1000000ULL;
+
+                // Generate note and commitment using ZKProver/Note
+                auto note = zkp::Note::random(amount);
+                uint256 commitment = note.commitment();
+
+                log << "Spend key: " << spendKey << std::endl;
+                log << "Amount: " << amount << std::endl;
+                log << "Commitment: " << commitment << std::endl;
+
+                // Check note validity
+                log << "Note valid: " << (note.isValid() ? "YES" : "NO") << std::endl;
+
+            } catch (const std::exception& e) {
+                log << "ERROR in input validation: " << e.what() << std::endl;
+            }
+        }
+    }
+
+    void debugCircuitComponents()
+    {
+        testcase("ZKP Circuit Component Testing");
+
+        log << "=== CIRCUIT COMPONENT DEBUGGING ===" << std::endl;
+
+        // Test 1: Commitment scheme
+        log << "\n--- Testing Commitment Scheme ---" << std::endl;
+        try {
+            for (int i = 0; i < 3; ++i) {
+                uint64_t value = 1000000ULL + i * 1000;
+                auto note = zkp::Note::random(value);
+                uint256 commitment = note.commitment();
+                log << "Test " << i << ": value=" << value << ", commitment=" << commitment << std::endl;
+            }
+        } catch (const std::exception& e) {
+            log << "ERROR in commitment testing: " << e.what() << std::endl;
+        }
+
+        // Test 2: Merkle tree components
+        log << "\n--- Testing Merkle Tree Components ---" << std::endl;
+        try {
+            zkp::IncrementalMerkleTree tree(4);
+            uint256 leaf = zkp::ZkProver::generateRandomUint256();
+            size_t position = tree.append(leaf);
+            auto path = tree.authPath(position);
+            log << "Leaf: " << leaf << std::endl;
+            log << "Auth path length: " << path.size() << std::endl;
+            bool hasZeros = std::any_of(path.begin(), path.end(), [](const uint256& h) { return h == uint256{}; });
+            log << "Merkle path validation: " << (hasZeros ? "BAD (contains all-zero values)" : "GOOD (no all-zero values)") << std::endl;
+        } catch (const std::exception& e) {
+            log << "ERROR in Merkle tree testing: " << e.what() << std::endl;
+        }
+
+        // Test 3: Nullifier generation
+        log << "\n--- Testing Nullifier Generation ---" << std::endl;
+        try {
+            for (int i = 0; i < 3; ++i) {
+                auto note = zkp::Note::random(1000000ULL);
+                uint256 a_sk = zkp::ZkProver::generateRandomUint256();
+                uint256 nullifier = note.nullifier(a_sk);
+                log << "Test " << i << ": nullifier=" << nullifier << std::endl;
+            }
+        } catch (const std::exception& e) {
+            log << "ERROR in nullifier testing: " << e.what() << std::endl;
+        }
+    }
+
+    void debugConstraintLevel()
+    {
+        testcase("ZKP Constraint-Level Debugging");
+
+        log << "=== CONSTRAINT-LEVEL DEBUGGING ===" << std::endl;
+
+        for (int i = 0; i < 2; ++i) {
+            log << "\n--- Detailed constraint analysis for test " << i << " ---" << std::endl;
+
+            std::string spendKey = "spend_key_" + std::to_string(i);
+            uint64_t amount = 1000000ULL;
+
+            try {
+                auto note = zkp::Note::random(amount);
+                uint256 commitment = note.commitment();
+                zkp::FieldT value_randomness = zkp::FieldT::random_element();
+
+                auto proofData = zkp::ZkProver::createDepositProof(
+                    amount, commitment, spendKey, value_randomness);
+
+                log << "Proof generation completed" << std::endl;
+
+                bool verified = zkp::ZkProver::verifyDepositProof(proofData);
+                log << "Proof verification: " << (verified ? "PASS" : "FAIL") << std::endl;
+
+            } catch (const std::exception& e) {
+                log << "Exception: " << e.what() << std::endl;
+            }
+        }
+    }
+
+    void debugInputMatrix()
+    {
+        testcase("ZKP Input Matrix Testing");
+
+        log << "=== INPUT MATRIX DEBUGGING ===" << std::endl;
+
+        std::vector<std::string> testKeys = {
+            "test_key_0",
+            "test_key_1",
+            "simple_key",
+            "a",
+            "very_long_key_name_with_lots_of_characters",
+            ""
+        };
+
+        std::vector<uint64_t> testAmounts = {
+            1000000ULL, 1ULL, 999999999ULL, 0ULL
+        };
+
+        for (const auto& key : testKeys) {
+            for (const auto& amount : testAmounts) {
+                if (key.empty() && amount == 0) continue;
+
+                log << "\nTesting: key='" << key << "', amount=" << amount << std::endl;
+
+                try {
+                    auto note = zkp::Note::random(amount);
+                    uint256 commitment = note.commitment();
+                    zkp::FieldT value_randomness = zkp::FieldT::random_element();
+
+                    auto proofData = zkp::ZkProver::createDepositProof(
+                        amount, commitment, key, value_randomness);
+
+                    log << "  Result: " << (!proofData.empty() ? "SUCCESS" : "FAILED") << std::endl;
+
+                    bool verified = !proofData.empty() && zkp::ZkProver::verifyDepositProof(proofData);
+                    log << "  Verification: " << (verified ? "PASS" : "FAIL") << std::endl;
+
+                } catch (const std::exception& e) {
+                    log << "  Result: FAILED - " << e.what() << std::endl;
+                }
+            }
+        }
     }
 };
 

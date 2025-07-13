@@ -7,12 +7,10 @@ namespace ripple {
     namespace keylet {
         inline Keylet nullifier(uint256 const& id)
         {
-            // ltNULLIFIER must be defined in your ledger entries.
             return Keylet(ltNULLIFIER, id);
         }
         inline Keylet shielded_pool()
         {
-            // ltSHIELDED_POOL must be defined in your ledger entries.
             return Keylet(ltSHIELDED_POOL, uint256());
         }
     }

@@ -850,7 +850,7 @@ std::vector<bool> MerkleCircuit::bytesToBits(const std::vector<uint8_t>& bytes) 
     return bits;
 }
 
-// FIXED: Simplified commitment computations to match circuit
+
 uint256 MerkleCircuit::computeNoteCommitment(
     uint64_t value,
     const uint256& rho,

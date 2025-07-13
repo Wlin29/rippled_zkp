@@ -74,14 +74,6 @@ public:
         uint64_t amount,
         const std::string& spendKey);
 
-private:
-    /**
-     * Get or create the global shielded pool SLE
-     * @param create Whether to create if it doesn't exist
-     * @return Shared pointer to shielded pool SLE
-     */
-    std::shared_ptr<SLE> getShieldedPool(bool create = false);
-
     /**
      * Verify zero-knowledge deposit proof
      * - Extracts proof data and public inputs from transaction
@@ -93,6 +85,14 @@ private:
      * @return true if proof is valid, false otherwise
      */
     static bool verifyZkProof(PreclaimContext const& ctx);
+
+private:
+    /**
+     * Get or create the global shielded pool SLE
+     * @param create Whether to create if it doesn't exist
+     * @return Shared pointer to shielded pool SLE
+     */
+    std::shared_ptr<SLE> getShieldedPool(bool create = false);
 
     /**
      * Transfer XRP from user account to shielded pool

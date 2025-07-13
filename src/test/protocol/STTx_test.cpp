@@ -33,8 +33,6 @@
 #include <chrono>
 #include <xrpl/protocol/jss.h>
 
-#include "libxrpl/zkp/circuits/BalanceCircuit.h"
-#include "libxrpl/zkp/circuits/SufficientFundsCircuit.h"
 #include <cassert>
 #include <iostream>
 #include <libff/common/default_types/ec_pp.hpp>
@@ -75,10 +73,7 @@ public:
         testcase("STObject constructor errors");
         testObjectCtorErrors();
 
-
     }
-
-    
 
     void
     testMalformedSerializedForm()
