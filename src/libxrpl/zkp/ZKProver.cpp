@@ -8,6 +8,7 @@
 #include <libff/algebra/curves/alt_bn128/alt_bn128_pp.hpp>
 #include <sstream>
 #include <libsnark/zk_proof_systems/ppzksnark/r1cs_gg_ppzksnark/r1cs_gg_ppzksnark.hpp>
+#include <libsnark/relations/constraint_satisfaction_problems/r1cs/r1cs.hpp>
 
 namespace ripple {
 namespace zkp {
@@ -277,19 +278,29 @@ ProofData ZkProver::createDepositProof(
         FieldT public_nullifier = unifiedCircuit->getNullifier();
         FieldT public_value_commitment = unifiedCircuit->getValueCommitment();
         
-        std::vector<FieldT> primary_input;
-        primary_input.push_back(public_anchor);
-        primary_input.push_back(public_nullifier);
-        primary_input.push_back(public_value_commitment);
+        // std::vector<FieldT> primary_input;
+        // primary_input.push_back(public_anchor);
+        // primary_input.push_back(public_nullifier);
+        // primary_input.push_back(public_value_commitment);
+        
+        // Build constraint system and primary input
+        libsnark::r1cs_constraint_system<FieldT> cs = unifiedCircuit->getConstraintSystem();
+        libsnark::r1cs_primary_input<FieldT> primary_input = {public_anchor, public_nullifier, public_value_commitment};
 
         std::cout << "Generated anchor: " << public_anchor << std::endl;
         std::cout << "Generated nullifier: " << public_nullifier << std::endl;
         std::cout << "Generated value_commitment: " << public_value_commitment << std::endl;
         
+        // Constraint Satisfaction Check 
+        if (!cs.is_satisfied(primary_input, witness)) {
+            std::cerr << "ERROR: Witness does not satisfy circuit constraints!" << std::endl;
+            return {}; // Abort proof generation
+        }
+
         // Generate proof using proving key
         auto proof = libsnark::r1cs_gg_ppzksnark_prover<DefaultCurve>(
             *provingKey, primary_input, witness);
-        
+
         // Serialize proof
         std::stringstream ss;
         ss << proof;
@@ -348,7 +359,7 @@ ProofData ZkProver::createWithdrawalProof(
         note.a_pk = generateRandomUint256();
         
         std::vector<bool> rootBits = uint256ToBits(merkleRoot);
-        std::vector<bool> leafBits = uint256ToBits(note.commitment()); // Use actual note commitment
+        std::vector<bool> leafBits = uint256ToBits(note.commitment());
         
         // Convert Merkle path to bit vectors
         std::vector<std::vector<bool>> pathBits;
@@ -388,11 +399,21 @@ ProofData ZkProver::createWithdrawalProof(
         std::cout << "Computed anchor: " << public_anchor << std::endl;
         std::cout << "Computed nullifier: " << public_nullifier << std::endl;
         std::cout << "Computed value_commitment: " << public_value_commitment << std::endl;
+
+         // Build constraint system and primary input
+        libsnark::r1cs_constraint_system<FieldT> cs = unifiedCircuit->getConstraintSystem();
+        libsnark::r1cs_primary_input<FieldT> primary_input = {public_anchor, public_nullifier, public_value_commitment};
         
-        std::vector<FieldT> primary_input;
-        primary_input.push_back(public_anchor);
-        primary_input.push_back(public_nullifier);
-        primary_input.push_back(public_value_commitment);
+        // Constraint Satisfaction Check 
+        if (!cs.is_satisfied(primary_input, witness)) {
+            std::cerr << "ERROR: Witness does not satisfy circuit constraints!" << std::endl;
+            return {}; // Abort proof generation
+        }
+        
+        // std::vector<FieldT> primary_input;
+        // primary_input.push_back(public_anchor);
+        // primary_input.push_back(public_nullifier);
+        // primary_input.push_back(public_value_commitment);
         
         // Generate proof using proving key
         auto proof = libsnark::r1cs_gg_ppzksnark_prover<DefaultCurve>(
