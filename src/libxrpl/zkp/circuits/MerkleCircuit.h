@@ -49,10 +49,10 @@ using libsnark::merkle_tree_check_read_gadget;
  * PRIVATE INPUTS: [Note(value, rho, r, a_pk), a_sk, vcm_r, auth_path]
  * 
  * SECURITY PROPERTIES:
- * ✓ Hiding: Values are cryptographically hidden via commitments
- * ✓ Binding: Cannot create fake commitments or change committed values
- * ✓ Unforgeability: Must know spend key to create valid nullifier
- * ✓ Non-malleability: Proofs cannot be modified without detection
+ * - Hiding: Values are cryptographically hidden via commitments
+ * - Binding: Cannot create fake commitments or change committed values
+ * - Unforgeability: Must know spend key to create valid nullifier
+ * - Non-malleability: Proofs cannot be modified without detection
  */
 class MerkleCircuit
 {

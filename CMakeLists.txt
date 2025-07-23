@@ -65,7 +65,13 @@ endif()
 ###
 
 include(deps/Boost)
-find_package(OpenSSL 1.1.1 REQUIRED)
+set(OPENSSL_ROOT_DIR "/usr")
+set(OPENSSL_INCLUDE_DIR "/usr/include")
+set(OPENSSL_LIBRARIES "/usr/lib/x86_64-linux-gnu/libssl.so;/usr/lib/x86_64-linux-gnu/libcrypto.so")
+find_package(OpenSSL REQUIRED)
+message(STATUS "OpenSSL version: ${OPENSSL_VERSION}")
+message(STATUS "OpenSSL include dir: ${OPENSSL_INCLUDE_DIR}")
+message(STATUS "OpenSSL libraries: ${OPENSSL_LIBRARIES}")
 set_target_properties(OpenSSL::SSL PROPERTIES
   INTERFACE_COMPILE_DEFINITIONS OPENSSL_NO_SSL2
 )
@@ -97,18 +103,27 @@ find_package(date REQUIRED)
 find_package(xxHash REQUIRED)
 
 # Libsnark
+# ---------------------------- Curve Selection ---------------------------------
+# Supported by upstream libsnark:
+#   • ALT_BN128  – alt-bn128 pairing curve
+#   • BN128      – (default) bn128 pairing curve
+#   • EDWARDS    – edwards25519
+#   • MNT4       – MNT4-298
+#   • MNT6       – MNT6-298
 add_definitions(-DCURVE_BN128) 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
-# include_directories(/usr/local/include)
-include_directories(dependencies)
-# link_directories(/usr/local/lib)
+
+# Header search paths
+include_directories(
+  dependencies
+  ${CMAKE_CURRENT_SOURCE_DIR}/src
+  ${CMAKE_CURRENT_SOURCE_DIR}/external/libsnark
+  ${CMAKE_CURRENT_SOURCE_DIR}/external/libsnark/depends/libff
+  ${CMAKE_CURRENT_SOURCE_DIR}/external/libsnark/depends/libfqfft)
+
+add_subdirectory(external/libsnark)
 
 link_directories(${CMAKE_CURRENT_SOURCE_DIR}/external/libsnark/depends/ate-pairing)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/external/libsnark)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/external/libsnark/depends/libff)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/external/libsnark/depends/libfqfft)
-add_subdirectory(external/libsnark)
-# add_library(libff_profiling_stub STATIC external/libsnark/depends/libff/libff/common/libff_profiling_stub.cpp)
+add_library(libff_profiling_stub STATIC external/libsnark/depends/libff/libff/common/libff_profiling_stub.cpp)
 
 
 target_link_libraries(ripple_libs INTERFACE
@@ -121,6 +136,7 @@ target_link_libraries(ripple_libs INTERFACE
   secp256k1::secp256k1
   soci::soci
   SQLite::SQLite3
+  libff_profiling_stub
   gmp                      # or -lgmp 
   gmpxx                    # or -lgmpxx 
   zm             # is there no target??

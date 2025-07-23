@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 2.8)
 
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 project (libff)
 
 # Default to RelWithDebInfo configuration if no configuration is explicitly specified.
@@ -112,8 +116,13 @@ set_target_properties(
   INTERFACE_INCLUDE_DIRECTORIES ${GMP_INCLUDE_DIR}
 )
 
+set(OPENSSL_ROOT_DIR "/usr")
+set(OPENSSL_INCLUDE_DIR "/usr/include")
+set(OPENSSL_LIBRARIES "/usr/lib/x86_64-linux-gnu/libssl.so;/usr/lib/x86_64-linux-gnu/libcrypto.so")
 find_package(OpenSSL REQUIRED)
-INCLUDE_DIRECTORIES(${OPENSSL_INCLUDE_DIR})
+message(STATUS "OpenSSL version: ${OPENSSL_VERSION}")
+message(STATUS "OpenSSL include dir: ${OPENSSL_INCLUDE_DIR}")
+message(STATUS "OpenSSL libraries: ${OPENSSL_LIBRARIES}")
 
 if("${WITH_PROCPS}")
   include(FindPkgConfig)

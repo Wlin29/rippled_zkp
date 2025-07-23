@@ -36,15 +36,13 @@ public:
     static void initialize();
     static bool isInitialized;
 
-    // Key management
-    static bool generateDepositKeys(bool forceRegeneration = false);
-    static bool generateWithdrawalKeys(bool forceRegeneration = false);
+    // UNIFIED key management - single circuit for both operations
     static bool generateKeys(bool forceRegeneration = false);
     static bool saveKeys(const std::string& basePath);
     static bool loadKeys(const std::string& basePath);
 
-    static std::shared_ptr<MerkleCircuit> depositCircuit;
-    static std::shared_ptr<MerkleCircuit> withdrawalCircuit;
+    // UNIFIED circuit - handles both deposits and withdrawals
+    static std::shared_ptr<MerkleCircuit> unifiedCircuit;
 
     // Proof creation returns ProofData (proof + public inputs)
     static ProofData createDepositProof(
@@ -97,10 +95,9 @@ public:
     static uint256 generateRandomUint256();
 
 private:
-    static std::shared_ptr<libsnark::r1cs_gg_ppzksnark_proving_key<DefaultCurve>> depositProvingKey;
-    static std::shared_ptr<libsnark::r1cs_gg_ppzksnark_verification_key<DefaultCurve>> depositVerificationKey;
-    static std::shared_ptr<libsnark::r1cs_gg_ppzksnark_proving_key<DefaultCurve>> withdrawalProvingKey;
-    static std::shared_ptr<libsnark::r1cs_gg_ppzksnark_verification_key<DefaultCurve>> withdrawalVerificationKey;
+    // UNIFIED proving and verification keys - one set for both operations
+    static std::shared_ptr<libsnark::r1cs_gg_ppzksnark_proving_key<DefaultCurve>> provingKey;
+    static std::shared_ptr<libsnark::r1cs_gg_ppzksnark_verification_key<DefaultCurve>> verificationKey;
 
     static std::vector<unsigned char> serializeProof(
         const libsnark::r1cs_gg_ppzksnark_proof<DefaultCurve>& proof);
