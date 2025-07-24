@@ -5,6 +5,8 @@
 #include <xrpl/protocol/STAmount.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/basics/base_uint.h>
+#include "Note.h"
+#include "ZKProver.h" 
 
 namespace ripple {
 
@@ -60,6 +62,15 @@ public:
      * - Creates destination account if needed
      */
     TER doApply() override;
+
+    // Add helper function for creating withdrawal proofs
+    static zkp::ProofData createWithdrawalProof(
+        const zkp::Note& inputNote,
+        const uint256& spendingKey,
+        const std::vector<uint256>& authPath,
+        size_t position,
+        const uint256& merkleRoot
+    );
 
 private:
     /**

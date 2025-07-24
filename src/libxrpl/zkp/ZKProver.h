@@ -46,21 +46,28 @@ public:
 
     // Proof creation returns ProofData (proof + public inputs)
     static ProofData createDepositProof(
-        uint64_t amount,
-        const uint256& commitment,
-        const std::string& spendKey,
-        const FieldT& value_randomness
+        const Note& outputNote,                    // Note being created
+        const std::vector<uint256>& authPath = {}, // Optional: for tree inclusion
+        size_t position = 0                        // Optional: position in tree
     );
 
     static ProofData createWithdrawalProof(
-        uint64_t amount,                     
-        const uint256& merkleRoot,          
-        const uint256& nullifier,           
-        const std::vector<uint256>& merklePath,
-        size_t pathIndex,
-        const std::string& spendKey,
-        const FieldT& value_randomness
+        const Note& inputNote,                     // Note being spent
+        const uint256& a_sk,                       // Secret spending key
+        const std::vector<uint256>& authPath,      // Merkle authentication path
+        size_t position,                           // Position in tree
+        const uint256& merkleRoot                  // Expected merkle root
     );
+    
+    // Helper function to create notes (like Zcash)
+    static Note createNote(
+        uint64_t value,
+        const uint256& a_pk,     // Recipient public key
+        const uint256& rho,      // Nullifier seed  
+        const uint256& r         // Note randomness
+    );
+    
+    static Note createRandomNote(uint64_t value);  // For testing/deposits
 
     // Verification with individual parameters
     static bool verifyDepositProof(

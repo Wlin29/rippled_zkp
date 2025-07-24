@@ -216,10 +216,9 @@ bool ZkProver::loadKeys(const std::string& basePath) {
 }
 
 ProofData ZkProver::createDepositProof(
-    uint64_t amount, 
-    const uint256& commitment, 
-    const std::string& spendKey,
-    const FieldT& value_randomness) 
+    const Note& outputNote,
+    const std::vector<uint256>& authPath,
+    size_t position) 
 {
     try {
         if (!provingKey || !unifiedCircuit) {
@@ -227,66 +226,78 @@ ProofData ZkProver::createDepositProof(
             return {};
         }
         
-        // Add commitment to incremental tree
-        size_t position = TreeManager::addCommitment(commitment);
-        uint256 currentRoot = TreeManager::getRoot();
+        std::cout << "=== ZCASH-STYLE DEPOSIT PROOF ===" << std::endl;
         
-        std::cout << "=== DEPOSIT PROOF ===" << std::endl;
-        std::cout << "Added commitment at position " << position 
-                  << " with root " << currentRoot << std::endl;
+        // Use the note's computed commitment 
+        uint256 noteCommitment = outputNote.commitment();
+        std::cout << "Output note commitment: " << noteCommitment << std::endl;
+        std::cout << "Output note value: " << outputNote.value << std::endl;
         
-        // Create Note structure
-        Note note;
-        note.value = amount;
-        
-        uint256 a_sk = {};
-        auto spendKeyBits = MerkleCircuit::spendKeyToBits(spendKey);
-        for (size_t i = 0; i < std::min(spendKeyBits.size(), size_t(256)); ++i) {
-            if (spendKeyBits[i]) {
-                size_t byteIndex = i / 8;
-                size_t bitIndex = i % 8;
-                if (byteIndex < 32) {
-                    a_sk.begin()[byteIndex] |= (1 << bitIndex);
-                }
-            }
+        // Add commitment to tree and get position
+        size_t actualPosition = position;
+        if (authPath.empty()) {
+            // If no auth path provided, add to tree and get new path
+            actualPosition = TreeManager::addCommitment(noteCommitment);
         }
         
-        note.rho = a_sk;
-        note.r = generateRandomUint256();
-        note.a_pk = generateRandomUint256();
+        uint256 currentRoot = TreeManager::getRoot();
+        std::vector<uint256> actualAuthPath = authPath;
+        if (actualAuthPath.empty()) {
+            actualAuthPath = TreeManager::getAuthPath(actualPosition);
+        }
         
-        uint256 actual_commitment = note.commitment();
+        std::cout << "Tree position: " << actualPosition << std::endl;
+        std::cout << "Tree root: " << currentRoot << std::endl;
         
-        std::cout << "Note value: " << note.value << std::endl;
-        std::cout << "Computed commitment: " << actual_commitment << std::endl;
-        std::cout << "Expected commitment: " << commitment << std::endl;
-        
-        // Convert to bits for circuit
-        std::vector<bool> commitmentBits = uint256ToBits(actual_commitment);
+        // Convert to circuit format
+        std::vector<bool> commitmentBits = uint256ToBits(noteCommitment);
         std::vector<bool> rootBits = uint256ToBits(currentRoot);
         
-        // Use value_randomness as vcm_r
-        uint256 vcm_r = fieldElementToUint256(value_randomness);
+        // Convert auth path to bit vectors
+        std::vector<std::vector<bool>> pathBits;
+        for (const auto& pathNode : actualAuthPath) {
+            pathBits.push_back(uint256ToBits(pathNode));
+        }
         
-        // Use circuit for deposit witness
+        // Ensure path has correct depth
+        size_t treeDepth = unifiedCircuit->getTreeDepth();
+        while (pathBits.size() < treeDepth) {
+            pathBits.push_back(std::vector<bool>(256, false));
+        }
+        
+        // For deposits, we don't need a secret spending key (transparent input)
+        uint256 zero_a_sk = uint256{}; // No spending key needed for deposit
+        uint256 vcm_r = generateRandomUint256(); // Value commitment randomness
+        
+        std::cout << "Generating deposit witness..." << std::endl;
+        
+        // Generate witness using the complete note
         auto witness = unifiedCircuit->generateDepositWitness(
-            note, a_sk, vcm_r, commitmentBits, rootBits);
+            outputNote,      // Complete note object
+            zero_a_sk,       // No spending key for deposit
+            vcm_r,           // Value commitment randomness
+            commitmentBits,  // Note commitment
+            rootBits         // Tree root
+        );
         
-        // Extract computed values from circuit
+        // Extract public outputs from circuit
         FieldT public_anchor = unifiedCircuit->getAnchor();
         FieldT public_nullifier = unifiedCircuit->getNullifier();
         FieldT public_value_commitment = unifiedCircuit->getValueCommitment();
         
+        std::cout << "Public outputs:" << std::endl;
+        std::cout << "  Anchor: " << public_anchor << std::endl;
+        std::cout << "  Nullifier: " << public_nullifier << std::endl;
+        std::cout << "  Value commitment: " << public_value_commitment << std::endl;
+        
+        // Create primary input vector
         std::vector<FieldT> primary_input;
         primary_input.push_back(public_anchor);
         primary_input.push_back(public_nullifier);
         primary_input.push_back(public_value_commitment);
-
-        std::cout << "Generated anchor: " << public_anchor << std::endl;
-        std::cout << "Generated nullifier: " << public_nullifier << std::endl;
-        std::cout << "Generated value_commitment: " << public_value_commitment << std::endl;
         
-        // Generate proof using proving key
+        // Generate the proof
+        std::cout << "Generating zk-SNARK proof..." << std::endl;
         auto proof = libsnark::r1cs_gg_ppzksnark_prover<DefaultCurve>(
             *provingKey, primary_input, witness);
         
@@ -294,6 +305,8 @@ ProofData ZkProver::createDepositProof(
         std::stringstream ss;
         ss << proof;
         std::string proof_str = ss.str();
+        
+        std::cout << "Deposit proof generated successfully" << std::endl;
         
         return ProofData{
             std::vector<unsigned char>(proof_str.begin(), proof_str.end()),
@@ -309,14 +322,11 @@ ProofData ZkProver::createDepositProof(
 }
 
 ProofData ZkProver::createWithdrawalProof(
-    uint64_t amount,
-    const uint256& merkleRoot,
-    const uint256& nullifier,
-    const std::vector<uint256>& merklePath,
-    size_t pathIndex,
-    const std::string& spendKey,
-    const FieldT& value_randomness
-)
+    const Note& inputNote,
+    const uint256& a_sk,
+    const std::vector<uint256>& authPath,
+    size_t position,
+    const uint256& merkleRoot)
 {
     try {
         if (!provingKey || !unifiedCircuit) {
@@ -326,81 +336,92 @@ ProofData ZkProver::createWithdrawalProof(
         
         std::cout << "=== WITHDRAWAL PROOF ===" << std::endl;
         
-        Note note;
-        note.value = amount;
+        // Use the input note's commitment 
+        uint256 inputCommitment = inputNote.commitment();
+        uint256 inputNullifier = inputNote.nullifier(a_sk);
         
-        // Convert spendKey to uint256
-        uint256 a_sk = {};
-        auto spendKeyBits = MerkleCircuit::spendKeyToBits(spendKey);
-        for (size_t i = 0; i < std::min(spendKeyBits.size(), size_t(256)); ++i) {
-            if (spendKeyBits[i]) {
-                size_t byteIndex = i / 8;
-                size_t bitIndex = i % 8;
-                if (byteIndex < 32) {
-                    a_sk.begin()[byteIndex] |= (1 << bitIndex);
-                }
-            }
+        std::cout << "Input note commitment: " << inputCommitment << std::endl;
+        std::cout << "Input note value: " << inputNote.value << std::endl;
+        std::cout << "Input nullifier: " << inputNullifier << std::endl;
+        std::cout << "Expected merkle root: " << merkleRoot << std::endl;
+        
+        // Validate auth path length
+        size_t treeDepth = unifiedCircuit->getTreeDepth();
+        if (authPath.size() > treeDepth) {
+            std::cerr << "Auth path too long: " << authPath.size() << " > " << treeDepth << std::endl;
+            return {};
         }
         
-        // Generate deterministic note components
-        note.rho = a_sk; // Use spend key as rho base
-        note.r = generateRandomUint256();
-        note.a_pk = generateRandomUint256();
-        
+        // Convert to circuit format
+        std::vector<bool> commitmentBits = uint256ToBits(inputCommitment);
         std::vector<bool> rootBits = uint256ToBits(merkleRoot);
-        std::vector<bool> leafBits = uint256ToBits(note.commitment()); // Use actual note commitment
         
-        // Convert Merkle path to bit vectors
+        // Convert auth path to bit vectors
         std::vector<std::vector<bool>> pathBits;
-        for (const auto& pathNode : merklePath) {
+        for (const auto& pathNode : authPath) {
             pathBits.push_back(uint256ToBits(pathNode));
         }
         
-        // Ensure path has correct depth
-        size_t treeDepth = unifiedCircuit->getTreeDepth();
+        // Pad auth path to correct depth
         while (pathBits.size() < treeDepth) {
-            pathBits.push_back(std::vector<bool>(256, false)); // Add dummy path elements
+            pathBits.push_back(std::vector<bool>(256, false));
         }
         
         std::cout << "Tree depth: " << treeDepth << std::endl;
-        std::cout << "Path index: " << pathIndex << std::endl;
         std::cout << "Path length: " << pathBits.size() << std::endl;
-        std::cout << "Expected root: " << merkleRoot << std::endl;
+        std::cout << "Position: " << position << std::endl;
         
-        // Use value_randomness as vcm_r
-        uint256 vcm_r = fieldElementToUint256(value_randomness);
+        // Generate value commitment randomness
+        uint256 vcm_r = generateRandomUint256();
         
-        // Use circuit for withdrawal witness
+        std::cout << "Generating withdrawal witness..." << std::endl;
+        
+        // Generate witness using the complete input note
         auto witness = unifiedCircuit->generateWithdrawalWitness(
-            note,       // The complete note structure
-            a_sk,       // Spend key as uint256
-            vcm_r,      // Value commitment randomness
-            leafBits,   // Note commitment as leaf
-            pathBits,   // Authentication path
-            rootBits,   // Expected root
-            pathIndex   // Leaf position
+            inputNote,       // Complete note being spent
+            a_sk,            // Secret spending key
+            vcm_r,           // Value commitment randomness
+            commitmentBits,  // Input note commitment
+            pathBits,        // Merkle authentication path
+            rootBits,        // Expected merkle root
+            position         // Position in tree
         );
         
+        // Extract public outputs from circuit
         FieldT public_anchor = unifiedCircuit->getAnchor();
         FieldT public_nullifier = unifiedCircuit->getNullifier();
         FieldT public_value_commitment = unifiedCircuit->getValueCommitment();
         
-        std::cout << "Computed anchor: " << public_anchor << std::endl;
-        std::cout << "Computed nullifier: " << public_nullifier << std::endl;
-        std::cout << "Computed value_commitment: " << public_value_commitment << std::endl;
+        std::cout << "Public outputs:" << std::endl;
+        std::cout << "  Anchor: " << public_anchor << std::endl;
+        std::cout << "  Nullifier: " << public_nullifier << std::endl;
+        std::cout << "  Value commitment: " << public_value_commitment << std::endl;
         
+        // Verify nullifier matches expected
+        uint256 expectedNullifier = fieldElementToUint256(public_nullifier);
+        if (expectedNullifier != inputNullifier) {
+            std::cout << "  Nullifier mismatch:" << std::endl;
+            std::cout << "    Expected: " << inputNullifier << std::endl;
+            std::cout << "    Computed: " << expectedNullifier << std::endl;
+        }
+        
+        // Create primary input vector
         std::vector<FieldT> primary_input;
         primary_input.push_back(public_anchor);
         primary_input.push_back(public_nullifier);
         primary_input.push_back(public_value_commitment);
         
-        // Generate proof using proving key
+        // Generate the proof
+        std::cout << "Generating zk-SNARK proof..." << std::endl;
         auto proof = libsnark::r1cs_gg_ppzksnark_prover<DefaultCurve>(
             *provingKey, primary_input, witness);
         
+        // Serialize proof
         std::stringstream ss;
         ss << proof;
         std::string proof_str = ss.str();
+        
+        std::cout << "Withdrawal proof generated successfully" << std::endl;
         
         return ProofData{
             std::vector<unsigned char>(proof_str.begin(), proof_str.end()),
@@ -584,6 +605,29 @@ libsnark::r1cs_gg_ppzksnark_proof<DefaultCurve> ZkProver::deserializeProof(
     iss >> proof;  
     
     return proof;
+}
+
+Note ZkProver::createNote(
+    uint64_t value,
+    const uint256& a_pk,
+    const uint256& rho,
+    const uint256& r)
+{
+    Note note;
+    note.value = value;
+    note.a_pk = a_pk;
+    note.rho = rho;
+    note.r = r;
+    return note;
+}
+
+Note ZkProver::createRandomNote(uint64_t value) {
+    return createNote(
+        value,
+        generateRandomUint256(),  // Random recipient
+        generateRandomUint256(),  // Random nullifier seed
+        generateRandomUint256()   // Random commitment randomness
+    );
 }
 
 } // namespace zkp

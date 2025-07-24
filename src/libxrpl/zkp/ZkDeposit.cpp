@@ -52,15 +52,6 @@ ZkDeposit::preflight(PreflightContext const& ctx)
         return temMALFORMED;
     }
 
-    if (!ctx.tx.isFieldPresent(sfNullifier))
-    {
-        JLOG(ctx.j.debug()) << "Missing Nullifier field";
-        return temMALFORMED;
-    }
-
-    // Use sfCommitment for now instead of sfValueCommitment
-    // We'll store the value commitment in a different way
-    
     if (!ctx.tx.isFieldPresent(sfAmount))
     {
         JLOG(ctx.j.debug()) << "Missing Amount field";
@@ -163,44 +154,41 @@ ZkDeposit::verifyZkProof(PreclaimContext const& ctx)
         auto const& tx = ctx.tx;
         auto const zkProofBlob = tx.getFieldVL(sfZKProof);
         auto const commitment = tx.getFieldH256(sfCommitment);
-        auto const nullifier = tx.getFieldH256(sfNullifier);
-        auto const valueCommitmentBlob = tx.getFieldVL(sfValueCommitment);
 
         JLOG(ctx.j.debug()) << "Verifying ZK proof for deposit";
         JLOG(ctx.j.trace()) << "Commitment: " << commitment;
-        JLOG(ctx.j.trace()) << "Nullifier: " << nullifier;
 
         // Convert proof data to vector
         std::vector<unsigned char> proofData(zkProofBlob.begin(), zkProofBlob.end());
 
+        // For deposits, we need to extract the ProofData structure from transaction
+        // The transaction should contain the serialized ProofData
+        
+        // Deserialize the proof to get all public inputs
+        // Note: This assumes the transaction stores a complete ProofData structure
+        
+        // For now, create a ProofData structure with extracted values
+        zkp::ProofData proofDataStruct;
+        proofDataStruct.proof = proofData;
+        
+        // Extract other public inputs from transaction fields
         // Convert commitment to FieldT (use as anchor for deposits)
-        zkp::FieldT anchor = zkp::MerkleCircuit::uint256ToFieldElement(commitment);
+        proofDataStruct.anchor = zkp::MerkleCircuit::uint256ToFieldElement(commitment);
 
-        // Convert nullifier to FieldT
-        zkp::FieldT nullifierField = zkp::MerkleCircuit::uint256ToFieldElement(nullifier);
+        // For deposits, nullifier might be stored in a different field or computed
+        auto nullifier = tx.getFieldH256(sfNullifier);
+        proofDataStruct.nullifier = zkp::MerkleCircuit::uint256ToFieldElement(nullifier);
 
-        // Convert value commitment blob to FieldT
-        zkp::FieldT valueCommitmentField;
-        if (valueCommitmentBlob.size() >= 32) {
-            uint256 vcHash;
-            std::memcpy(vcHash.begin(), valueCommitmentBlob.data(), 32);
-            valueCommitmentField = zkp::MerkleCircuit::uint256ToFieldElement(vcHash);
-        } else {
-            JLOG(ctx.j.warn()) << "Invalid value commitment size: " << valueCommitmentBlob.size();
-            return false;
-        }
+        // Value commitment should be extracted from the proof or computed
+        // For now, use commitment as placeholder
+        proofDataStruct.value_commitment = zkp::MerkleCircuit::uint256ToFieldElement(commitment);
 
-        JLOG(ctx.j.trace()) << "Anchor field: " << anchor;
-        JLOG(ctx.j.trace()) << "Nullifier field: " << nullifierField;
-        JLOG(ctx.j.trace()) << "Value commitment field: " << valueCommitmentField;
+        JLOG(ctx.j.trace()) << "Anchor field: " << proofDataStruct.anchor;
+        JLOG(ctx.j.trace()) << "Nullifier field: " << proofDataStruct.nullifier;
+        JLOG(ctx.j.trace()) << "Value commitment field: " << proofDataStruct.value_commitment;
 
-        // Verify the zero-knowledge proof using ZkProver
-        bool verificationResult = zkp::ZkProver::verifyDepositProof(
-            proofData,
-            anchor,
-            nullifierField,
-            valueCommitmentField
-        );
+        // Verify using the new ProofData structure
+        bool verificationResult = zkp::ZkProver::verifyDepositProof(proofDataStruct);
 
         JLOG(ctx.j.debug()) << "ZK proof verification result: " 
                            << (verificationResult ? "PASS" : "FAIL");
@@ -299,20 +287,22 @@ ZkDeposit::createDepositProof(
             zkp::ZkProver::initialize();
         }
 
-        // Generate randomness for value commitment
-        zkp::FieldT value_randomness = zkp::FieldT::random_element();
+        std::cout << "Creating deposit proof using Zcash-style approach" << std::endl;
+        std::cout << "Amount: " << amount << std::endl;
+        std::cout << "Spend key: " << spendKey << std::endl;
 
-        // Create a note for this deposit
-        auto note = zkp::Note::random(amount);
-        uint256 commitment = note.commitment();
+        // Create note
+        zkp::Note depositNote = zkp::ZkProver::createRandomNote(amount);
 
-        // Create the zero-knowledge proof
-        auto proofData = zkp::ZkProver::createDepositProof(
-            amount,
-            commitment, 
-            spendKey,
-            value_randomness
-        );
+        std::cout << "Created note:" << std::endl;
+        std::cout << "  Value: " << depositNote.value << std::endl;
+        std::cout << "  Commitment: " << depositNote.commitment() << std::endl;
+
+        // Then create proof using the note
+        auto proofData = zkp::ZkProver::createDepositProof(depositNote);
+
+        std::cout << "Deposit proof created successfully" << std::endl;
+        std::cout << "Proof size: " << proofData.proof.size() << " bytes" << std::endl;
 
         return proofData;
 
