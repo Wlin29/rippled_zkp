@@ -88,7 +88,7 @@ public:
             ripple::zkp::ZkProver::initialize();
             ripple::zkp::ZkProver::generateKeys(false);
             
-            std::cout << "Creating deposit using Zcash pattern..." << std::endl;
+            std::cout << "Creating deposit ..." << std::endl;
             
             ripple::zkp::Note depositNote = ripple::zkp::ZkProver::createRandomNote(100000000);
             
@@ -271,7 +271,6 @@ public:
         BEAST_EXPECT(secp256k1_keys.size() == NUM_ITERATIONS);
         
         std::cout << "\n=== TEST COMPLETED ===" << std::endl;
-        std::cout << "Using new Zcash-style ZkProver API" << std::endl;
     }
 };
 

@@ -93,7 +93,7 @@ public:
     }
     
     void testNoteCreationAndCommitment() {
-        testcase("Note Creation and Commitment - Zcash Style");
+        testcase("Note Creation and Commitment");
         
         uint64_t amount = 1000000;
         
@@ -142,14 +142,14 @@ public:
 
     void testDepositProofCreation()
     {
-        testcase("Deposit Proof Creation - Zcash Style");
+        testcase("Deposit Proof Creation");
         BEAST_EXPECT(zkp::ZkProver::generateKeys(false));
 
         for (size_t idx = 0; idx < 3; ++idx) {
             uint64_t amount = 1000000 + idx * 100000;
 
-            std::cout << "=== CREATING DEPOSIT PROOF " << idx << " (ZCASH STYLE) ===" << std::endl;
-            
+            std::cout << "=== CREATING DEPOSIT PROOF " << idx << " ===" << std::endl;
+
             // Create note first
             zkp::Note depositNote = zkp::ZkProver::createRandomNote(amount);
             
@@ -173,7 +173,7 @@ public:
 
     void testWithdrawalProofCreation()
     {
-        testcase("Withdrawal Proof Creation - Zcash Style");
+        testcase("Withdrawal Proof Creation");
         
         BEAST_EXPECT(zkp::ZkProver::generateKeys(false));
 
@@ -200,7 +200,7 @@ public:
         // Generate spending key
         uint256 a_sk = zkp::ZkProver::generateRandomUint256();
 
-        std::cout << "=== CREATING WITHDRAWAL PROOF (ZCASH STYLE) ===" << std::endl;
+        std::cout << "=== CREATING WITHDRAWAL PROOF ===" << std::endl;
         std::cout << "Input note value: " << inputNote.value << std::endl;
         std::cout << "Input note commitment: " << noteCommitment << std::endl;
         std::cout << "Tree root: " << merkleRoot << std::endl;
@@ -228,7 +228,7 @@ public:
 
     void testDepositProofVerification()
     {
-        testcase("Deposit Proof Verification - Zcash Style");
+        testcase("Deposit Proof Verification");
         
         BEAST_EXPECT(zkp::ZkProver::generateKeys(false));
         
@@ -260,7 +260,7 @@ public:
 
     void testWithdrawalProofVerification()
     {
-        testcase("Withdrawal Proof Verification - Zcash Style");
+        testcase("Withdrawal Proof Verification");
         
         BEAST_EXPECT(zkp::ZkProver::generateKeys(false));
         
@@ -277,7 +277,7 @@ public:
         
         uint256 a_sk = zkp::ZkProver::generateRandomUint256();
 
-        std::cout << "=== WITHDRAWAL PROOF VERIFICATION (ZCASH STYLE) ===" << std::endl;
+        std::cout << "=== WITHDRAWAL PROOF VERIFICATION ===" << std::endl;
 
         // Create proof using new signature
         auto proofData = zkp::ZkProver::createWithdrawalProof(
@@ -335,14 +335,14 @@ public:
 
     void testMultipleProofs()
     {
-        testcase("Multiple Proofs - Zcash Style");
+        testcase("Multiple Proofs");
         
         BEAST_EXPECT(zkp::ZkProver::generateKeys(false));
         
         std::vector<zkp::ProofData> proofs;
         std::vector<zkp::Note> notes;
         
-        // ✅ Create multiple proofs using Zcash-style approach
+        // Create multiple proofs 
         for (int i = 0; i < 3; ++i) {
             uint64_t amount = 1000000 + i * 250000;
             
@@ -376,12 +376,12 @@ public:
             }
         }
         
-        std::cout << "Multiple Zcash-style proofs test: " << proofs.size() << " proofs generated and verified" << std::endl;
+        std::cout << "Multiple proofs test: " << proofs.size() << " proofs generated and verified" << std::endl;
     }
 
     void testEdgeCases()
     {
-        testcase("Edge Cases - Zcash Style");
+        testcase("Edge Cases");
         
         BEAST_EXPECT(zkp::ZkProver::generateKeys(false));
         
@@ -457,7 +457,7 @@ public:
     }
 
     void testMerkleVerificationEnforcement() {
-        testcase("Merkle Verification Enforcement - Zcash Style");
+        testcase("Merkle Verification Enforcement");
         
         // Create note first 
         uint64_t amount = 1000000;
@@ -552,7 +552,7 @@ public:
         
         uint64_t amount = 1500000;
         
-        std::cout << "=== UNIFIED CIRCUIT BEHAVIOR TEST (ZCASH STYLE) ===" << std::endl;
+        std::cout << "=== UNIFIED CIRCUIT BEHAVIOR TEST ===" << std::endl;
         
         // Create deposit note and proof
         zkp::Note depositNote = zkp::ZkProver::createRandomNote(amount);
@@ -605,7 +605,7 @@ public:
         
         BEAST_EXPECT(zkp::ZkProver::generateKeys(false));
         
-        std::cout << "=== COMPLETE ZCASH-STYLE WORKFLOW ===" << std::endl;
+        std::cout << "=== COMPLETE WORKFLOW ===" << std::endl;
         
         // Step 1: Alice creates a shielded note (deposit)
         uint64_t depositAmount = 1000000;
@@ -687,7 +687,7 @@ public:
             std::cout << "7. Privacy check: Different notes produce different nullifiers" << std::endl;
         }
         
-        std::cout << "=== ZCASH-STYLE WORKFLOW COMPLETE ===" << std::endl;
+        std::cout << "=== WORKFLOW COMPLETE ===" << std::endl;
     }
 };
 

@@ -103,6 +103,11 @@ private:
     std::unique_ptr<packing_gadget<FieldT>> a_sk_digest_packer_;
     std::unique_ptr<packing_gadget<FieldT>> vcm_r_digest_packer_;
 
+    std::unique_ptr<digest_variable<FieldT>> a_sk_digest_raw_;
+    std::unique_ptr<digest_variable<FieldT>> note_rho_digest_raw_;
+
+    std::unique_ptr<digest_variable<FieldT>> note_value_digest_raw_;
+
 public:
     Impl(size_t tree_depth) : tree_depth_(tree_depth) {
         std::cout << "Creating MerkleCircuit with depth " << tree_depth << std::endl;
@@ -189,20 +194,39 @@ public:
         vcm_r_digest_ = std::make_unique<digest_variable<FieldT>>(
             *pb_, 256, "vcm_r_digest");
 
+        // 4.5. CREATE RAW DIGEST VARIABLES (hold raw bits, not hash outputs)
+        a_sk_digest_raw_ = std::make_unique<digest_variable<FieldT>>(
+            *pb_, 256, "a_sk_digest_raw");
+        
+        note_rho_digest_raw_ = std::make_unique<digest_variable<FieldT>>(
+            *pb_, 256, "note_rho_digest_raw");
+            
+        note_value_digest_raw_ = std::make_unique<digest_variable<FieldT>>(
+            *pb_, 256, "note_value_digest_raw");
+
+        for (size_t i = 0; i < 256; ++i) {
+            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                a_sk_digest_raw_->bits[i], 1, a_sk_bits_[i]), 
+                "a_sk_raw_bit_" + std::to_string(i));
+            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                note_rho_digest_raw_->bits[i], 1, note_rho_bits_[i]), 
+                "rho_raw_bit_" + std::to_string(i));
+        }
+
         // 5. SETUP SHA256 HASH GADGETS (now digest variables exist)
         // Note commitment: SHA256(value_digest || rho_digest)  
         note_commit_hasher_ = std::make_unique<libsnark::sha256_two_to_one_hash_gadget<FieldT>>(
             *pb_,
-            *note_value_digest_, 
-            *note_rho_digest_,  
+            *note_value_digest_raw_,
+            *note_rho_digest_raw_,
             *note_commitment_hash_,
             "note_commit_hasher");
 
         // Nullifier: SHA256(a_sk_digest || rho_digest)
         nullifier_hasher_ = std::make_unique<libsnark::sha256_two_to_one_hash_gadget<FieldT>>(
             *pb_,
-            *a_sk_digest_,         
-            *note_rho_digest_,     
+            *a_sk_digest_raw_,
+            *note_rho_digest_raw_,
             *nullifier_hash_,
             "nullifier_hasher");
 
@@ -288,7 +312,7 @@ public:
         std::cout << "Constraints generated. Total: " << pb_->num_constraints() << std::endl;
     }
     
-    // FIXED: Simplified hash input setup 
+    // hash input setup 
     void setupHashInputConstraints(
         pb_variable_array<FieldT>& note_commitment_input,
         pb_variable_array<FieldT>& nullifier_input,
@@ -523,6 +547,8 @@ private:
             pb_->val(note_a_pk_bits_[i]) = a_pk_bits[i] ? FieldT::one() : FieldT::zero();
             pb_->val(a_sk_bits_[i]) = a_sk_bits[i] ? FieldT::one() : FieldT::zero();
             pb_->val(vcm_r_bits_[i]) = vcm_r_bits[i] ? FieldT::one() : FieldT::zero();
+            pb_->val(a_sk_digest_raw_->bits[i]) = pb_->val(a_sk_bits_[i]);
+            pb_->val(note_rho_digest_raw_->bits[i]) = pb_->val(note_rho_bits_[i]);
         }
         
         // Set note_value_digest bits (padded to 256 bits)
