@@ -515,7 +515,7 @@ private:
             pb_->val(a_sk_) = MerkleCircuit::uint256ToFieldElement(a_sk);
             pb_->val(vcm_r_) = MerkleCircuit::uint256ToFieldElement(vcm_r);
             pb_->val(read_successful_) = FieldT::one();
-            pb_->val(is_withdrawal_) = FieldT::one(); 
+            // pb_->val(is_withdrawal_) = FieldT::one();
             
             // 2. SET ADDRESS BITS
             for (size_t i = 0; i < tree_depth_; ++i) {
@@ -579,18 +579,20 @@ private:
         
         // Set note_value_digest_raw bits
         for (size_t i = 0; i < 256; ++i) {
+            // Secret key raw digest
+            pb_->val(a_sk_digest_raw_->bits[i]) = a_sk_bits[i] ? FieldT::one() : FieldT::zero();
+            
+            // Rho raw digest
+            pb_->val(note_rho_digest_raw_->bits[i]) = rho_bits[i] ? FieldT::one() : FieldT::zero();
+            
+            // Value raw digest (64 bits + 192 padding)
             if (i < 64) {
                 pb_->val(note_value_digest_raw_->bits[i]) = FieldT((value_u64 >> i) & 1);
             } else {
                 pb_->val(note_value_digest_raw_->bits[i]) = FieldT::zero();
             }
-        }
-        
-        // Set other digest bits directly from input bits
-        for (size_t i = 0; i < 256; ++i) {
-            pb_->val(a_sk_digest_raw_->bits[i]) = pb_->val(a_sk_bits_[i]);
-            pb_->val(note_rho_digest_raw_->bits[i]) = pb_->val(note_rho_bits_[i]);
-            pb_->val(note_value_digest_raw_->bits[i]) = (i < 64) ? FieldT((value_u64 >> i) & 1) : FieldT::zero();
+            
+            // VCM randomness raw digest
             pb_->val(vcm_r_digest_raw_->bits[i]) = vcm_r_bits[i] ? FieldT::one() : FieldT::zero();
         }
     }
@@ -634,7 +636,9 @@ private:
     }
     
     void generateAllWitnesses() {
-        // Generate witnesses for packing gadgets
+        std::cout << "Generating witnesses..." << std::endl;
+        
+        // 1. FIRST: Generate witnesses for input packing (bits ↔ field elements)
         note_value_packer_->generate_r1cs_witness_from_packed();
         note_rho_packer_->generate_r1cs_witness_from_packed();
         note_r_packer_->generate_r1cs_witness_from_packed();
@@ -642,18 +646,33 @@ private:
         a_sk_packer_->generate_r1cs_witness_from_packed();
         vcm_r_packer_->generate_r1cs_witness_from_packed();
         
-        // Generate witnesses for hash gadgets
+        std::cout << "Input packing witnesses generated" << std::endl;
+        
+        // 2. SECOND: Generate witnesses for hash gadgets (now that input bits are set)
+        std::cout << "Generating hash witnesses..." << std::endl;
         note_commit_hasher_->generate_r1cs_witness();
+        std::cout << "Note commitment hash generated" << std::endl;
+        
         nullifier_hasher_->generate_r1cs_witness();
+        std::cout << "Nullifier hash generated. First few bits: ";
+        for (int i = 0; i < 8; ++i) {
+            std::cout << pb_->val(nullifier_hash_->bits[i]);
+        }
+        std::cout << std::endl;
+        
         value_commit_hasher_->generate_r1cs_witness();
+        std::cout << "Value commitment hash generated" << std::endl;
         
-        // Generate witness for Merkle tree verification
+        // 3. THIRD: Generate witness for Merkle tree verification
         merkle_verifier_->generate_r1cs_witness();
+        std::cout << "Merkle verification witness generated" << std::endl;
         
-        // Generate witnesses for output packing
+        // 4. LAST: Generate witnesses for output packing (hash bits → field elements)
         anchor_packer_->generate_r1cs_witness_from_bits();
         nullifier_packer_->generate_r1cs_witness_from_bits();
         value_commitment_packer_->generate_r1cs_witness_from_bits();
+        
+        std::cout << "Output packing witnesses generated" << std::endl;
     }
 
 public:
