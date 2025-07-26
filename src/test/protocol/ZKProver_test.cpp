@@ -43,6 +43,55 @@ private:
         return "spend_key_" + std::to_string(dis(gen));
     }
 
+    // ✅ ADD: Debug helper functions
+    void printMerklePathDebug(const std::vector<uint256>& authPath, size_t noteIndex, const uint256& merkleRoot, const std::string& testName) {
+        std::cout << "\n=== MERKLE PATH DEBUG: " << testName << " ===" << std::endl;
+        std::cout << "Note index: " << noteIndex << std::endl;
+        std::cout << "Merkle root: " << strHex(merkleRoot) << std::endl;
+        std::cout << "Auth path length: " << authPath.size() << std::endl;
+        std::cout << "Address bits (LSB first): ";
+        for (int i = 0; i < authPath.size(); ++i) {
+            std::cout << ((noteIndex >> i) & 1);
+        }
+        std::cout << std::endl;
+        
+        for (size_t i = 0; i < authPath.size(); ++i) {
+            std::cout << "  Level " << i << ": " << strHex(authPath[i]) << std::endl;
+            if (authPath[i] == uint256{}) {
+                std::cout << "    ^^ WARNING: All-zero hash at level " << i << std::endl;
+            }
+        }
+        std::cout << "=== END MERKLE PATH DEBUG ===" << std::endl;
+    }
+
+    void printNullifierDebug(const zkp::Note& note, const uint256& a_sk, const std::string& testName) {
+        std::cout << "\n=== NULLIFIER DEBUG: " << testName << " ===" << std::endl;
+        std::cout << "Note rho: " << strHex(note.rho) << std::endl;
+        std::cout << "Spending key: " << strHex(a_sk) << std::endl;
+        uint256 expectedNullifier = note.nullifier(a_sk);
+        std::cout << "Expected nullifier: " << strHex(expectedNullifier) << std::endl;
+        std::cout << "=== END NULLIFIER DEBUG ===" << std::endl;
+    }
+
+    void printNoteDebug(const zkp::Note& note, const std::string& testName) {
+        std::cout << "\n=== NOTE DEBUG: " << testName << " ===" << std::endl;
+        std::cout << "Value: " << note.value << std::endl;
+        std::cout << "Rho: " << strHex(note.rho) << std::endl;
+        std::cout << "R: " << strHex(note.r) << std::endl;
+        std::cout << "A_pk: " << strHex(note.a_pk) << std::endl;
+        std::cout << "Commitment: " << strHex(note.commitment()) << std::endl;
+        std::cout << "=== END NOTE DEBUG ===" << std::endl;
+    }
+
+    void printProofDebug(const zkp::ProofData& proofData, const std::string& testName) {
+        std::cout << "\n=== PROOF DEBUG: " << testName << " ===" << std::endl;
+        std::cout << "Proof size: " << proofData.proof.size() << " bytes" << std::endl;
+        std::cout << "Anchor: " << strHex(zkp::ZkProver::fieldElementToUint256(proofData.anchor)) << std::endl;
+        std::cout << "Nullifier: " << strHex(zkp::ZkProver::fieldElementToUint256(proofData.nullifier)) << std::endl;
+        std::cout << "Value commitment: " << strHex(zkp::ZkProver::fieldElementToUint256(proofData.value_commitment)) << std::endl;
+        std::cout << "=== END PROOF DEBUG ===" << std::endl;
+    }
+
 public:
     void run() override
     {
@@ -102,6 +151,9 @@ public:
         BEAST_EXPECT(randomNote.isValid());
         BEAST_EXPECT(randomNote.value == amount);
         
+        // ✅ ADD: Debug the random note
+        printNoteDebug(randomNote, "Random Note Creation");
+        
         // Test manual note creation
         uint256 a_pk = zkp::ZkProver::generateRandomUint256();
         uint256 rho = zkp::ZkProver::generateRandomUint256();
@@ -113,6 +165,9 @@ public:
         BEAST_EXPECT(manualNote.a_pk == a_pk);
         BEAST_EXPECT(manualNote.rho == rho);
         BEAST_EXPECT(manualNote.r == r);
+        
+        // ✅ ADD: Debug the manual note
+        printNoteDebug(manualNote, "Manual Note Creation");
         
         // Test commitment computation
         auto commitment1 = randomNote.commitment();
@@ -127,6 +182,10 @@ public:
         auto nullifier2 = manualNote.nullifier(a_sk);
         BEAST_EXPECT(nullifier1 != uint256{});
         BEAST_EXPECT(nullifier2 != uint256{});
+        
+        // ✅ ADD: Debug nullifiers
+        printNullifierDebug(randomNote, a_sk, "Random Note Nullifier");
+        printNullifierDebug(manualNote, a_sk, "Manual Note Nullifier");
         
         // Test serialization
         auto serialized = randomNote.serialize();
@@ -153,15 +212,15 @@ public:
             // Create note first
             zkp::Note depositNote = zkp::ZkProver::createRandomNote(amount);
             
-            std::cout << "Created note:" << std::endl;
-            std::cout << "  Value: " << depositNote.value << std::endl;
-            std::cout << "  Commitment: " << depositNote.commitment() << std::endl;
-            std::cout << "  Rho: " << depositNote.rho << std::endl;
-            std::cout << "  R: " << depositNote.r << std::endl;
+            // ✅ ADD: Debug the deposit note
+            printNoteDebug(depositNote, "Deposit Note " + idx);
 
             // Create proof using the note (new signature)
             auto proofData = zkp::ZkProver::createDepositProof(depositNote);
             BEAST_EXPECT(!proofData.empty());
+            
+            // ✅ ADD: Debug the proof
+            printProofDebug(proofData, "Deposit Proof " + idx);
             
             // Verify the proof using ProofData structure
             bool isValid = zkp::ZkProver::verifyDepositProof(proofData);
@@ -184,6 +243,9 @@ public:
         uint64_t amount = 500000;
         zkp::Note inputNote = zkp::ZkProver::createRandomNote(amount);
         
+        // ✅ ADD: Debug the input note
+        printNoteDebug(inputNote, "Withdrawal Input Note");
+        
         // Add the note's commitment to the tree
         uint256 noteCommitment = inputNote.commitment();
         size_t noteIndex = tree.append(noteCommitment);
@@ -199,6 +261,10 @@ public:
         
         // Generate spending key
         uint256 a_sk = zkp::ZkProver::generateRandomUint256();
+
+        // ✅ ADD: Debug Merkle path and nullifier
+        printMerklePathDebug(authPath, noteIndex, merkleRoot, "Withdrawal Proof Creation");
+        printNullifierDebug(inputNote, a_sk, "Withdrawal Nullifier");
 
         std::cout << "=== CREATING WITHDRAWAL PROOF ===" << std::endl;
         std::cout << "Input note value: " << inputNote.value << std::endl;
@@ -218,6 +284,11 @@ public:
         BEAST_EXPECT(!proofData.empty());
         std::cout << "withdrawal proof creation: " << (!proofData.empty() ? "SUCCESS" : "FAILED") << std::endl;
         
+        // ✅ ADD: Debug the withdrawal proof
+        if (!proofData.empty()) {
+            printProofDebug(proofData, "Withdrawal Proof");
+        }
+        
         // Verify the withdrawal proof
         if (!proofData.empty()) {
             bool isValid = zkp::ZkProver::verifyWithdrawalProof(proofData);
@@ -236,8 +307,14 @@ public:
         uint64_t amount = 2000000;
         zkp::Note depositNote = zkp::ZkProver::createRandomNote(amount);
         
+        // ✅ ADD: Debug the deposit note
+        printNoteDebug(depositNote, "Deposit Verification Note");
+        
         auto proofData = zkp::ZkProver::createDepositProof(depositNote);
         BEAST_EXPECT(!proofData.empty());
+        
+        // ✅ ADD: Debug the proof
+        printProofDebug(proofData, "Deposit Verification Proof");
         
         // Test valid proof verification
         bool isValid = zkp::ZkProver::verifyDepositProof(proofData);
@@ -271,11 +348,18 @@ public:
         zkp::Note inputNote = zkp::ZkProver::createRandomNote(amount);
         uint256 noteCommitment = inputNote.commitment();
         
+        // ✅ ADD: Debug the input note
+        printNoteDebug(inputNote, "Withdrawal Verification Note");
+        
         size_t noteIndex = tree.append(noteCommitment);
         uint256 merkleRoot = tree.root();
         std::vector<uint256> authPath = tree.authPath(noteIndex);
         
         uint256 a_sk = zkp::ZkProver::generateRandomUint256();
+
+        // ✅ ADD: Debug Merkle path and nullifier
+        printMerklePathDebug(authPath, noteIndex, merkleRoot, "Withdrawal Verification");
+        printNullifierDebug(inputNote, a_sk, "Withdrawal Verification Nullifier");
 
         std::cout << "=== WITHDRAWAL PROOF VERIFICATION ===" << std::endl;
 
@@ -284,6 +368,9 @@ public:
             inputNote, a_sk, authPath, noteIndex, merkleRoot);
         
         if (!proofData.empty()) {
+            // ✅ ADD: Debug the proof
+            printProofDebug(proofData, "Withdrawal Verification Proof");
+            
             // Test valid proof
             bool isValid = zkp::ZkProver::verifyWithdrawalProof(proofData);
             BEAST_EXPECT(isValid);
@@ -350,9 +437,15 @@ public:
             zkp::Note note = zkp::ZkProver::createRandomNote(amount);
             notes.push_back(note);
             
+            // ✅ ADD: Debug each note
+            printNoteDebug(note, "Multiple Proof Note " + i);
+            
             // Then create proof
             auto proof = zkp::ZkProver::createDepositProof(note);
             proofs.push_back(proof);
+            
+            // ✅ ADD: Debug each proof
+            printProofDebug(proof, "Multiple Proof " + i);
         }
         
         // Verify all proofs
@@ -387,21 +480,27 @@ public:
         
         // Test zero amount
         zkp::Note zeroNote = zkp::ZkProver::createRandomNote(0);
+        printNoteDebug(zeroNote, "Zero Amount Note");
         auto zeroProof = zkp::ZkProver::createDepositProof(zeroNote);
+        printProofDebug(zeroProof, "Zero Amount Proof");
         bool zeroValid = zkp::ZkProver::verifyDepositProof(zeroProof);
         BEAST_EXPECT(zeroValid);
         
         // Test large amount
         uint64_t largeAmount = (1ULL << 50);
         zkp::Note largeNote = zkp::ZkProver::createRandomNote(largeAmount);
+        printNoteDebug(largeNote, "Large Amount Note");
         auto largeProof = zkp::ZkProver::createDepositProof(largeNote);
+        printProofDebug(largeProof, "Large Amount Proof");
         bool largeValid = zkp::ZkProver::verifyDepositProof(largeProof);
         BEAST_EXPECT(largeValid);
         
         // Test maximum uint64_t amount
         uint64_t maxAmount = std::numeric_limits<uint64_t>::max();
         zkp::Note maxNote = zkp::ZkProver::createRandomNote(maxAmount);
+        printNoteDebug(maxNote, "Max Amount Note");
         auto maxProof = zkp::ZkProver::createDepositProof(maxNote);
+        printProofDebug(maxProof, "Max Amount Proof");
         bool maxValid = zkp::ZkProver::verifyDepositProof(maxProof);
         BEAST_EXPECT(maxValid);
         
@@ -422,6 +521,11 @@ public:
         zkp::Note note1 = zkp::ZkProver::createRandomNote(1000000);
         zkp::Note note2 = zkp::ZkProver::createRandomNote(2000000);
         zkp::Note note3 = zkp::ZkProver::createRandomNote(3000000);
+        
+        // ✅ ADD: Debug the notes
+        printNoteDebug(note1, "Tree Note 1");
+        printNoteDebug(note2, "Tree Note 2");
+        printNoteDebug(note3, "Tree Note 3");
         
         uint256 leaf1 = note1.commitment();
         uint256 leaf2 = note2.commitment();
@@ -446,6 +550,11 @@ public:
         BEAST_EXPECT(path2.size() == 4);
         BEAST_EXPECT(path3.size() == 4);
         
+        // ✅ ADD: Debug all paths
+        printMerklePathDebug(path1, pos1, tree.root(), "Tree Path 1");
+        printMerklePathDebug(path2, pos2, tree.root(), "Tree Path 2");
+        printMerklePathDebug(path3, pos3, tree.root(), "Tree Path 3");
+        
         // Verify paths
         uint256 root = tree.root();
         BEAST_EXPECT(tree.verify(leaf1, path1, pos1, root));
@@ -453,7 +562,7 @@ public:
         BEAST_EXPECT(tree.verify(leaf3, path3, pos3, root));
         
         std::cout << "Incremental tree test: final size=" << tree.size() 
-                  << ", root=" << root << std::endl;
+                  << ", root=" << strHex(root) << std::endl;
     }
 
     void testMerkleVerificationEnforcement() {
@@ -464,6 +573,9 @@ public:
         zkp::Note inputNote = zkp::ZkProver::createRandomNote(amount);
         uint256 noteCommitment = inputNote.commitment();
         
+        // ✅ ADD: Debug the note
+        printNoteDebug(inputNote, "Merkle Enforcement Note");
+        
         // Create a tree and add the note
         zkp::IncrementalMerkleTree tree(20);
         size_t position = tree.append(noteCommitment);
@@ -472,8 +584,12 @@ public:
         // Generate spending key
         uint256 a_sk = zkp::ZkProver::generateRandomUint256();
         
-        // Get valid authentication path
+        // Get valid authentication path 3.8
         std::vector<uint256> validPath = tree.authPath(position);
+        
+        // ✅ ADD: Debug valid path and nullifier
+        printMerklePathDebug(validPath, position, validRoot, "Valid Merkle Path");
+        printNullifierDebug(inputNote, a_sk, "Merkle Enforcement Nullifier");
         
         // Test 1: Valid proof should succeed
         auto validProof = zkp::ZkProver::createWithdrawalProof(
@@ -481,6 +597,7 @@ public:
         
         bool validResult = false;
         if (!validProof.empty()) {
+            printProofDebug(validProof, "Valid Merkle Proof");
             validResult = zkp::ZkProver::verifyWithdrawalProof(validProof);
         }
         
@@ -496,6 +613,9 @@ public:
                 invalidPath[i] = generateRandomUint256();  // Random values
             }
         }
+        
+        // ✅ ADD: Debug invalid path
+        printMerklePathDebug(invalidPath, position, validRoot, "Invalid Merkle Path");
         
         std::cout << "Testing with invalid path..." << std::endl;
         
@@ -513,6 +633,7 @@ public:
         
         bool invalidResult = false;
         if (!proofGenerationFailed && !invalidProof.empty()) {
+            printProofDebug(invalidProof, "Invalid Merkle Proof");
             try {
                 invalidResult = zkp::ZkProver::verifyWithdrawalProof(invalidProof);
             } catch (const std::exception& e) {
@@ -533,11 +654,15 @@ public:
         
         // Test 3: Invalid root should fail
         uint256 invalidRoot = generateRandomUint256();
+        
+        std::cout << "Testing with invalid root: " << strHex(invalidRoot) << std::endl;
+        
         auto invalidRootProof = zkp::ZkProver::createWithdrawalProof(
             inputNote, a_sk, validPath, position, invalidRoot);
         
         bool invalidRootResult = false;
         if (!invalidRootProof.empty()) {
+            printProofDebug(invalidRootProof, "Invalid Root Proof");
             invalidRootResult = zkp::ZkProver::verifyWithdrawalProof(invalidRootProof);
         }
         
@@ -556,12 +681,17 @@ public:
         
         // Create deposit note and proof
         zkp::Note depositNote = zkp::ZkProver::createRandomNote(amount);
+        printNoteDebug(depositNote, "Unified Deposit Note");
+        
         auto depositProof = zkp::ZkProver::createDepositProof(depositNote);
         BEAST_EXPECT(!depositProof.empty());
+        printProofDebug(depositProof, "Unified Deposit Proof");
         
         // Create withdrawal note and proof
         zkp::Note withdrawalNote = zkp::ZkProver::createRandomNote(amount);
         uint256 withdrawalCommitment = withdrawalNote.commitment();
+        
+        printNoteDebug(withdrawalNote, "Unified Withdrawal Note");
         
         zkp::IncrementalMerkleTree tree(3);
         size_t noteIndex = tree.append(withdrawalCommitment);
@@ -570,10 +700,15 @@ public:
         uint256 a_sk = zkp::ZkProver::generateRandomUint256();
         std::vector<uint256> authPath = tree.authPath(noteIndex);
         
+        printMerklePathDebug(authPath, noteIndex, merkleRoot, "Unified Withdrawal");
+        printNullifierDebug(withdrawalNote, a_sk, "Unified Withdrawal Nullifier");
+        
         auto withdrawalProof = zkp::ZkProver::createWithdrawalProof(
             withdrawalNote, a_sk, authPath, noteIndex, merkleRoot);
         
         if (!withdrawalProof.empty()) {
+            printProofDebug(withdrawalProof, "Unified Withdrawal Proof");
+            
             // Both proofs should verify with unified verification key
             bool depositValid = zkp::ZkProver::verifyDepositProof(depositProof);
             bool withdrawalValid = zkp::ZkProver::verifyWithdrawalProof(withdrawalProof);
@@ -611,13 +746,17 @@ public:
         uint64_t depositAmount = 1000000;
         zkp::Note aliceNote = zkp::ZkProver::createRandomNote(depositAmount);
         
+        printNoteDebug(aliceNote, "Alice's Note");
+
         std::cout << "1. Alice creates note with value: " << aliceNote.value << std::endl;
         std::cout << "   Commitment: " << aliceNote.commitment() << std::endl;
-        
+
         // Step 2: Alice creates deposit proof
         auto depositProof = zkp::ZkProver::createDepositProof(aliceNote);
         BEAST_EXPECT(!depositProof.empty());
         BEAST_EXPECT(zkp::ZkProver::verifyDepositProof(depositProof));
+        
+        printProofDebug(depositProof, "Alice's Deposit Proof");
         
         std::cout << "2. Alice creates valid deposit proof" << std::endl;
         
@@ -640,51 +779,66 @@ public:
         uint256 aliceSpendingKey = zkp::ZkProver::generateRandomUint256();
         std::vector<uint256> aliceAuthPath = commitmentTree.authPath(aliceIndex);
         
+        printMerklePathDebug(aliceAuthPath, aliceIndex, currentRoot, "Alice's Withdrawal");
+        printNullifierDebug(aliceNote, aliceSpendingKey, "Alice's Nullifier");
+        
         // Step 5: Alice creates withdrawal proof
         auto withdrawalProof = zkp::ZkProver::createWithdrawalProof(
             aliceNote, aliceSpendingKey, aliceAuthPath, aliceIndex, currentRoot);
         
         BEAST_EXPECT(!withdrawalProof.empty());
-        BEAST_EXPECT(zkp::ZkProver::verifyWithdrawalProof(withdrawalProof));
         
-        std::cout << "4. Alice creates valid withdrawal proof" << std::endl;
-        
-        // Step 6: Verify privacy properties
-        // The withdrawal proof should not reveal which note Alice is spending
-        uint256 aliceNullifier = zkp::ZkProver::fieldElementToUint256(withdrawalProof.nullifier);
-        std::cout << "5. Alice's nullifier: " << aliceNullifier << std::endl;
-        
-        // Step 7: Test double-spending prevention
-        // Alice tries to spend the same note again (should be prevented by nullifier tracking)
-        auto doubleSpendProof = zkp::ZkProver::createWithdrawalProof(
-            aliceNote, aliceSpendingKey, aliceAuthPath, aliceIndex, currentRoot);
-        
-        if (!doubleSpendProof.empty()) {
-            uint256 secondNullifier = zkp::ZkProver::fieldElementToUint256(doubleSpendProof.nullifier);
-            bool sameNullifier = (aliceNullifier == secondNullifier);
-            BEAST_EXPECT(sameNullifier);  // Same note should produce same nullifier
+        if (!withdrawalProof.empty()) {
+            printProofDebug(withdrawalProof, "Alice's Withdrawal Proof");
             
-            std::cout << "6. Double-spend check: Same nullifier produced" << std::endl;
-            std::cout << "   (In practice, the ledger would reject the second transaction)" << std::endl;
-        }
-        
-        // Step 8: Test that different notes produce different nullifiers
-        zkp::Note bobNote = zkp::ZkProver::createRandomNote(2000000);
-        size_t bobIndex = commitmentTree.append(bobNote.commitment());
-        currentRoot = commitmentTree.root();
-        
-        std::vector<uint256> bobAuthPath = commitmentTree.authPath(bobIndex);
-        uint256 bobSpendingKey = zkp::ZkProver::generateRandomUint256();
-        
-        auto bobProof = zkp::ZkProver::createWithdrawalProof(
-            bobNote, bobSpendingKey, bobAuthPath, bobIndex, currentRoot);
-        
-        if (!bobProof.empty()) {
-            uint256 bobNullifier = zkp::ZkProver::fieldElementToUint256(bobProof.nullifier);
-            bool differentNullifiers = (aliceNullifier != bobNullifier);
-            BEAST_EXPECT(differentNullifiers);
+            BEAST_EXPECT(zkp::ZkProver::verifyWithdrawalProof(withdrawalProof));
             
-            std::cout << "7. Privacy check: Different notes produce different nullifiers" << std::endl;
+            std::cout << "4. Alice creates valid withdrawal proof" << std::endl;
+            
+            // Step 6: Verify privacy properties
+            // The withdrawal proof should not reveal which note Alice is spending
+            uint256 aliceNullifier = zkp::ZkProver::fieldElementToUint256(withdrawalProof.nullifier);
+            std::cout << "5. Alice's nullifier: " << strHex(aliceNullifier) << std::endl;
+
+            // Step 7: Test double-spending prevention
+            // Alice tries to spend the same note again (should be prevented by nullifier tracking)
+            auto doubleSpendProof = zkp::ZkProver::createWithdrawalProof(
+                aliceNote, aliceSpendingKey, aliceAuthPath, aliceIndex, currentRoot);
+            
+            if (!doubleSpendProof.empty()) {
+                uint256 secondNullifier = zkp::ZkProver::fieldElementToUint256(doubleSpendProof.nullifier);
+                bool sameNullifier = (aliceNullifier == secondNullifier);
+                BEAST_EXPECT(sameNullifier);  // Same note should produce same nullifier
+                
+                std::cout << "6. Double-spend check: Same nullifier produced" << std::endl;
+                std::cout << "   (In practice, the ledger would reject the second transaction)" << std::endl;
+            }
+            
+            // Step 8: Test that different notes produce different nullifiers
+            zkp::Note bobNote = zkp::ZkProver::createRandomNote(2000000);
+            size_t bobIndex = commitmentTree.append(bobNote.commitment());
+            currentRoot = commitmentTree.root();
+            
+            printNoteDebug(bobNote, "Bob's Note");
+            
+            std::vector<uint256> bobAuthPath = commitmentTree.authPath(bobIndex);
+            uint256 bobSpendingKey = zkp::ZkProver::generateRandomUint256();
+            
+            printMerklePathDebug(bobAuthPath, bobIndex, currentRoot, "Bob's Withdrawal");
+            printNullifierDebug(bobNote, bobSpendingKey, "Bob's Nullifier");
+            
+            auto bobProof = zkp::ZkProver::createWithdrawalProof(
+                bobNote, bobSpendingKey, bobAuthPath, bobIndex, currentRoot);
+            
+            if (!bobProof.empty()) {
+                printProofDebug(bobProof, "Bob's Withdrawal Proof");
+                
+                uint256 bobNullifier = zkp::ZkProver::fieldElementToUint256(bobProof.nullifier);
+                bool differentNullifiers = (aliceNullifier != bobNullifier);
+                BEAST_EXPECT(differentNullifiers);
+                
+                std::cout << "7. Privacy check: Different notes produce different nullifiers" << std::endl;
+            }
         }
         
         std::cout << "=== WORKFLOW COMPLETE ===" << std::endl;

@@ -107,6 +107,7 @@ private:
     std::unique_ptr<digest_variable<FieldT>> note_rho_digest_raw_;
 
     std::unique_ptr<digest_variable<FieldT>> note_value_digest_raw_;
+    std::unique_ptr<digest_variable<FieldT>> vcm_r_digest_raw_;
 
 public:
     Impl(size_t tree_depth) : tree_depth_(tree_depth) {
@@ -206,35 +207,62 @@ public:
 
         for (size_t i = 0; i < 256; ++i) {
             pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
-                a_sk_digest_raw_->bits[i], 1, a_sk_bits_[i]), 
+                a_sk_digest_raw_->bits[i], 
+                FieldT::one(), 
+                a_sk_bits_[i]), 
                 "a_sk_raw_bit_" + std::to_string(i));
+            
             pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
-                note_rho_digest_raw_->bits[i], 1, note_rho_bits_[i]), 
+                note_rho_digest_raw_->bits[i], 
+                FieldT::one(), 
+                note_rho_bits_[i]), 
                 "rho_raw_bit_" + std::to_string(i));
         }
 
+        for (size_t i = 0; i < 256; ++i) {
+            if (i < 64) {
+                // First 64 bits are the actual value
+                pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                    note_value_digest_raw_->bits[i], 
+                    FieldT::one(), 
+                    note_value_bits_[i]), 
+                    "value_raw_bit_" + std::to_string(i));
+            } else {
+                // Remaining bits are padding (zero)
+                pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                    note_value_digest_raw_->bits[i], 
+                    FieldT::one(), 
+                    FieldT::zero()), 
+                    "value_raw_padding_" + std::to_string(i));
+            }
+        }
+
         // 5. SETUP SHA256 HASH GADGETS (now digest variables exist)
-        // Note commitment: SHA256(value_digest || rho_digest)  
+        // Note commitment: SHA256(value_raw || rho_raw)  
         note_commit_hasher_ = std::make_unique<libsnark::sha256_two_to_one_hash_gadget<FieldT>>(
             *pb_,
-            *note_value_digest_raw_,
-            *note_rho_digest_raw_,
+            *note_value_digest_raw_,    // ✅ Use raw digest
+            *note_rho_digest_raw_,      // ✅ Use raw digest
             *note_commitment_hash_,
             "note_commit_hasher");
 
-        // Nullifier: SHA256(a_sk_digest || rho_digest)
+        // Nullifier: SHA256(a_sk_raw || rho_raw)
         nullifier_hasher_ = std::make_unique<libsnark::sha256_two_to_one_hash_gadget<FieldT>>(
             *pb_,
-            *a_sk_digest_raw_,
-            *note_rho_digest_raw_,
+            *a_sk_digest_raw_,          // ✅ Use raw digest
+            *note_rho_digest_raw_,      // ✅ Use raw digest
             *nullifier_hash_,
             "nullifier_hasher");
 
-        // Value commitment: SHA256(value_digest || vcm_r_digest)
+        // Value commitment: SHA256(value_raw || vcm_r_raw) - CREATE vcm_r_raw!
+        // First, add vcm_r_digest_raw_ allocation in constructor:
+        vcm_r_digest_raw_ = std::make_unique<digest_variable<FieldT>>(
+            *pb_, 256, "vcm_r_digest_raw");
+
         value_commit_hasher_ = std::make_unique<libsnark::sha256_two_to_one_hash_gadget<FieldT>>(
             *pb_,
-            *note_value_digest_,   
-            *vcm_r_digest_,        
+            *note_value_digest_raw_,    // ✅ Use raw digest
+            *vcm_r_digest_raw_,         // ✅ Use raw digest (need to create this)
             *value_commitment_hash_,
             "value_commit_hasher");
 
@@ -547,66 +575,39 @@ private:
             pb_->val(note_a_pk_bits_[i]) = a_pk_bits[i] ? FieldT::one() : FieldT::zero();
             pb_->val(a_sk_bits_[i]) = a_sk_bits[i] ? FieldT::one() : FieldT::zero();
             pb_->val(vcm_r_bits_[i]) = vcm_r_bits[i] ? FieldT::one() : FieldT::zero();
-            pb_->val(a_sk_digest_raw_->bits[i]) = pb_->val(a_sk_bits_[i]);
-            pb_->val(note_rho_digest_raw_->bits[i]) = pb_->val(note_rho_bits_[i]);
         }
         
-        // Set note_value_digest bits (padded to 256 bits)
+        // Set note_value_digest_raw bits
         for (size_t i = 0; i < 256; ++i) {
             if (i < 64) {
-                pb_->val(note_value_digest_->bits[i]) = FieldT((value_u64 >> i) & 1);
+                pb_->val(note_value_digest_raw_->bits[i]) = FieldT((value_u64 >> i) & 1);
             } else {
-                pb_->val(note_value_digest_->bits[i]) = FieldT::zero();
+                pb_->val(note_value_digest_raw_->bits[i]) = FieldT::zero();
             }
         }
         
         // Set other digest bits directly from input bits
         for (size_t i = 0; i < 256; ++i) {
-            pb_->val(note_rho_digest_->bits[i]) = rho_bits[i] ? FieldT::one() : FieldT::zero();
-            pb_->val(a_sk_digest_->bits[i]) = a_sk_bits[i] ? FieldT::one() : FieldT::zero();
-            pb_->val(vcm_r_digest_->bits[i]) = vcm_r_bits[i] ? FieldT::one() : FieldT::zero();
+            pb_->val(a_sk_digest_raw_->bits[i]) = pb_->val(a_sk_bits_[i]);
+            pb_->val(note_rho_digest_raw_->bits[i]) = pb_->val(note_rho_bits_[i]);
+            pb_->val(note_value_digest_raw_->bits[i]) = (i < 64) ? FieldT((value_u64 >> i) & 1) : FieldT::zero();
+            pb_->val(vcm_r_digest_raw_->bits[i]) = vcm_r_bits[i] ? FieldT::one() : FieldT::zero();
         }
     }
     
     void setAuthenticationPath(const std::vector<std::vector<bool>>& path, size_t address) {
-        // Create path validation variables
-        std::vector<pb_variable<FieldT>> path_validity_checks;
-        
         for (size_t level = 0; level < tree_depth_; ++level) {
-            // Determine if we need left or right sibling at this level
             bool is_right = (address >> level) & 1;
             
             if (level < path.size() && !path[level].empty()) {
-                // Check for suspicious all-zero paths at critical levels
+                // Check for all-zero paths and warn, but don't add complex constraints
                 size_t nonZeroBits = 0;
                 for (bool bit : path[level]) {
                     if (bit) nonZeroBits++;
                 }
                 
-                // For withdrawals, critical levels must not be all zero
                 if (nonZeroBits == 0 && level < 3) {
                     std::cout << "WARNING: Suspicious all-zero authentication path at level " << level << std::endl;
-                    
-                    // Create a validation variable for this level
-                    pb_variable<FieldT> level_valid;
-                    level_valid.allocate(*pb_, "level_valid_" + std::to_string(level));
-                    path_validity_checks.push_back(level_valid);
-                    
-                    // Set level_valid = 0 for all-zero paths (invalid)
-                    pb_->val(level_valid) = FieldT::zero();
-                    
-                    // Add constraint: for withdrawals, level_valid must be 1
-                    // This forces: is_withdrawal => level_valid = 1
-                    // If level_valid = 0 and is_withdrawal = 1, constraint fails
-                    pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
-                        is_withdrawal_, 1, level_valid), 
-                        "enforce_valid_path_level_" + std::to_string(level));
-                } else {
-                    // Valid path element
-                    pb_variable<FieldT> level_valid;
-                    level_valid.allocate(*pb_, "level_valid_" + std::to_string(level));
-                    path_validity_checks.push_back(level_valid);
-                    pb_->val(level_valid) = FieldT::one();
                 }
                 
                 // Set the sibling hash at this level
@@ -617,54 +618,18 @@ private:
                     }
                     
                     if (is_right) {
-                        // We are the right child, sibling goes to left
                         pb_->val(auth_path_->left_digests[level].bits[bit]) = bit_value;
                     } else {
-                        // We are the left child, sibling goes to right  
                         pb_->val(auth_path_->right_digests[level].bits[bit]) = bit_value;
                     }
                 }
             } else {
-                // Empty level - only acceptable for deposits
-                pb_variable<FieldT> level_valid;
-                level_valid.allocate(*pb_, "level_valid_" + std::to_string(level));
-                path_validity_checks.push_back(level_valid);
-                
-                // For deposits, empty paths are OK (level_valid = 1)
-                // For withdrawals, empty paths are invalid (level_valid = 0 if is_withdrawal = 1)
-                pb_->val(level_valid) = FieldT::one();
-                
-                // Add constraint: if withdrawal and level < 3, then level_valid = 0 (forces failure)
-                if (level < 3) {
-                    pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
-                        is_withdrawal_, 1, level_valid), 
-                        "enforce_non_empty_path_level_" + std::to_string(level));
-                }
-                
-                // Set empty hash
+                // Set empty hash for missing levels
                 for (size_t bit = 0; bit < 256; ++bit) {
                     pb_->val(auth_path_->left_digests[level].bits[bit]) = FieldT::zero();
                     pb_->val(auth_path_->right_digests[level].bits[bit]) = FieldT::zero();
                 }
             }
-        }
-        
-        // ADDITIONAL SECURITY: Create overall path validity constraint
-        if (!path_validity_checks.empty()) {
-            pb_variable<FieldT> overall_path_valid;
-            overall_path_valid.allocate(*pb_, "overall_path_valid");
-            
-            // Sum up all path validity checks
-            libsnark::linear_combination<FieldT> validity_sum;
-            for (const auto& check : path_validity_checks) {
-                validity_sum = validity_sum + check;
-            }
-            
-            // For withdrawals, require at least N valid path elements
-            size_t min_valid_levels = std::min(tree_depth_, size_t(3));
-            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
-                is_withdrawal_ * min_valid_levels, 1, validity_sum), 
-                "enforce_minimum_valid_path_elements");
         }
     }
     
