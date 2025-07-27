@@ -205,6 +205,9 @@ public:
         note_value_digest_raw_ = std::make_unique<digest_variable<FieldT>>(
             *pb_, 256, "note_value_digest_raw");
 
+        vcm_r_digest_raw_ = std::make_unique<digest_variable<FieldT>>( 
+            *pb_, 256, "vcm_r_digest_raw");
+
         for (size_t i = 0; i < 256; ++i) {
             pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
                 a_sk_digest_raw_->bits[i], 
@@ -237,6 +240,14 @@ public:
             }
         }
 
+        for (size_t i = 0; i < 256; ++i) {
+            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                vcm_r_digest_raw_->bits[i], 
+                FieldT::one(), 
+                vcm_r_bits_[i]), 
+                "vcm_r_raw_bit_" + std::to_string(i));
+        }
+
         // 5. SETUP SHA256 HASH GADGETS (now digest variables exist)
         // Note commitment: SHA256(value_raw || rho_raw)  
         note_commit_hasher_ = std::make_unique<libsnark::sha256_two_to_one_hash_gadget<FieldT>>(
@@ -255,10 +266,6 @@ public:
             "nullifier_hasher");
 
         // Value commitment: SHA256(value_raw || vcm_r_raw) - CREATE vcm_r_raw!
-        // First, add vcm_r_digest_raw_ allocation in constructor:
-        vcm_r_digest_raw_ = std::make_unique<digest_variable<FieldT>>(
-            *pb_, 256, "vcm_r_digest_raw");
-
         value_commit_hasher_ = std::make_unique<libsnark::sha256_two_to_one_hash_gadget<FieldT>>(
             *pb_,
             *note_value_digest_raw_,    // ✅ Use raw digest
@@ -661,13 +668,17 @@ private:
         std::cout << std::endl;
         
         value_commit_hasher_->generate_r1cs_witness();
-        std::cout << "Value commitment hash generated" << std::endl;
+        std::cout << "Value commitment hash generated. First few bits: ";
+        for (int i = 0; i < 8; ++i) {
+            std::cout << pb_->val(value_commitment_hash_->bits[i]);
+        }
+        std::cout << std::endl;
         
         // 3. THIRD: Generate witness for Merkle tree verification
         merkle_verifier_->generate_r1cs_witness();
         std::cout << "Merkle verification witness generated" << std::endl;
         
-        // 4. LAST: Generate witnesses for output packing (hash bits → field elements)
+        // // 4. LAST: Generate witnesses for output packing (hash bits → field elements)
         anchor_packer_->generate_r1cs_witness_from_bits();
         nullifier_packer_->generate_r1cs_witness_from_bits();
         value_commitment_packer_->generate_r1cs_witness_from_bits();
@@ -811,17 +822,16 @@ FieldT MerkleCircuit::bitsToFieldElement(const std::vector<bool>& bits) {
 }
 
 std::vector<bool> MerkleCircuit::fieldElementToBits(const FieldT& element) {
-    std::vector<bool> bits(253);
-    FieldT temp = element;
-    FieldT two = FieldT(2);
+    std::vector<bool> bits(256);
     
-    for (size_t i = 0; i < 253; ++i) {
-        FieldT quotient = temp * two.inverse();
-        FieldT remainder = temp - (quotient + quotient);
-        
-        bits[i] = (remainder == FieldT::one());
-        temp = quotient;
+    // Convert field element to its big integer representation
+    auto bigint = element.as_bigint();
+    
+    // Extract bits directly from the big integer
+    for (size_t i = 0; i < 256; ++i) {
+        bits[i] = bigint.test_bit(i);
     }
+    
     return bits;
 }
 
