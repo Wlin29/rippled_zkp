@@ -556,17 +556,21 @@ uint256 ZkProver::bitsToUint256(const std::vector<bool>& bits) {
 
 // Helper function to convert FieldT to uint256
 uint256 ZkProver::fieldElementToUint256(const FieldT& element) {
-    auto bits = MerkleCircuit::fieldElementToBits(element);
     uint256 result;
-    for (size_t i = 0; i < std::min(bits.size(), size_t(256)); ++i) {
-        if (bits[i]) {
-            size_t byteIndex = i / 8;
-            size_t bitIndex = i % 8;
-            if (byteIndex < 32) {
-                result.begin()[byteIndex] |= (1 << bitIndex);
-            }
+    
+    auto bigint = element.as_bigint();
+    
+    const size_t NUM_LIMBS = 4;
+    const size_t LIMB_SIZE = sizeof(bigint.data[0]); // 8 bytes per limb
+    
+    // Extract bytes from the bigint limbs
+    for (size_t limb_idx = 0; limb_idx < NUM_LIMBS && limb_idx * LIMB_SIZE < 32; ++limb_idx) {
+        for (size_t byte_idx = 0; byte_idx < LIMB_SIZE && limb_idx * LIMB_SIZE + byte_idx < 32; ++byte_idx) {
+            size_t result_idx = limb_idx * LIMB_SIZE + byte_idx;
+            result.begin()[result_idx] = (bigint.data[limb_idx] >> (byte_idx * 8)) & 0xFF;
         }
     }
+    
     return result;
 }
 
