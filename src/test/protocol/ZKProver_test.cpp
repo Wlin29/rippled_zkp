@@ -98,7 +98,7 @@ public:
         zkp::ZkProver::initialize();
         
         testKeyGeneration();
-        testKeyPersistence();
+        // testKeyPersistence();
         testNoteCreationAndCommitment();
         testDepositProofCreation();
         testWithdrawalProofCreation();

@@ -8,7 +8,6 @@
 #include <libsnark/gadgetlib1/gadgets/hashes/sha256/sha256_gadget.hpp>
 #include <libsnark/gadgetlib1/gadgets/hashes/hash_io.hpp>
 #include <libsnark/gadgetlib1/gadgets/merkle_tree/merkle_tree_check_read_gadget.hpp>
-#include <algorithm>
 #include <cassert>
 #include <openssl/sha.h>
 
@@ -23,6 +22,7 @@ using libsnark::multipacking_gadget;
 using libsnark::sha256_two_to_one_hash_gadget;
 using libsnark::merkle_authentication_path_variable;
 using libsnark::merkle_tree_check_read_gadget;
+using libsnark::digest_variable;
 
 void initCurveParameters() {
     static bool initialized = false;
@@ -72,6 +72,8 @@ private:
     std::unique_ptr<digest_variable<FieldT>> computed_root_;
     
     // Input digest variables for hash computations
+    std::unique_ptr<digest_variable<FieldT>> note_input_part1_;
+    std::unique_ptr<digest_variable<FieldT>> note_input_part2_;
     std::unique_ptr<digest_variable<FieldT>> a_sk_digest_;
     std::unique_ptr<digest_variable<FieldT>> rho_digest_;
     std::unique_ptr<digest_variable<FieldT>> value_digest_;
@@ -170,43 +172,47 @@ public:
         computed_root_ = std::make_unique<digest_variable<FieldT>>(
             *pb_, 256, "computed_root");
         
-        // 4. SETUP SHA256 HASH GADGETS
+        // 4. SIMPLIFIED SHA256 HASH GADGETS
         
-        // FIXED: Use digest_variable inputs for sha256_two_to_one_hash_gadget
+        // Create digest variables for the inputs to SHA256 gadgets
+        auto note_input_part1 = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "note_input_part1");
+        auto note_input_part2 = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "note_input_part2");
+        auto a_sk_digest = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "a_sk_digest");
+        auto rho_digest = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "rho_digest");
+        auto value_digest = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "value_digest");
+        auto vcm_r_digest = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "vcm_r_digest");
         
-        // Note commitment hash: combine value+rho with r+a_pk
-        auto value_rho_digest = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "value_rho_digest");
-        auto r_a_pk_digest = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "r_a_pk_digest");
-        
+        // Note commitment: hash two 256-bit parts
         note_commit_hasher_ = std::make_unique<sha256_two_to_one_hash_gadget<FieldT>>(
             *pb_,
-            *value_rho_digest,
-            *r_a_pk_digest,
+            *note_input_part1,
+            *note_input_part2,
             *note_commitment_hash_,
             "note_commit_hasher");
         
-        // Nullifier hash: combine a_sk with rho
-        // Store these as class members so they don't go out of scope
-        a_sk_digest_ = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "a_sk_digest");
-        rho_digest_ = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "rho_digest");
-        
+        // Nullifier: hash a_sk + rho  
         nullifier_hasher_ = std::make_unique<sha256_two_to_one_hash_gadget<FieldT>>(
             *pb_,
-            *a_sk_digest_,
-            *rho_digest_,
+            *a_sk_digest,
+            *rho_digest,
             *nullifier_hash_,
             "nullifier_hasher");
         
-        // Value commitment hash: combine value with vcm_r
-        value_digest_ = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "value_digest");
-        vcm_r_digest_ = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "vcm_r_digest");
-        
+        // Value commitment: hash value + vcm_r
         value_commit_hasher_ = std::make_unique<sha256_two_to_one_hash_gadget<FieldT>>(
             *pb_,
-            *value_digest_,
-            *vcm_r_digest_,
+            *value_digest,
+            *vcm_r_digest,
             *value_commitment_hash_,
             "value_commit_hasher");
+        
+        // Store digest pointers so they don't go out of scope
+        note_input_part1_ = std::move(note_input_part1);
+        note_input_part2_ = std::move(note_input_part2);
+        a_sk_digest_ = std::move(a_sk_digest);
+        rho_digest_ = std::move(rho_digest);
+        value_digest_ = std::move(value_digest);
+        vcm_r_digest_ = std::move(vcm_r_digest);
     
         // 5. SETUP MERKLE TREE VERIFICATION
         auth_path_ = std::make_unique<merkle_authentication_path_variable<FieldT, sha256_two_to_one_hash_gadget<FieldT>>>(
@@ -242,10 +248,57 @@ public:
         a_sk_packer_->generate_r1cs_constraints(true);
         vcm_r_packer_->generate_r1cs_constraints(true);
         
-        // Set up proper input concatenation constraints
-        setupHashInputConstraints(value_rho_digest.get(), r_a_pk_digest.get(), 
-                                 a_sk_digest_.get(), rho_digest_.get(),
-                                 value_digest_.get(), vcm_r_digest_.get());
+        // Connect bit arrays to digest variables for note commitment
+        // Part 1: value(64) + rho(192) = 256 bits
+        for (size_t i = 0; i < 64; ++i) {
+            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                note_input_part1_->bits[i], 1, note_value_bits_[i]), 
+                "note_part1_value_" + std::to_string(i));
+        }
+        for (size_t i = 0; i < 192; ++i) {
+            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                note_input_part1_->bits[64 + i], 1, note_rho_bits_[i]), 
+                "note_part1_rho_" + std::to_string(i));
+        }
+        
+        // Part 2: r(128) + a_pk(128) = 256 bits
+        for (size_t i = 0; i < 128; ++i) {
+            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                note_input_part2_->bits[i], 1, note_r_bits_[i]), 
+                "note_part2_r_" + std::to_string(i));
+        }
+        for (size_t i = 0; i < 128; ++i) {
+            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                note_input_part2_->bits[128 + i], 1, note_a_pk_bits_[i]), 
+                "note_part2_a_pk_" + std::to_string(i));
+        }
+        
+        // Connect digest variables for nullifier
+        for (size_t i = 0; i < 256; ++i) {
+            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                a_sk_digest_->bits[i], 1, a_sk_bits_[i]), 
+                "a_sk_digest_" + std::to_string(i));
+            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                rho_digest_->bits[i], 1, note_rho_bits_[i]), 
+                "rho_digest_" + std::to_string(i));
+        }
+        
+        // Connect digest variables for value commitment
+        for (size_t i = 0; i < 64; ++i) {
+            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                value_digest_->bits[i], 1, note_value_bits_[i]), 
+                "value_digest_" + std::to_string(i));
+        }
+        for (size_t i = 64; i < 256; ++i) {
+            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                value_digest_->bits[i], 1, FieldT::zero()), 
+                "value_digest_padding_" + std::to_string(i));
+        }
+        for (size_t i = 0; i < 256; ++i) {
+            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
+                vcm_r_digest_->bits[i], 1, vcm_r_bits_[i]), 
+                "vcm_r_digest_" + std::to_string(i));
+        }
         
         // Hash constraints
         note_commit_hasher_->generate_r1cs_constraints();
@@ -268,72 +321,6 @@ public:
         generateBooleanConstraints();
         
         std::cout << "Constraints generated. Total: " << pb_->num_constraints() << std::endl;
-    }
-    
-    // Helper method to set up hash input constraints
-    void setupHashInputConstraints(
-        digest_variable<FieldT>* value_rho_digest,
-        digest_variable<FieldT>* r_a_pk_digest,
-        digest_variable<FieldT>* a_sk_digest,
-        digest_variable<FieldT>* rho_digest,
-        digest_variable<FieldT>* value_digest,
-        digest_variable<FieldT>* vcm_r_digest) {
-        
-        // FIXED: For note commitment, we need to properly handle the full inputs
-        // The note commitment should be: SHA256(SHA256(value||rho), SHA256(r||a_pk))
-        
-        // 1. For note commitment first hash: value(64) + rho(192) = 256 bits
-        for (size_t i = 0; i < 64; ++i) {
-            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
-                value_rho_digest->bits[i], 1, note_value_bits_[i]), 
-                "value_to_hash1_" + std::to_string(i));
-        }
-        for (size_t i = 0; i < 192; ++i) {
-            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
-                value_rho_digest->bits[64 + i], 1, note_rho_bits_[i]), 
-                "rho_to_hash1_" + std::to_string(i));
-        }
-        
-        // 2. For note commitment second hash: r(128) + a_pk(128) = 256 bits
-        for (size_t i = 0; i < 128; ++i) {
-            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
-                r_a_pk_digest->bits[i], 1, note_r_bits_[i]), 
-                "r_to_hash2_" + std::to_string(i));
-        }
-        for (size_t i = 0; i < 128; ++i) {
-            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
-                r_a_pk_digest->bits[128 + i], 1, note_a_pk_bits_[i]), 
-                "a_pk_to_hash2_" + std::to_string(i));
-        }
-        
-        // 3. For nullifier: a_sk(256) and rho(256) - separate inputs
-        for (size_t i = 0; i < 256; ++i) {
-            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
-                a_sk_digest->bits[i], 1, a_sk_bits_[i]), 
-                "a_sk_to_nullifier_" + std::to_string(i));
-            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
-                rho_digest->bits[i], 1, note_rho_bits_[i]), 
-                "rho_to_nullifier_" + std::to_string(i));
-        }
-        
-        // 4. For value commitment: value(64) + padding(192) and vcm_r(256)
-        for (size_t i = 0; i < 64; ++i) {
-            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
-                value_digest->bits[i], 1, note_value_bits_[i]), 
-                "value_to_vcm_" + std::to_string(i));
-        }
-        for (size_t i = 64; i < 256; ++i) {
-            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
-                value_digest->bits[i], 1, FieldT::zero()), 
-                "value_padding_" + std::to_string(i));
-        }
-        
-        // 5. vcm_r digest - NO CONFLICTS, each bit gets exactly one constraint
-        for (size_t i = 0; i < 256; ++i) {
-            pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
-                vcm_r_digest->bits[i], 1, vcm_r_bits_[i]), 
-                "vcm_r_to_vcm_" + std::to_string(i));
-        }
     }
     
     void generateBooleanConstraints() {
@@ -489,31 +476,41 @@ private:
         a_sk_packer_->generate_r1cs_witness_from_packed();
         vcm_r_packer_->generate_r1cs_witness_from_packed();
         
-        // Set digest witness values
-        // Set a_sk_digest witness from a_sk_bits_
-        for (size_t i = 0; i < 256; ++i) {
-            pb_->val(a_sk_digest_->bits[i]) = pb_->val(a_sk_bits_[i]);
+        // Set digest witness values for note commitment
+        // Part 1: value(64) + rho(192) = 256 bits
+        for (size_t i = 0; i < 64; ++i) {
+            pb_->val(note_input_part1_->bits[i]) = pb_->val(note_value_bits_[i]);
+        }
+        for (size_t i = 0; i < 192; ++i) {
+            pb_->val(note_input_part1_->bits[64 + i]) = pb_->val(note_rho_bits_[i]);
         }
         
-        // Set rho_digest witness from note_rho_bits_  
+        // Part 2: r(128) + a_pk(128) = 256 bits
+        for (size_t i = 0; i < 128; ++i) {
+            pb_->val(note_input_part2_->bits[i]) = pb_->val(note_r_bits_[i]);
+        }
+        for (size_t i = 0; i < 128; ++i) {
+            pb_->val(note_input_part2_->bits[128 + i]) = pb_->val(note_a_pk_bits_[i]);
+        }
+        
+        // Set digest witness values for nullifier
         for (size_t i = 0; i < 256; ++i) {
+            pb_->val(a_sk_digest_->bits[i]) = pb_->val(a_sk_bits_[i]);
             pb_->val(rho_digest_->bits[i]) = pb_->val(note_rho_bits_[i]);
         }
         
-        // Set value_digest witness (note_value_bits + padding)
+        // Set digest witness values for value commitment
         for (size_t i = 0; i < 64; ++i) {
             pb_->val(value_digest_->bits[i]) = pb_->val(note_value_bits_[i]);
         }
         for (size_t i = 64; i < 256; ++i) {
             pb_->val(value_digest_->bits[i]) = FieldT::zero();
         }
-        
-        // Set vcm_r_digest witness from vcm_r_bits_
         for (size_t i = 0; i < 256; ++i) {
             pb_->val(vcm_r_digest_->bits[i]) = pb_->val(vcm_r_bits_[i]);
         }
         
-        // Now generate hash witnesses
+        // Generate hash witnesses
         note_commit_hasher_->generate_r1cs_witness();
         nullifier_hasher_->generate_r1cs_witness();
         value_commit_hasher_->generate_r1cs_witness();
@@ -712,14 +709,14 @@ std::vector<bool> MerkleCircuit::bytesToBits(const std::vector<uint8_t>& bytes) 
     return bits;
 }
 
-// Commitment computations (outside circuit, for testing)
+// Simplified commitment computations (outside circuit, for testing)
 uint256 MerkleCircuit::computeNoteCommitment(
     uint64_t value,
     const uint256& rho,
     const uint256& r,
     const uint256& a_pk) {
     
-    // Match circuit: SHA256(SHA256(value||rho_192), SHA256(r_128||a_pk_128))
+    // Simplified: SHA256(SHA256(value||rho_192), SHA256(r_128||a_pk_128))
     
     // First hash: value(8 bytes) + rho(24 bytes) = 32 bytes
     std::vector<uint8_t> input1;
@@ -760,17 +757,15 @@ uint256 MerkleCircuit::computeNullifier(
     const uint256& a_sk,
     const uint256& rho) {
     
-    // Match circuit: SHA256(SHA256(a_sk) || SHA256(rho))
+    // Simplified: SHA256(SHA256(a_sk), SHA256(rho))
     
-    // First hash a_sk
     uint256 a_sk_hash;
     SHA256(a_sk.begin(), 32, a_sk_hash.begin());
     
-    // Then hash rho
     uint256 rho_hash;
     SHA256(rho.begin(), 32, rho_hash.begin());
     
-    // Finally combine the two hashes
+    // Combine the two hashes
     std::vector<uint8_t> combined_input(64);
     std::memcpy(&combined_input[0], a_sk_hash.begin(), 32);
     std::memcpy(&combined_input[32], rho_hash.begin(), 32);
@@ -785,7 +780,7 @@ uint256 MerkleCircuit::computeValueCommitment(
     uint64_t value,
     const uint256& vcm_r) {
     
-    // Match circuit: SHA256(value_padded, vcm_r)
+    // Simplified: SHA256(value_padded, vcm_r)
     
     // First input: value(8 bytes) + padding(24 bytes)
     std::vector<uint8_t> input1(32, 0);
@@ -796,7 +791,6 @@ uint256 MerkleCircuit::computeValueCommitment(
     uint256 value_hash;
     SHA256(input1.data(), input1.size(), value_hash.begin());
     
-    // Second input: vcm_r(32 bytes)
     uint256 vcm_r_hash;
     SHA256(vcm_r.begin(), 32, vcm_r_hash.begin());
     
