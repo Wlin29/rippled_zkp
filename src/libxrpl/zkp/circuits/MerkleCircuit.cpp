@@ -528,6 +528,22 @@ public:
     // Getters
     FieldT getNullifier() const { return pb_->val(nullifier_); }
     FieldT getValueCommitment() const { return pb_->val(value_commitment_); }
+    
+    uint256 getNullifierFromBits() const {
+        // Extract nullifier directly from the SHA256 digest bits
+        if (!nullifier_hash_) {
+            return uint256{}; // Return zero if hasher not initialized
+        }
+        
+        // Get the digest bits from the nullifier hash digest variable
+        std::vector<bool> nullifier_bits(256);
+        for (size_t i = 0; i < 256; ++i) {
+            nullifier_bits[i] = pb_->val(nullifier_hash_->bits[i]) == FieldT::one();
+        }
+        
+        return bitsToUint256(nullifier_bits);
+    }
+    
     FieldT getAnchor() const { return pb_->val(anchor_); }
     
     libsnark::r1cs_constraint_system<FieldT> getConstraintSystem() const {
@@ -584,6 +600,7 @@ std::vector<FieldT> MerkleCircuit::generateWithdrawalWitness(
 FieldT MerkleCircuit::getNullifier() const { return pImpl_->getNullifier(); }
 FieldT MerkleCircuit::getValueCommitment() const { return pImpl_->getValueCommitment(); }
 FieldT MerkleCircuit::getAnchor() const { return pImpl_->getAnchor(); }
+uint256 MerkleCircuit::getNullifierFromBits() const { return pImpl_->getNullifierFromBits(); }
 
 libsnark::r1cs_constraint_system<FieldT> MerkleCircuit::getConstraintSystem() const {
     return pImpl_->getConstraintSystem();
@@ -607,32 +624,55 @@ size_t MerkleCircuit::getTreeDepth() const {
 
 // ===== UTILITY FUNCTIONS =====
 
-std::vector<bool> MerkleCircuit::uint256ToBits(const uint256& input) {
+std::vector<bool> convertToLibsnarkBits(const uint256& input) {
     std::vector<bool> bits(256);
-    for (size_t i = 0; i < 256; i++) {
-        size_t byteIndex = i / 8;
-        size_t bitIndex = i % 8;
-        if (byteIndex < 32) {
-            bits[i] = ((input.begin()[byteIndex] >> bitIndex) & 1) != 0;
-        } else {
-            bits[i] = false;
+    const unsigned char* data = input.begin();
+    
+    for (size_t word = 0; word < 8; ++word) {
+        for (size_t bit = 0; bit < 32; ++bit) {
+            size_t byte_idx = word * 4 + (3 - bit / 8);
+            size_t bit_idx = 7 - (bit % 8);
+            
+            bool bit_value = (data[byte_idx] >> bit_idx) & 1;
+            bits[word * 32 + bit] = bit_value;
         }
     }
     return bits;
 }
 
-uint256 MerkleCircuit::bitsToUint256(const std::vector<bool>& bits) {
+uint256 convertFromLibsnarkBits(const std::vector<bool>& bits) {
     uint256 result;
-    for (size_t i = 0; i < std::min(bits.size(), size_t(256)); ++i) {
-        if (bits[i]) {
-            size_t byteIndex = i / 8;
-            size_t bitIndex = i % 8;
-            if (byteIndex < 32) {
-                result.begin()[byteIndex] |= (1 << bitIndex);
+    unsigned char* data = result.begin();
+    std::fill(data, data + 32, 0);
+    
+    for (size_t word = 0; word < 8 && word * 32 < bits.size(); ++word) {
+        for (size_t bit = 0; bit < 32 && word * 32 + bit < bits.size(); ++bit) {
+            if (bits[word * 32 + bit]) {
+                size_t byte_idx = word * 4 + (3 - bit / 8);
+                size_t bit_idx = 7 - (bit % 8);
+                data[byte_idx] |= (1 << bit_idx);
             }
         }
     }
     return result;
+}
+
+uint256 convertFromLibsnarkBits(const digest_variable<FieldT>& digest, const libsnark::protoboard<FieldT>& pb) {
+    std::vector<bool> bits(256);
+    for (size_t i = 0; i < 256; ++i) {
+        bits[i] = pb.val(digest.bits[i]) == FieldT::one();
+    }
+    return convertFromLibsnarkBits(bits);
+}
+
+std::vector<bool> MerkleCircuit::uint256ToBits(const uint256& input) {
+    // Use libsnark-compatible bit ordering
+    return convertToLibsnarkBits(input);
+}
+
+uint256 MerkleCircuit::bitsToUint256(const std::vector<bool>& bits) {
+    // Use libsnark-compatible bit ordering
+    return convertFromLibsnarkBits(bits);
 }
 
 std::vector<bool> MerkleCircuit::spendKeyToBits(const std::string& spendKey) {
@@ -757,21 +797,39 @@ uint256 MerkleCircuit::computeNullifier(
     const uint256& a_sk,
     const uint256& rho) {
     
-    // Simplified: SHA256(SHA256(a_sk), SHA256(rho))
+    // Match the circuit's sha256_two_to_one_hash_gadget approach:
+    // Use the same SHA256 compression function that the circuit uses
     
-    uint256 a_sk_hash;
-    SHA256(a_sk.begin(), 32, a_sk_hash.begin());
+    // Create a protoboard to compute the nullifier using the exact same logic as the circuit
+    libsnark::protoboard<FieldT> pb;
     
-    uint256 rho_hash;
-    SHA256(rho.begin(), 32, rho_hash.begin());
+    // Create digest variables for a_sk and rho (exactly like in circuit)
+    digest_variable<FieldT> a_sk_digest(pb, 256, "a_sk_digest");
+    digest_variable<FieldT> rho_digest(pb, 256, "rho_digest");
+    digest_variable<FieldT> nullifier_hash(pb, 256, "nullifier_hash");
     
-    // Combine the two hashes
-    std::vector<uint8_t> combined_input(64);
-    std::memcpy(&combined_input[0], a_sk_hash.begin(), 32);
-    std::memcpy(&combined_input[32], rho_hash.begin(), 32);
+    // Create SHA256 gadget (exactly like in circuit)
+    sha256_two_to_one_hash_gadget<FieldT> sha256_gadget(
+        pb, a_sk_digest, rho_digest, nullifier_hash, "nullifier_sha256");
     
-    uint256 result;
-    SHA256(combined_input.data(), 64, result.begin());
+    // Generate constraints first
+    sha256_gadget.generate_r1cs_constraints();
+    
+    // Convert inputs to libsnark bit format - use same method as circuit
+    auto a_sk_bits = uint256ToBits(a_sk);
+    auto rho_bits = uint256ToBits(rho);
+    
+    // Set input bits in libsnark format (same as circuit setBits method)
+    for (size_t i = 0; i < 256; ++i) {
+        pb.val(a_sk_digest.bits[i]) = a_sk_bits[i] ? FieldT::one() : FieldT::zero();
+        pb.val(rho_digest.bits[i]) = rho_bits[i] ? FieldT::one() : FieldT::zero();
+    }
+    
+    // Generate witness (compute the hash) - same as circuit
+    sha256_gadget.generate_r1cs_witness();
+    
+    // Convert result back from libsnark format using same method as circuit
+    uint256 result = convertFromLibsnarkBits(nullifier_hash, pb);
     
     return result;
 }
@@ -780,27 +838,21 @@ uint256 MerkleCircuit::computeValueCommitment(
     uint64_t value,
     const uint256& vcm_r) {
     
-    // Simplified: SHA256(value_padded, vcm_r)
+    // Match simplified circuit: Direct SHA256(value_padded || vcm_r)
     
-    // First input: value(8 bytes) + padding(24 bytes)
-    std::vector<uint8_t> input1(32, 0);
+    // First input: value(8 bytes) + padding(24 bytes) = 32 bytes
+    std::vector<uint8_t> value_padded(32, 0);
     for (int i = 0; i < 8; ++i) {
-        input1[i] = (value >> (i * 8)) & 0xFF;
+        value_padded[i] = (value >> (i * 8)) & 0xFF;
     }
     
-    uint256 value_hash;
-    SHA256(input1.data(), input1.size(), value_hash.begin());
-    
-    uint256 vcm_r_hash;
-    SHA256(vcm_r.begin(), 32, vcm_r_hash.begin());
-    
-    // Final: SHA256(value_hash || vcm_r_hash)
-    std::vector<uint8_t> final_input;
-    final_input.insert(final_input.end(), value_hash.begin(), value_hash.end());
-    final_input.insert(final_input.end(), vcm_r_hash.begin(), vcm_r_hash.end());
+    // Combined input: value_padded(32 bytes) + vcm_r(32 bytes) = 64 bytes
+    std::vector<uint8_t> combined_input(64);
+    std::memcpy(&combined_input[0], value_padded.data(), 32);
+    std::memcpy(&combined_input[32], vcm_r.begin(), 32);
     
     uint256 result;
-    SHA256(final_input.data(), final_input.size(), result.begin());
+    SHA256(combined_input.data(), 64, result.begin());
     
     return result;
 }

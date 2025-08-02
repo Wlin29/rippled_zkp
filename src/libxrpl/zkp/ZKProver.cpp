@@ -397,12 +397,12 @@ ProofData ZkProver::createWithdrawalProof(
         std::cout << "  Nullifier: " << public_nullifier << std::endl;
         std::cout << "  Value commitment: " << public_value_commitment << std::endl;
         
-        // Verify nullifier matches expected
-        uint256 expectedNullifier = fieldElementToUint256(public_nullifier);
-        if (expectedNullifier != inputNullifier) {
+        // Get nullifier directly from digest bits
+        uint256 computedNullifier = unifiedCircuit->getNullifierFromBits();
+        if (computedNullifier != inputNullifier) {
             std::cout << "  Nullifier mismatch:" << std::endl;
             std::cout << "    Expected: " << inputNullifier << std::endl;
-            std::cout << "    Computed: " << expectedNullifier << std::endl;
+            std::cout << "    Computed: " << computedNullifier << std::endl;
         }
         
         // Create primary input vector

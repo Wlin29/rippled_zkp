@@ -154,6 +154,14 @@ public:
     FieldT getValueCommitment() const;
 
     /**
+     * Get nullifier directly from digest bits (not packed field element).
+     * Returns the full 256-bit nullifier hash.
+     * 
+     * This is needed because the packed field element can only hold 253 bits.
+     */
+    uint256 getNullifierFromBits() const;
+
+    /**
      * Get the anchor/root (public output).
      * 
      * The Merkle tree root that the note was proven to be in.
