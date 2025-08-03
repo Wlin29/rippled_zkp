@@ -112,7 +112,9 @@ public:
         testMerkleVerificationEnforcement();
         testUnifiedCircuitBehavior();
         testZcashStyleWorkflow();
-        // testSHA256GadgetComparison();
+        testSHA256TwoToOneGadget();
+        testSHA256CompressionFunction();
+        testSHA256GadgetComparison();
         // testSHA256OnlyGadget();
         testBitOrderingDebug();
     }
@@ -893,6 +895,11 @@ public:
         zkp::FieldT circuit_nullifier_field = testCircuit.getNullifier();
         uint256 circuit_nullifier = zkp::MerkleCircuit::fieldElementToUint256(circuit_nullifier_field);
         
+        // Also try getting nullifier directly from digest bits
+        uint256 circuit_nullifier_from_bits = testCircuit.getNullifierFromBits();
+        std::cout << "Circuit nullifier (field): " << strHex(circuit_nullifier) << std::endl;
+        std::cout << "Circuit nullifier (bits):  " << strHex(circuit_nullifier_from_bits) << std::endl;
+        
         std::cout << "Circuit nullifier result: " << strHex(circuit_nullifier) << std::endl;
         
         // Method 3: Use MerkleCircuit::computeNullifier (external function)
@@ -947,6 +954,140 @@ public:
         }
         
         std::cout << "=== END SHA256 GADGET COMPARISON ===" << std::endl;
+    }
+
+    void testSHA256TwoToOneGadget() {
+        testcase("SHA256 Two-to-One Gadget Verification");
+        
+        std::cout << "\n=== SHA256 TWO-TO-ONE GADGET TEST ===" << std::endl;
+        
+        // Initialize libsnark
+        zkp::initCurveParameters();
+        
+        // Test multiple different input pairs to ensure gadget works correctly
+        std::vector<std::pair<uint256, uint256>> test_vectors;
+        
+        // Test vector 1: All 0x42 vs all 0x84
+        uint256 input1_a, input2_a;
+        std::memset(input1_a.begin(), 0x42, 32);
+        std::memset(input2_a.begin(), 0x84, 32);
+        test_vectors.push_back({input1_a, input2_a});
+        
+        // Test vector 2: All 0x11 vs all 0x22
+        uint256 input1_b, input2_b;
+        std::memset(input1_b.begin(), 0x11, 32);
+        std::memset(input2_b.begin(), 0x22, 32);
+        test_vectors.push_back({input1_b, input2_b});
+        
+        // Test vector 3: Zero vs ones
+        uint256 input1_c, input2_c;
+        std::memset(input1_c.begin(), 0x00, 32);
+        std::memset(input2_c.begin(), 0xFF, 32);
+        test_vectors.push_back({input1_c, input2_c});
+        
+        // Test vector 4: Pattern vs reverse pattern
+        uint256 input1_d, input2_d;
+        for (int i = 0; i < 32; ++i) {
+            input1_d.begin()[i] = static_cast<uint8_t>(i);
+            input2_d.begin()[i] = static_cast<uint8_t>(31 - i);
+        }
+        test_vectors.push_back({input1_d, input2_d});
+        
+        bool all_tests_passed = true;
+        std::vector<uint256> gadget_results;
+        
+        for (size_t test_num = 0; test_num < test_vectors.size(); ++test_num) {
+            const auto& [input1, input2] = test_vectors[test_num];
+            
+            std::cout << "\n--- Test Vector " << (test_num + 1) << " ---" << std::endl;
+            std::cout << "Input 1: " << strHex(input1).substr(0, 16) << "..." << std::endl;
+            std::cout << "Input 2: " << strHex(input2).substr(0, 16) << "..." << std::endl;
+            
+            // Create a minimal protoboard to test the SHA256 gadget
+            libsnark::protoboard<zkp::FieldT> pb;
+            
+            // Create digest variables
+            libsnark::digest_variable<zkp::FieldT> left_input(pb, 256, "left_input");
+            libsnark::digest_variable<zkp::FieldT> right_input(pb, 256, "right_input");
+            libsnark::digest_variable<zkp::FieldT> output_digest(pb, 256, "output_digest");
+            
+            // Create the SHA256 two-to-one gadget
+            libsnark::sha256_two_to_one_hash_gadget<zkp::FieldT> sha256_gadget(
+                pb, left_input, right_input, output_digest, "sha256_test");
+            
+            // Generate constraints
+            sha256_gadget.generate_r1cs_constraints();
+            
+            // Convert inputs to libsnark bit format
+            auto input1_bits = zkp::MerkleCircuit::uint256ToBits(input1);
+            auto input2_bits = zkp::MerkleCircuit::uint256ToBits(input2);
+            
+            // Set the input witnesses
+            for (size_t i = 0; i < 256; ++i) {
+                pb.val(left_input.bits[i]) = input1_bits[i] ? zkp::FieldT::one() : zkp::FieldT::zero();
+                pb.val(right_input.bits[i]) = input2_bits[i] ? zkp::FieldT::one() : zkp::FieldT::zero();
+            }
+            
+            // Generate witness for the SHA256 computation
+            sha256_gadget.generate_r1cs_witness();
+            
+            // Check if constraints are satisfied
+            bool constraints_satisfied = pb.is_satisfied();
+            std::cout << "Constraints satisfied: " << (constraints_satisfied ? "YES" : "NO") << std::endl;
+            
+            if (!constraints_satisfied) {
+                std::cout << "ERROR: SHA256 gadget constraints not satisfied for test " << (test_num + 1) << "!" << std::endl;
+                all_tests_passed = false;
+                continue;
+            }
+            
+            // Extract the result using the same method as the circuit
+            std::vector<bool> output_bits(256);
+            for (size_t i = 0; i < 256; ++i) {
+                output_bits[i] = pb.val(output_digest.bits[i]) == zkp::FieldT::one();
+            }
+            uint256 gadget_result = zkp::MerkleCircuit::bitsToUint256(output_bits);
+            gadget_results.push_back(gadget_result);
+            std::cout << "SHA256 gadget result: " << strHex(gadget_result).substr(0, 16) << "..." << std::endl;
+            
+            // Compare with external computation using the same method
+            uint256 external_result = zkp::MerkleCircuit::computeNullifier(input1, input2);
+            std::cout << "External result:      " << strHex(external_result).substr(0, 16) << "..." << std::endl;
+            
+            // They should match since both use the same SHA256 gadget
+            bool results_match = (gadget_result == external_result);
+            std::cout << "Results match: " << (results_match ? "YES" : "NO") << std::endl;
+            
+            if (!results_match) {
+                std::cout << "ERROR: Gadget and external results don't match for test " << (test_num + 1) << "!" << std::endl;
+                all_tests_passed = false;
+            }
+        }
+        
+        // Verify that different inputs produce different outputs
+        std::cout << "\n--- Checking output uniqueness ---" << std::endl;
+        bool all_outputs_unique = true;
+        for (size_t i = 0; i < gadget_results.size(); ++i) {
+            for (size_t j = i + 1; j < gadget_results.size(); ++j) {
+                if (gadget_results[i] == gadget_results[j]) {
+                    std::cout << "ERROR: Test " << (i + 1) << " and " << (j + 1) << " produced identical outputs!" << std::endl;
+                    all_outputs_unique = false;
+                }
+            }
+        }
+        
+        if (all_outputs_unique) {
+            std::cout << "✓ All test vectors produced unique outputs" << std::endl;
+        }
+        
+        std::cout << "\n=== SHA256 TWO-TO-ONE GADGET TEST SUMMARY ===" << std::endl;
+        std::cout << "Tests passed: " << (all_tests_passed && all_outputs_unique ? "ALL" : "SOME FAILED") << std::endl;
+        std::cout << "Total test vectors: " << test_vectors.size() << std::endl;
+        
+        BEAST_EXPECT(all_tests_passed);
+        BEAST_EXPECT(all_outputs_unique);
+        
+        std::cout << "=== SHA256 TWO-TO-ONE GADGET TEST COMPLETE ===" << std::endl;
     }
 
     void testSHA256OnlyGadget() {
@@ -1074,9 +1215,9 @@ public:
         sha256_gadget.generate_r1cs_constraints();
         std::cout << "Circuit has " << pb.num_constraints() << " constraints" << std::endl;
         
-        // Convert to libsnark bit format (MSB first within 32-bit words)
-        auto a_sk_bits = convertToLibsnarkBits(test_a_sk);
-        auto rho_bits = convertToLibsnarkBits(test_rho);
+        // Convert inputs to libsnark bit format (MSB first within 32-bit words)
+        auto a_sk_bits = zkp::MerkleCircuit::uint256ToBits(test_a_sk);
+        auto rho_bits = zkp::MerkleCircuit::uint256ToBits(test_rho);
         
         std::cout << "a_sk libsnark bits (first 16): ";
         for (int i = 0; i < 16; ++i) {
@@ -1099,7 +1240,11 @@ public:
         sha256_gadget.generate_r1cs_witness();
         
         // Convert result back from libsnark format
-        uint256 circuit_result = convertFromLibsnarkBits(nullifier_hash, pb);
+        std::vector<bool> circuit_bits(256);
+        for (size_t i = 0; i < 256; ++i) {
+            circuit_bits[i] = pb.val(nullifier_hash.bits[i]) == zkp::FieldT::one();
+        }
+        uint256 circuit_result = zkp::MerkleCircuit::bitsToUint256(circuit_bits);
         std::cout << "Circuit result (libsnark format): " << strHex(circuit_result) << std::endl;
         
         bool matches = (circuit_result == openssl_result);
@@ -1116,8 +1261,8 @@ public:
             std::memset(test2_a_sk.begin(), 0x11, 32);
             std::memset(test2_rho.begin(), 0x22, 32);
             
-            auto test2_a_sk_bits = convertToLibsnarkBits(test2_a_sk);
-            auto test2_rho_bits = convertToLibsnarkBits(test2_rho);
+            auto test2_a_sk_bits = zkp::MerkleCircuit::uint256ToBits(test2_a_sk);
+            auto test2_rho_bits = zkp::MerkleCircuit::uint256ToBits(test2_rho);
             
             for (size_t i = 0; i < 256; ++i) {
                 pb.val(a_sk_digest.bits[i]) = test2_a_sk_bits[i] ? zkp::FieldT::one() : zkp::FieldT::zero();
@@ -1125,7 +1270,11 @@ public:
             }
             
             sha256_gadget.generate_r1cs_witness();
-            uint256 test2_circuit = convertFromLibsnarkBits(nullifier_hash, pb);
+            std::vector<bool> test2_circuit_bits(256);
+            for (size_t i = 0; i < 256; ++i) {
+                test2_circuit_bits[i] = pb.val(nullifier_hash.bits[i]) == zkp::FieldT::one();
+            }
+            uint256 test2_circuit = zkp::MerkleCircuit::bitsToUint256(test2_circuit_bits);
             
             std::cout << "Test 2 - a_sk: " << strHex(test2_a_sk) << std::endl;
             std::cout << "Test 2 - rho:  " << strHex(test2_rho) << std::endl;
@@ -1145,140 +1294,171 @@ public:
         std::cout << "=== END BIT ORDERING DEBUG TEST ===" << std::endl;
     }
 
-private:
-    // Helper function to convert uint256 to libsnark big-endian bit ordering
-    std::vector<bool> convertToLibsnarkBits(const uint256& input) {
-        std::vector<bool> bits(256);
-        for (size_t i = 0; i < 8; ++i) {
-            uint32_t word = 0;
-            // Extract 32-bit word in big-endian format
-            for (size_t j = 0; j < 4; ++j) {
-                word = (word << 8) | input.begin()[i * 4 + j];
+    void testSHA256CompressionFunction() {
+        testcase("SHA256 Compression Function Verification");
+        
+        std::cout << "\n=== SHA256 COMPRESSION FUNCTION TEST ===" << std::endl;
+        
+        // Initialize libsnark
+        zkp::initCurveParameters();
+        
+        // Test with RFC 6234 test vectors for SHA256
+        struct TestVector {
+            std::string name;
+            std::string input_hex;
+            std::string expected_hex;
+        };
+        
+        std::vector<TestVector> test_vectors = {
+            // Test 1: Empty string
+            {
+                "Empty string",
+                "",
+                "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            // Test 2: Single byte 'a'
+            {
+                "Single 'a'",
+                "61",
+                "ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb"
+            },
+            // Test 3: "abc"
+            {
+                "abc",
+                "616263",
+                "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+            }
+        };
+        
+        // For the two-to-one gadget, we need to test 512-bit (64 byte) inputs
+        // So we'll create test vectors by concatenating 32-byte inputs
+        std::vector<std::pair<uint256, uint256>> gadget_test_vectors;
+        
+        // Test vector 1: Zero inputs
+        uint256 zero_input;
+        std::memset(zero_input.begin(), 0x00, 32);
+        gadget_test_vectors.push_back({zero_input, zero_input});
+        
+        // Test vector 2: Known pattern
+        uint256 pattern_a, pattern_b;
+        for (int i = 0; i < 32; ++i) {
+            pattern_a.begin()[i] = static_cast<uint8_t>(i);
+            pattern_b.begin()[i] = static_cast<uint8_t>(255 - i);
+        }
+        gadget_test_vectors.push_back({pattern_a, pattern_b});
+        
+        // Test vector 3: ASCII text patterns
+        uint256 ascii_a, ascii_b;
+        std::memset(ascii_a.begin(), 'A', 32);  // All 'A' characters
+        std::memset(ascii_b.begin(), 'B', 32);  // All 'B' characters
+        gadget_test_vectors.push_back({ascii_a, ascii_b});
+        
+        bool all_tests_passed = true;
+        
+        for (size_t test_num = 0; test_num < gadget_test_vectors.size(); ++test_num) {
+            const auto& [input1, input2] = gadget_test_vectors[test_num];
+            
+            std::cout << "\n--- Compression Test " << (test_num + 1) << " ---" << std::endl;
+            
+            // Create protoboard for the test
+            libsnark::protoboard<zkp::FieldT> pb;
+            
+            // Create digest variables
+            libsnark::digest_variable<zkp::FieldT> left_digest(pb, 256, "left_digest");
+            libsnark::digest_variable<zkp::FieldT> right_digest(pb, 256, "right_digest");
+            libsnark::digest_variable<zkp::FieldT> output_digest(pb, 256, "output_digest");
+            
+            // Create SHA256 compression gadget
+            libsnark::sha256_two_to_one_hash_gadget<zkp::FieldT> compression_gadget(
+                pb, left_digest, right_digest, output_digest, "compression_test");
+            
+            // Generate constraints
+            compression_gadget.generate_r1cs_constraints();
+            size_t num_constraints = pb.num_constraints();
+            std::cout << "Compression gadget constraints: " << num_constraints << std::endl;
+            
+            // Convert inputs to bit representation
+            auto input1_bits = zkp::MerkleCircuit::uint256ToBits(input1);
+            auto input2_bits = zkp::MerkleCircuit::uint256ToBits(input2);
+            
+            // Set input witnesses
+            for (size_t i = 0; i < 256; ++i) {
+                pb.val(left_digest.bits[i]) = input1_bits[i] ? zkp::FieldT::one() : zkp::FieldT::zero();
+                pb.val(right_digest.bits[i]) = input2_bits[i] ? zkp::FieldT::one() : zkp::FieldT::zero();
             }
             
-            // Extract bits MSB first (like libsnark)
-            for (size_t j = 0; j < 32; ++j) {
-                bits[i * 32 + j] = (word >> (31 - j)) & 1;
-            }
-        }
-        return bits;
-    }
-    
-    // Helper function to convert from libsnark bits back to uint256
-    uint256 convertFromLibsnarkBits(const zkp::digest_variable<zkp::FieldT>& digest, 
-                                    const libsnark::protoboard<zkp::FieldT>& pb) {
-        uint256 result;
-        for (size_t i = 0; i < 8; ++i) {
-            uint32_t word = 0;
-            // Reconstruct 32-bit word from MSB-first bits
-            for (size_t j = 0; j < 32; ++j) {
-                if (pb.val(digest.bits[i * 32 + j]) == zkp::FieldT::one()) {
-                    word |= (1U << (31 - j));
-                }
+            // Generate witness
+            compression_gadget.generate_r1cs_witness();
+            
+            // Verify constraints are satisfied
+            bool constraints_satisfied = pb.is_satisfied();
+            std::cout << "Constraints satisfied: " << (constraints_satisfied ? "✓" : "✗") << std::endl;
+            
+            if (!constraints_satisfied) {
+                std::cout << "ERROR: Compression gadget constraints failed!" << std::endl;
+                all_tests_passed = false;
+                continue;
             }
             
-            // Store word in big-endian format
-            for (size_t j = 0; j < 4; ++j) {
-                result.data()[i * 4 + j] = (word >> (8 * (3 - j))) & 0xFF;
+            // Extract the compression result
+            std::vector<bool> output_bits(256);
+            for (size_t i = 0; i < 256; ++i) {
+                output_bits[i] = pb.val(output_digest.bits[i]) == zkp::FieldT::one();
+            }
+            uint256 gadget_output = zkp::MerkleCircuit::bitsToUint256(output_bits);
+            
+            // Compare with reference implementation
+            std::vector<uint8_t> combined_input(64);
+            std::memcpy(&combined_input[0], input1.begin(), 32);
+            std::memcpy(&combined_input[32], input2.begin(), 32);
+            
+            uint256 reference_output;
+            SHA256(combined_input.data(), 64, reference_output.begin());
+            
+            bool outputs_match = (gadget_output == reference_output);
+            std::cout << "Gadget vs reference: " << (outputs_match ? "✓ MATCH" : "✗ MISMATCH") << std::endl;
+            
+            if (!outputs_match) {
+                std::cout << "Gadget output:    " << strHex(gadget_output).substr(0, 32) << "..." << std::endl;
+                std::cout << "Reference output: " << strHex(reference_output).substr(0, 32) << "..." << std::endl;
+                all_tests_passed = false;
+            }
+            
+            // Test constraint efficiency
+            double constraints_per_bit = static_cast<double>(num_constraints) / 512.0; // 512 input bits
+            std::cout << "Efficiency: " << std::fixed << std::setprecision(1) 
+                      << constraints_per_bit << " constraints per input bit" << std::endl;
+        }
+        
+        // Test determinism - same inputs should always produce same outputs
+        std::cout << "\n--- Testing Determinism ---" << std::endl;
+        uint256 det_input1, det_input2;
+        std::memset(det_input1.begin(), 0xAA, 32);
+        std::memset(det_input2.begin(), 0x55, 32);
+        
+        std::vector<uint256> repeated_results;
+        for (int run = 0; run < 3; ++run) {
+            uint256 result = zkp::MerkleCircuit::computeNullifier(det_input1, det_input2);
+            repeated_results.push_back(result);
+        }
+        
+        bool deterministic = true;
+        for (size_t i = 1; i < repeated_results.size(); ++i) {
+            if (repeated_results[i] != repeated_results[0]) {
+                deterministic = false;
+                break;
             }
         }
-        return result;
-    }
-    
-    // Convert with byte order reversed (byte 0 -> byte 31, etc.)
-    std::vector<bool> convertByteReversedBits(const uint256& input) {
-        std::vector<bool> bits(256);
-        for (size_t byte_idx = 0; byte_idx < 32; ++byte_idx) {
-            uint8_t byte_val = input.begin()[31 - byte_idx]; // Reverse byte order
-            // Use normal LSB first within each byte
-            for (size_t bit_idx = 0; bit_idx < 8; ++bit_idx) {
-                bits[byte_idx * 8 + bit_idx] = (byte_val >> bit_idx) & 1;
-            }
-        }
-        return bits;
-    }
-    
-    // Convert with bit order reversed within each byte
-    std::vector<bool> convertBitReversedBits(const uint256& input) {
-        std::vector<bool> bits(256);
-        for (size_t byte_idx = 0; byte_idx < 32; ++byte_idx) {
-            uint8_t byte_val = input.begin()[byte_idx];
-            // Reverse bit order within byte
-            for (size_t bit_idx = 0; bit_idx < 8; ++bit_idx) {
-                bits[byte_idx * 8 + bit_idx] = (byte_val >> (7 - bit_idx)) & 1;
-            }
-        }
-        return bits;
-    }
-    
-    // Convert with both byte and bit order reversed
-    std::vector<bool> convertFullReversedBits(const uint256& input) {
-        std::vector<bool> bits(256);
-        for (size_t byte_idx = 0; byte_idx < 32; ++byte_idx) {
-            uint8_t byte_val = input.begin()[31 - byte_idx]; // Reverse byte order
-            // Reverse bit order within byte
-            for (size_t bit_idx = 0; bit_idx < 8; ++bit_idx) {
-                bits[byte_idx * 8 + bit_idx] = (byte_val >> (7 - bit_idx)) & 1;
-            }
-        }
-        return bits;
-    }
-    
-    // Output converters
-    uint256 convertFromCurrentBits(const zkp::digest_variable<zkp::FieldT>& digest, 
-                                   const libsnark::protoboard<zkp::FieldT>& pb) {
-        uint256 result;
-        for (size_t i = 0; i < 256; ++i) {
-            if (pb.val(digest.bits[i]) == zkp::FieldT::one()) {
-                result.data()[i / 8] |= (1 << (i % 8)); // LSB first within byte
-            }
-        }
-        return result;
-    }
-    
-    uint256 convertFromByteReversedBits(const zkp::digest_variable<zkp::FieldT>& digest, 
-                                        const libsnark::protoboard<zkp::FieldT>& pb) {
-        uint256 result;
-        for (size_t byte_idx = 0; byte_idx < 32; ++byte_idx) {
-            uint8_t byte_val = 0;
-            for (size_t bit_idx = 0; bit_idx < 8; ++bit_idx) {
-                if (pb.val(digest.bits[byte_idx * 8 + bit_idx]) == zkp::FieldT::one()) {
-                    byte_val |= (1 << bit_idx); // LSB first within byte
-                }
-            }
-            result.data()[31 - byte_idx] = byte_val; // Reverse byte order
-        }
-        return result;
-    }
-    
-    uint256 convertFromBitReversedBits(const zkp::digest_variable<zkp::FieldT>& digest, 
-                                       const libsnark::protoboard<zkp::FieldT>& pb) {
-        uint256 result;
-        for (size_t byte_idx = 0; byte_idx < 32; ++byte_idx) {
-            uint8_t byte_val = 0;
-            for (size_t bit_idx = 0; bit_idx < 8; ++bit_idx) {
-                if (pb.val(digest.bits[byte_idx * 8 + bit_idx]) == zkp::FieldT::one()) {
-                    byte_val |= (1 << (7 - bit_idx)); // MSB first within byte
-                }
-            }
-            result.data()[byte_idx] = byte_val;
-        }
-        return result;
-    }
-    
-    uint256 convertFromFullReversedBits(const zkp::digest_variable<zkp::FieldT>& digest, 
-                                        const libsnark::protoboard<zkp::FieldT>& pb) {
-        uint256 result;
-        for (size_t byte_idx = 0; byte_idx < 32; ++byte_idx) {
-            uint8_t byte_val = 0;
-            for (size_t bit_idx = 0; bit_idx < 8; ++bit_idx) {
-                if (pb.val(digest.bits[byte_idx * 8 + bit_idx]) == zkp::FieldT::one()) {
-                    byte_val |= (1 << (7 - bit_idx)); // MSB first within byte
-                }
-            }
-            result.data()[31 - byte_idx] = byte_val; // Reverse byte order
-        }
-        return result;
+        
+        std::cout << "Determinism test: " << (deterministic ? "✓ PASSED" : "✗ FAILED") << std::endl;
+        
+        std::cout << "\n=== SHA256 COMPRESSION FUNCTION TEST SUMMARY ===" << std::endl;
+        std::cout << "Overall result: " << (all_tests_passed && deterministic ? "✓ ALL PASSED" : "✗ SOME FAILED") << std::endl;
+        
+        BEAST_EXPECT(all_tests_passed);
+        BEAST_EXPECT(deterministic);
+        
+        std::cout << "=== SHA256 COMPRESSION FUNCTION TEST COMPLETE ===" << std::endl;
     }
 };
 

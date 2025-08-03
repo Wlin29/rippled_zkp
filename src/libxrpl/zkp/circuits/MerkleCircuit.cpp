@@ -10,6 +10,7 @@
 #include <libsnark/gadgetlib1/gadgets/merkle_tree/merkle_tree_check_read_gadget.hpp>
 #include <cassert>
 #include <openssl/sha.h>
+#include <iomanip>
 
 namespace ripple {
 namespace zkp {
@@ -433,6 +434,26 @@ private:
         auto a_sk_bits = MerkleCircuit::uint256ToBits(a_sk);
         auto vcm_r_bits = MerkleCircuit::uint256ToBits(vcm_r);
         
+        // DEBUG: Print circuit bit conversion for comparison
+        std::cout << "Circuit setBits debug:" << std::endl;
+        std::cout << "  a_sk hex: " << std::hex;
+        for (int i = 0; i < 4; ++i) {
+            std::cout << std::setfill('0') << std::setw(2) << (unsigned int)a_sk.begin()[i];
+        }
+        std::cout << "..." << std::dec << std::endl;
+        
+        std::cout << "  a_sk bits[0-15]: ";
+        for (int i = 0; i < 16; ++i) {
+            std::cout << (a_sk_bits[i] ? "1" : "0");
+        }
+        std::cout << std::endl;
+        
+        std::cout << "  rho bits[0-15]: ";
+        for (int i = 0; i < 16; ++i) {
+            std::cout << (rho_bits[i] ? "1" : "0");
+        }
+        std::cout << std::endl;
+        
         // Set bit values
         for (size_t i = 0; i < 256; ++i) {
             pb_->val(note_rho_bits_[i]) = rho_bits[i] ? FieldT::one() : FieldT::zero();
@@ -541,7 +562,17 @@ public:
             nullifier_bits[i] = pb_->val(nullifier_hash_->bits[i]) == FieldT::one();
         }
         
-        return bitsToUint256(nullifier_bits);
+        uint256 result = MerkleCircuit::bitsToUint256(nullifier_bits);
+        
+        // DEBUG: Print circuit nullifier extraction
+        std::cout << "Circuit getNullifierFromBits debug:" << std::endl;
+        std::cout << "  Circuit result: " << std::hex;
+        for (int i = 0; i < 8; ++i) {
+            std::cout << std::setfill('0') << std::setw(2) << (unsigned int)result.begin()[i];
+        }
+        std::cout << "..." << std::dec << std::endl;
+        
+        return result;
     }
     
     FieldT getAnchor() const { return pb_->val(anchor_); }
@@ -819,6 +850,26 @@ uint256 MerkleCircuit::computeNullifier(
     auto a_sk_bits = uint256ToBits(a_sk);
     auto rho_bits = uint256ToBits(rho);
     
+    // DEBUG: Print first few bits to compare with circuit
+    std::cout << "External computeNullifier debug:" << std::endl;
+    std::cout << "  a_sk hex: " << std::hex;
+    for (int i = 0; i < 4; ++i) {
+        std::cout << std::setfill('0') << std::setw(2) << (unsigned int)a_sk.begin()[i];
+    }
+    std::cout << "..." << std::dec << std::endl;
+    
+    std::cout << "  a_sk bits[0-15]: ";
+    for (int i = 0; i < 16; ++i) {
+        std::cout << (a_sk_bits[i] ? "1" : "0");
+    }
+    std::cout << std::endl;
+    
+    std::cout << "  rho bits[0-15]: ";
+    for (int i = 0; i < 16; ++i) {
+        std::cout << (rho_bits[i] ? "1" : "0");
+    }
+    std::cout << std::endl;
+    
     // Set input bits in libsnark format (same as circuit setBits method)
     for (size_t i = 0; i < 256; ++i) {
         pb.val(a_sk_digest.bits[i]) = a_sk_bits[i] ? FieldT::one() : FieldT::zero();
@@ -830,6 +881,12 @@ uint256 MerkleCircuit::computeNullifier(
     
     // Convert result back from libsnark format using same method as circuit
     uint256 result = convertFromLibsnarkBits(nullifier_hash, pb);
+    
+    std::cout << "  External result: " << std::hex;
+    for (int i = 0; i < 8; ++i) {
+        std::cout << std::setfill('0') << std::setw(2) << (unsigned int)result.begin()[i];
+    }
+    std::cout << "..." << std::dec << std::endl;
     
     return result;
 }
