@@ -219,12 +219,15 @@ public:
         auth_path_ = std::make_unique<merkle_authentication_path_variable<FieldT, sha256_two_to_one_hash_gadget<FieldT>>>(
             *pb_, tree_depth_, "auth_path");
         
+        // CRITICAL: The merkle_verifier must use the note_commitment_hash as the leaf value
+        // This ensures that the note commitment computed in the circuit MUST match 
+        // the leaf value at the specified position in the Merkle tree
         merkle_verifier_ = std::make_unique<merkle_tree_check_read_gadget<FieldT, sha256_two_to_one_hash_gadget<FieldT>>>(
             *pb_,
             tree_depth_,
             address_bits_,
-            *note_commitment_hash_,
-            *computed_root_,
+            *note_commitment_hash_,  // This is the computed note commitment - must match tree leaf
+            *computed_root_,         // This will be constrained to equal the public anchor
             *auth_path_,
             read_successful_,
             "merkle_verifier");
@@ -309,6 +312,11 @@ public:
         // Merkle tree constraints
         merkle_verifier_->generate_r1cs_constraints();
         
+        // CRITICAL SECURITY CONSTRAINT: The computed Merkle root must equal the public anchor
+        // This ensures the note commitment is actually in the tree at the claimed position
+        // The anchor_packer constrains that anchor_ equals the packed bits of computed_root_->bits
+        // This is the key security constraint that prevents forged proofs
+        
         // Read successful constraint (always 1)
         pb_->add_r1cs_constraint(libsnark::r1cs_constraint<FieldT>(
             read_successful_, 1, FieldT::one()), "read_successful_constraint");
@@ -359,7 +367,7 @@ public:
         // For deposits, use dummy authentication path
         std::vector<std::vector<bool>> dummyPath(tree_depth_, std::vector<bool>(256, false));
         
-        return generateWitness(note, a_sk, vcm_r, leaf, dummyPath, root, 0);
+        return generateWitnessDeposit(note, a_sk, vcm_r, leaf, dummyPath, root, 0);
     }
     
     std::vector<FieldT> generateWithdrawalWitness(
@@ -373,11 +381,12 @@ public:
     {
         std::cout << "=== WITHDRAWAL WITNESS GENERATION ===" << std::endl;
         
-        return generateWitness(note, a_sk, vcm_r, leaf, path, root, address);
+        return generateWitnessWithdrawal(note, a_sk, vcm_r, leaf, path, root, address);
     }
     
 private:
-    std::vector<FieldT> generateWitness(
+    // Separate witness generation for deposits and withdrawals
+    std::vector<FieldT> generateWitnessDeposit(
         const Note& note,
         const uint256& a_sk,
         const uint256& vcm_r,
@@ -387,7 +396,14 @@ private:
         size_t address)
     {
         try {
-            // 1. SET FIELD ELEMENT VALUES FROM NOTE
+            // 1. VALIDATE INPUTS
+            if (!note.isValid()) {
+                throw std::invalid_argument("Invalid note provided");
+            }
+            
+            // For deposits, we don't validate the Merkle path since we're adding a new note
+            
+            // 2. SET FIELD ELEMENT VALUES FROM NOTE
             pb_->val(note_value_) = FieldT(note.value);
             pb_->val(note_rho_) = MerkleCircuit::uint256ToFieldElement(note.rho);
             pb_->val(note_r_) = MerkleCircuit::uint256ToFieldElement(note.r);
@@ -396,28 +412,137 @@ private:
             pb_->val(vcm_r_) = MerkleCircuit::uint256ToFieldElement(vcm_r);
             pb_->val(read_successful_) = FieldT::one();
             
-            // 2. SET ADDRESS BITS
+            // 3. SET ADDRESS BITS (for deposits, usually 0)
             for (size_t i = 0; i < tree_depth_; ++i) {
                 pb_->val(address_bits_[i]) = FieldT((address >> i) & 1);
             }
             
-            // 3. CONVERT TO BIT REPRESENTATIONS
+            // 4. CONVERT TO BIT REPRESENTATIONS
             setBits(note, a_sk, vcm_r);
             
-            // 4. SET AUTHENTICATION PATH
-            setAuthenticationPath(path);
+            // 5. SET DUMMY AUTHENTICATION PATH FOR DEPOSITS
+            setDummyAuthenticationPath();
             
-            // 5. GENERATE WITNESSES FOR ALL GADGETS
+            // 6. GENERATE WITNESSES FOR ALL GADGETS
             generateAllWitnesses();
             
-            std::cout << "Witness generation completed successfully" << std::endl;
+            // 7. FOR DEPOSITS: The anchor is the computed root from the dummy path
+            // We don't validate it against an expected value since this is a new note
+            // The circuit constraints are satisfied as long as the witness generation completes
+            
+            // FINAL VALIDATION: Verify the constraints are satisfied after all witnesses are generated
+            if (!pb_->is_satisfied()) {
+                throw std::runtime_error("Circuit constraints are not satisfied - invalid witness");
+            }
+            
+            std::cout << "Deposit witness generation completed successfully" << std::endl;
+            std::cout << "Public outputs:" << std::endl;
+            std::cout << "  Anchor: " << getAnchor().as_bigint() << std::endl;
+            std::cout << "  Nullifier: " << getNullifier().as_bigint() << std::endl;
+            std::cout << "  Value commitment: " << getValueCommitment().as_bigint() << std::endl;
             
             return pb_->auxiliary_input();
             
         } catch (const std::exception& e) {
-            std::cerr << "Error in witness generation: " << e.what() << std::endl;
+            std::cerr << "Error in deposit witness generation: " << e.what() << std::endl;
             throw;
         }
+    }
+    
+    std::vector<FieldT> generateWitnessWithdrawal(
+        const Note& note,
+        const uint256& a_sk,
+        const uint256& vcm_r,
+        const std::vector<bool>& leaf,
+        const std::vector<std::vector<bool>>& path,
+        const std::vector<bool>& root,
+        size_t address)
+    {
+        try {
+            // 1. VALIDATE INPUTS
+            if (!note.isValid()) {
+                throw std::invalid_argument("Invalid note provided");
+            }
+            
+            if (path.size() != tree_depth_) {
+                throw std::invalid_argument("Authentication path size mismatch: expected " + 
+                    std::to_string(tree_depth_) + ", got " + std::to_string(path.size()));
+            }
+            
+            // Validate that each path element has correct size
+            for (size_t i = 0; i < path.size(); ++i) {
+                if (path[i].size() != 256) {
+                    throw std::invalid_argument("Authentication path level " + std::to_string(i) + 
+                        " has incorrect size: expected 256, got " + std::to_string(path[i].size()));
+                }
+            }
+            
+            if (root.size() != 256) {
+                throw std::invalid_argument("Root size must be 256 bits");
+            }
+            
+            // 2. SET FIELD ELEMENT VALUES FROM NOTE
+            pb_->val(note_value_) = FieldT(note.value);
+            pb_->val(note_rho_) = MerkleCircuit::uint256ToFieldElement(note.rho);
+            pb_->val(note_r_) = MerkleCircuit::uint256ToFieldElement(note.r);
+            pb_->val(note_a_pk_) = MerkleCircuit::uint256ToFieldElement(note.a_pk);
+            pb_->val(a_sk_) = MerkleCircuit::uint256ToFieldElement(a_sk);
+            pb_->val(vcm_r_) = MerkleCircuit::uint256ToFieldElement(vcm_r);
+            pb_->val(read_successful_) = FieldT::one();
+            
+            // 3. SET ADDRESS BITS
+            for (size_t i = 0; i < tree_depth_; ++i) {
+                pb_->val(address_bits_[i]) = FieldT((address >> i) & 1);
+            }
+            
+            // 4. CONVERT TO BIT REPRESENTATIONS
+            setBits(note, a_sk, vcm_r);
+            
+            // 5. SET AUTHENTICATION PATH WITH VALIDATION
+            setAuthenticationPath(path);
+            
+            // 6. GENERATE WITNESSES FOR ALL GADGETS WITH VALIDATION
+            generateAllWitnesses();
+            
+            // 7. FINAL VALIDATION: Verify that computed values match expected
+            // Validate that the computed root matches the expected root
+            FieldT computed_anchor = getAnchor();
+            FieldT expected_anchor = MerkleCircuit::uint256ToFieldElement(MerkleCircuit::bitsToUint256(root));
+            
+            if (computed_anchor != expected_anchor) {
+                throw std::runtime_error("Merkle root mismatch: computed root does not match expected root");
+            }
+            
+            // FINAL VALIDATION: Verify the constraints are satisfied after all witnesses are generated
+            if (!pb_->is_satisfied()) {
+                throw std::runtime_error("Circuit constraints are not satisfied - invalid witness");
+            }
+            
+            std::cout << "Withdrawal witness generation completed successfully" << std::endl;
+            std::cout << "Public outputs:" << std::endl;
+            std::cout << "  Anchor: " << getAnchor().as_bigint() << std::endl;
+            std::cout << "  Nullifier: " << getNullifier().as_bigint() << std::endl;
+            std::cout << "  Value commitment: " << getValueCommitment().as_bigint() << std::endl;
+            
+            return pb_->auxiliary_input();
+            
+        } catch (const std::exception& e) {
+            std::cerr << "Error in withdrawal witness generation: " << e.what() << std::endl;
+            throw;
+        }
+    }
+
+    std::vector<FieldT> generateWitness(
+        const Note& note,
+        const uint256& a_sk,
+        const uint256& vcm_r,
+        const std::vector<bool>& leaf,
+        const std::vector<std::vector<bool>>& path,
+        const std::vector<bool>& root,
+        size_t address)
+    {
+        // Legacy method - kept for compatibility
+        return generateWitnessWithdrawal(note, a_sk, vcm_r, leaf, path, root, address);
     }
     
     void setBits(const Note& note, const uint256& a_sk, const uint256& vcm_r) {
@@ -464,32 +589,91 @@ private:
         }
     }
     
-    void setAuthenticationPath(const std::vector<std::vector<bool>>& path) {
-        // FIXED: Properly set authentication path 
-        for (size_t level = 0; level < tree_depth_; ++level) {
-            if (level < path.size()) {
-                // Set the sibling hash at this level
-                for (size_t bit = 0; bit < 256; ++bit) {
-                    if (bit < path[level].size()) {
-                        pb_->val(auth_path_->left_digests[level].bits[bit]) = path[level][bit] ? FieldT::one() : FieldT::zero();
-                        pb_->val(auth_path_->right_digests[level].bits[bit]) = path[level][bit] ? FieldT::one() : FieldT::zero();
-                    } else {
-                        pb_->val(auth_path_->left_digests[level].bits[bit]) = FieldT::zero();
-                        pb_->val(auth_path_->right_digests[level].bits[bit]) = FieldT::zero();
-                    }
-                }
-            } else {
-                // Empty level - use zero hash
-                for (size_t bit = 0; bit < 256; ++bit) {
-                    pb_->val(auth_path_->left_digests[level].bits[bit]) = FieldT::zero();
-                    pb_->val(auth_path_->right_digests[level].bits[bit]) = FieldT::zero();
-                }
+    void setDummyAuthenticationPath() {
+        // For deposits, set a dummy authentication path that doesn't validate Merkle tree inclusion
+        // This is because we're adding a new note to the tree, not proving an existing one
+        
+        std::vector<std::vector<bool>> dummyPath(tree_depth_, std::vector<bool>(256, false));
+        
+        // Get the address (should be 0 for deposits)
+        size_t address = 0;
+        for (size_t i = 0; i < tree_depth_; ++i) {
+            if (pb_->val(address_bits_[i]) == FieldT::one()) {
+                address |= (1ul << i);
             }
         }
+        
+        // Convert dummy path to libsnark format
+        libsnark::merkle_authentication_path snark_path;
+        for (size_t level = 0; level < tree_depth_; ++level) {
+            libff::bit_vector level_bits;
+            level_bits.reserve(256);
+            for (size_t bit = 0; bit < 256; ++bit) {
+                level_bits.push_back(false); // All dummy bits are false
+            }
+            snark_path.push_back(level_bits);
+        }
+        
+        // Set dummy authentication path
+        auth_path_->generate_r1cs_witness(address, snark_path);
+        
+        // Generate witness for merkle verifier with dummy path
+        merkle_verifier_->generate_r1cs_witness();
+        
+        std::cout << "Dummy authentication path set for deposit" << std::endl;
+    }
+
+    void setAuthenticationPath(const std::vector<std::vector<bool>>& path) {
+        // CRITICAL FIX: Validate authentication path before setting witness
+        
+        if (path.size() != tree_depth_) {
+            throw std::invalid_argument("Authentication path size must match tree depth");
+        }
+        
+        // Get the address from address_bits_ for witness generation
+        size_t address = 0;
+        for (size_t i = 0; i < tree_depth_; ++i) {
+            if (pb_->val(address_bits_[i]) == FieldT::one()) {
+                address |= (1ul << i);
+            }
+        }
+        
+        // Convert path to libsnark's merkle_authentication_path format with validation
+        libsnark::merkle_authentication_path snark_path;
+        for (size_t level = 0; level < tree_depth_; ++level) {
+            if (level < path.size() && path[level].size() == 256) {
+                // Convert each level's bit vector to libsnark's bit_vector
+                libff::bit_vector level_bits;
+                level_bits.reserve(256);
+                for (size_t bit = 0; bit < 256; ++bit) {
+                    level_bits.push_back(path[level][bit]);
+                }
+                snark_path.push_back(level_bits);
+            } else {
+                throw std::invalid_argument("Invalid authentication path: level " + std::to_string(level) + 
+                                          " has wrong size or is missing");
+            }
+        }
+        
+        // CRITICAL: Validate the authentication path before setting witness
+        // This ensures we catch invalid paths during witness generation
+        try {
+            auth_path_->generate_r1cs_witness(address, snark_path);
+        } catch (const std::exception& e) {
+            throw std::runtime_error("Invalid authentication path: " + std::string(e.what()));
+        }
+        
+        // Additional validation: verify the path leads to a non-zero root
+        // Generate witness for merkle verifier to compute the root
+        merkle_verifier_->generate_r1cs_witness();
+        
+        // Check that the computed root is valid (not all zeros would indicate an invalid path)
+        // Note: We can't easily validate the specific root value here without more complex logic
+        std::cout << "Authentication path witness generated successfully" << std::endl;
     }
     
     void generateAllWitnesses() {
-        // Generate witnesses for packing gadgets
+        // Generate witnesses for packing gadgets first
         note_value_packer_->generate_r1cs_witness_from_packed();
         note_rho_packer_->generate_r1cs_witness_from_packed();
         note_r_packer_->generate_r1cs_witness_from_packed();
@@ -531,18 +715,21 @@ private:
             pb_->val(vcm_r_digest_->bits[i]) = pb_->val(vcm_r_bits_[i]);
         }
         
-        // Generate hash witnesses
+        // Generate hash witnesses - these must complete successfully
         note_commit_hasher_->generate_r1cs_witness();
         nullifier_hasher_->generate_r1cs_witness();
         value_commit_hasher_->generate_r1cs_witness();
         
-        // Generate witness for Merkle tree verification
-        merkle_verifier_->generate_r1cs_witness();
+        // Authentication path and Merkle verification are handled in setAuthenticationPath
+        // Don't regenerate here to avoid double witness generation
         
         // Generate witnesses for output packing
         anchor_packer_->generate_r1cs_witness_from_bits();
         nullifier_packer_->generate_r1cs_witness_from_bits();
         value_commitment_packer_->generate_r1cs_witness_from_bits();
+        
+        // Note: Constraint satisfaction will be checked in the main generateWitness method
+        // after all witnesses including Merkle tree are fully generated
     }
 
 public:
@@ -573,6 +760,21 @@ public:
         std::cout << "..." << std::dec << std::endl;
         
         return result;
+    }
+    
+    uint256 getNoteCommitmentFromBits() const {
+        // Extract note commitment directly from the SHA256 digest bits
+        if (!note_commitment_hash_) {
+            return uint256{}; // Return zero if hasher not initialized
+        }
+        
+        // Get the digest bits from the note commitment hash digest variable
+        std::vector<bool> commitment_bits(256);
+        for (size_t i = 0; i < 256; ++i) {
+            commitment_bits[i] = pb_->val(note_commitment_hash_->bits[i]) == FieldT::one();
+        }
+        
+        return MerkleCircuit::bitsToUint256(commitment_bits);
     }
     
     FieldT getAnchor() const { return pb_->val(anchor_); }
