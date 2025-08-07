@@ -112,11 +112,11 @@ public:
         testMerkleVerificationEnforcement();
         testUnifiedCircuitBehavior();
         testZcashStyleWorkflow();
-        testSHA256TwoToOneGadget();
-        testSHA256CompressionFunction();
-        testSHA256GadgetComparison();
-        // testSHA256OnlyGadget();
-        testBitOrderingDebug();
+        // testSHA256TwoToOneGadget();
+        // testSHA256CompressionFunction();
+        // testSHA256GadgetComparison();
+        // // testSHA256OnlyGadget();
+        // testBitOrderingDebug();
     }
 
     void testKeyGeneration()

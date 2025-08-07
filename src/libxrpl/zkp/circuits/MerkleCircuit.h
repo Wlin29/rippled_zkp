@@ -244,10 +244,29 @@ public:
         const uint256& a_pk);
 
     /**
-     * Nullifier computation (outside circuit).
+     * Nullifier computation using circuit (canonical).
      * nf = SHA256(a_sk || rho)
      * 
-     * This matches the circuit computation and is used for testing/verification.
+     * This creates a minimal circuit to compute the nullifier exactly as the main circuit does.
+     * This ensures consistency between external nullifier computation and circuit computation.
+     */
+    static uint256 computeNullifierWithCircuit(
+        const uint256& a_sk,
+        const uint256& rho);
+
+    /**
+     * Get nullifier from this circuit instance.
+     * Should only be called after witness generation has been completed.
+     * Returns the nullifier computed by this circuit.
+     */
+    uint256 getNullifierFromCircuit() const;
+
+    /**
+     * Nullifier computation (outside circuit) - DEPRECATED.
+     * nf = SHA256(a_sk || rho)
+     * 
+     * This now redirects to computeNullifierWithCircuit for consistency.
+     * Kept for compatibility but should use computeNullifierWithCircuit instead.
      */
     static uint256 computeNullifier(
         const uint256& a_sk,

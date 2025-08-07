@@ -13,7 +13,8 @@ uint256 Note::commitment() const {
 }
 
 uint256 Note::nullifier(const uint256& a_sk) const {
-    return MerkleCircuit::computeNullifier(a_sk, rho);
+    // Use circuit-based computation to ensure consistency with proofs
+    return MerkleCircuit::computeNullifierWithCircuit(a_sk, rho);
 }
 
 std::vector<bool> Note::toBits() const {

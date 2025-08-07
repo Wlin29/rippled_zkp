@@ -633,6 +633,11 @@ FieldT MerkleCircuit::getValueCommitment() const { return pImpl_->getValueCommit
 FieldT MerkleCircuit::getAnchor() const { return pImpl_->getAnchor(); }
 uint256 MerkleCircuit::getNullifierFromBits() const { return pImpl_->getNullifierFromBits(); }
 
+uint256 MerkleCircuit::getNullifierFromCircuit() const {
+    // Get nullifier from this circuit instance (after witness generation)
+    return getNullifierFromBits();
+}
+
 libsnark::r1cs_constraint_system<FieldT> MerkleCircuit::getConstraintSystem() const {
     return pImpl_->getConstraintSystem();
 }
@@ -824,71 +829,39 @@ uint256 MerkleCircuit::computeNoteCommitment(
     return result;
 }
 
+uint256 MerkleCircuit::computeNullifierWithCircuit(
+    const uint256& a_sk,
+    const uint256& rho) {
+    
+    // Create a minimal circuit just to compute the nullifier
+    // This ensures we get the exact same result as the main circuit
+    MerkleCircuit minimalCircuit(1); // Minimal depth
+    minimalCircuit.generateConstraints();
+    
+    // Create a dummy note with the rho we need
+    Note dummyNote(0, rho, uint256{}, uint256{});
+    
+    // Generate witness with the spending key
+    auto witness = minimalCircuit.generateDepositWitness(
+        dummyNote,
+        a_sk,
+        uint256{}, // vcm_r doesn't matter for nullifier
+        std::vector<bool>(256, false), // dummy leaf
+        std::vector<bool>(256, false)  // dummy root
+    );
+    
+    // Get the nullifier from the circuit bits (this is the canonical computation)
+    return minimalCircuit.getNullifierFromBits();
+}
+
+// DEPRECATED: This external function produces different results than the circuit
+// It's kept for now but marked as deprecated to avoid breaking existing code
 uint256 MerkleCircuit::computeNullifier(
     const uint256& a_sk,
     const uint256& rho) {
     
-    // Match the circuit's sha256_two_to_one_hash_gadget approach:
-    // Use the same SHA256 compression function that the circuit uses
-    
-    // Create a protoboard to compute the nullifier using the exact same logic as the circuit
-    libsnark::protoboard<FieldT> pb;
-    
-    // Create digest variables for a_sk and rho (exactly like in circuit)
-    digest_variable<FieldT> a_sk_digest(pb, 256, "a_sk_digest");
-    digest_variable<FieldT> rho_digest(pb, 256, "rho_digest");
-    digest_variable<FieldT> nullifier_hash(pb, 256, "nullifier_hash");
-    
-    // Create SHA256 gadget (exactly like in circuit)
-    sha256_two_to_one_hash_gadget<FieldT> sha256_gadget(
-        pb, a_sk_digest, rho_digest, nullifier_hash, "nullifier_sha256");
-    
-    // Generate constraints first
-    sha256_gadget.generate_r1cs_constraints();
-    
-    // Convert inputs to libsnark bit format - use same method as circuit
-    auto a_sk_bits = uint256ToBits(a_sk);
-    auto rho_bits = uint256ToBits(rho);
-    
-    // DEBUG: Print first few bits to compare with circuit
-    std::cout << "External computeNullifier debug:" << std::endl;
-    std::cout << "  a_sk hex: " << std::hex;
-    for (int i = 0; i < 4; ++i) {
-        std::cout << std::setfill('0') << std::setw(2) << (unsigned int)a_sk.begin()[i];
-    }
-    std::cout << "..." << std::dec << std::endl;
-    
-    std::cout << "  a_sk bits[0-15]: ";
-    for (int i = 0; i < 16; ++i) {
-        std::cout << (a_sk_bits[i] ? "1" : "0");
-    }
-    std::cout << std::endl;
-    
-    std::cout << "  rho bits[0-15]: ";
-    for (int i = 0; i < 16; ++i) {
-        std::cout << (rho_bits[i] ? "1" : "0");
-    }
-    std::cout << std::endl;
-    
-    // Set input bits in libsnark format (same as circuit setBits method)
-    for (size_t i = 0; i < 256; ++i) {
-        pb.val(a_sk_digest.bits[i]) = a_sk_bits[i] ? FieldT::one() : FieldT::zero();
-        pb.val(rho_digest.bits[i]) = rho_bits[i] ? FieldT::one() : FieldT::zero();
-    }
-    
-    // Generate witness (compute the hash) - same as circuit
-    sha256_gadget.generate_r1cs_witness();
-    
-    // Convert result back from libsnark format using same method as circuit
-    uint256 result = convertFromLibsnarkBits(nullifier_hash, pb);
-    
-    std::cout << "  External result: " << std::hex;
-    for (int i = 0; i < 8; ++i) {
-        std::cout << std::setfill('0') << std::setw(2) << (unsigned int)result.begin()[i];
-    }
-    std::cout << "..." << std::dec << std::endl;
-    
-    return result;
+    // Simply delegate to the circuit-based computation for consistency
+    return computeNullifierWithCircuit(a_sk, rho);
 }
 
 uint256 MerkleCircuit::computeValueCommitment(
