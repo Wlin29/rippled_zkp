@@ -3,15 +3,21 @@
 #include <memory>
 #include <string>
 #include <xrpl/basics/base_uint.h>
+#include <xrpl/protocol/UintTypes.h>
 #include <libff/algebra/curves/alt_bn128/alt_bn128_pp.hpp>
 #include <libsnark/zk_proof_systems/ppzksnark/r1cs_gg_ppzksnark/r1cs_gg_ppzksnark.hpp>
-#include <libxrpl/zkp/circuits/MerkleCircuit.h>
 
 namespace ripple {
 namespace zkp {
 
+// Forward declarations
+class MerkleCircuit;
+class Note;
+
+// Type aliases
 using DefaultCurve = libff::alt_bn128_pp;
 using FieldT = libff::Fr<DefaultCurve>;
+using uint256 = ::ripple::uint256;
 
 // Structure to hold proof + public inputs
 struct ProofData {
@@ -47,7 +53,7 @@ public:
     // Proof creation returns ProofData (proof + public inputs)
     static ProofData createDepositProof(
         const Note& outputNote,                    // Note being created
-        const std::vector<uint256>& authPath = {}, // Optional: for tree inclusion
+        const std::vector<ripple::uint256>& authPath = {}, // Optional: for tree inclusion
         size_t position = 0                        // Optional: position in tree
     );
 
@@ -59,7 +65,7 @@ public:
         const uint256& merkleRoot                  // Expected merkle root
     );
     
-    // Helper function to create notes (like Zcash)
+    // Helper function to create notes
     static Note createNote(
         uint64_t value,
         const uint256& a_pk,     // Recipient public key
@@ -82,15 +88,27 @@ public:
         const FieldT& nullifier,
         const FieldT& value_commitment);
     
-    // CONVENIENCE: Verify using ProofData structure
+    // UNIFIED VERIFICATION: Same circuit works for both deposits and withdrawals
+    static bool verifyProof(const ProofData& proofData) {
+        return verifyProof(proofData.proof, proofData.anchor, 
+                          proofData.nullifier, proofData.value_commitment);
+    }
+    
+    static bool verifyProof(
+        const std::vector<unsigned char>& proof,
+        const FieldT& anchor,
+        const FieldT& nullifier,
+        const FieldT& value_commitment);
+
+    // CONVENIENCE: Verify using ProofData structure (DEPRECATED - use verifyProof)
     static bool verifyDepositProof(const ProofData& proofData) {
-        return verifyDepositProof(proofData.proof, proofData.anchor, 
-                                proofData.nullifier, proofData.value_commitment);
+        return verifyProof(proofData.proof, proofData.anchor, 
+                          proofData.nullifier, proofData.value_commitment);
     }
     
     static bool verifyWithdrawalProof(const ProofData& proofData) {
-        return verifyWithdrawalProof(proofData.proof, proofData.anchor,
-                                   proofData.nullifier, proofData.value_commitment);
+        return verifyProof(proofData.proof, proofData.anchor,
+                          proofData.nullifier, proofData.value_commitment);
     }
 
     // Utility functions

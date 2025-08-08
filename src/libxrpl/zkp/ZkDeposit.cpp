@@ -1,5 +1,6 @@
 #include "ZkDeposit.h"
 #include "ZKProver.h"
+#include "circuits/MerkleCircuit.h"
 #include "Note.h"
 #include <xrpld/ledger/ApplyViewImpl.h>
 #include <xrpl/protocol/Feature.h>

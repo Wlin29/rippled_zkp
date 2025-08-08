@@ -226,28 +226,21 @@ ProofData ZkProver::createDepositProof(
             return {};
         }
         
-        std::cout << "=== ZCASH-STYLE DEPOSIT PROOF ===" << std::endl;
+        std::cout << "=== UNIFIED DEPOSIT PROOF (TREE INCLUSION) ===" << std::endl;
         
         // Use the note's computed commitment 
         uint256 noteCommitment = outputNote.commitment();
         std::cout << "Output note commitment: " << noteCommitment << std::endl;
         std::cout << "Output note value: " << outputNote.value << std::endl;
         
-        // Add commitment to tree and get position
-        size_t actualPosition = position;
-        if (authPath.empty()) {
-            // If no auth path provided, add to tree and get new path
-            actualPosition = TreeManager::addCommitment(noteCommitment);
-        }
-        
+        // ALWAYS add the note to the tree and get real authentication path
+        size_t actualPosition = TreeManager::addCommitment(noteCommitment);
         uint256 currentRoot = TreeManager::getRoot();
-        std::vector<uint256> actualAuthPath = authPath;
-        if (actualAuthPath.empty()) {
-            actualAuthPath = TreeManager::getAuthPath(actualPosition);
-        }
+        std::vector<uint256> actualAuthPath = TreeManager::getAuthPath(actualPosition);
         
-        std::cout << "Tree position: " << actualPosition << std::endl;
-        std::cout << "Tree root: " << currentRoot << std::endl;
+        std::cout << "Added note to tree at position: " << actualPosition << std::endl;
+        std::cout << "Current tree root: " << currentRoot << std::endl;
+        std::cout << "Authentication path length: " << actualAuthPath.size() << std::endl;
         
         // Convert to circuit format
         std::vector<bool> commitmentBits = uint256ToBits(noteCommitment);
@@ -265,19 +258,24 @@ ProofData ZkProver::createDepositProof(
             pathBits.push_back(std::vector<bool>(256, false));
         }
         
-        // For deposits, we don't need a secret spending key (transparent input)
-        uint256 zero_a_sk = uint256{}; // No spending key needed for deposit
+        std::cout << "Tree depth: " << treeDepth << std::endl;
+        std::cout << "Padded path length: " << pathBits.size() << std::endl;
+        
+        // Generate a spending key for the depositor (in real use, this would be provided)
+        uint256 depositor_a_sk = generateRandomUint256(); 
         uint256 vcm_r = generateRandomUint256(); // Value commitment randomness
         
-        std::cout << "Generating deposit witness..." << std::endl;
+        std::cout << "Generating deposit witness with REAL tree inclusion..." << std::endl;
         
-        // Generate witness using the complete note
-        auto witness = unifiedCircuit->generateDepositWitness(
-            outputNote,      // Complete note object
-            zero_a_sk,       // No spending key for deposit
+        // Use withdrawal witness generation since it handles real tree paths
+        auto witness = unifiedCircuit->generateWithdrawalWitness(
+            outputNote,      // Complete note object  
+            depositor_a_sk,  // Spending key (proves authorization to create note)
             vcm_r,           // Value commitment randomness
             commitmentBits,  // Note commitment
-            rootBits         // Tree root
+            pathBits,        // REAL authentication path
+            rootBits,        // REAL tree root
+            actualPosition   // REAL position in tree
         );
         
         // Extract public outputs from circuit
@@ -289,6 +287,18 @@ ProofData ZkProver::createDepositProof(
         std::cout << "  Anchor: " << public_anchor << std::endl;
         std::cout << "  Nullifier: " << public_nullifier << std::endl;
         std::cout << "  Value commitment: " << public_value_commitment << std::endl;
+        
+        // Verify nullifier computation consistency
+        uint256 computedNullifier = unifiedCircuit->getNullifierFromBits();
+        uint256 expectedNullifier = outputNote.nullifier(depositor_a_sk);
+        
+        if (computedNullifier != expectedNullifier) {
+            std::cout << "  Nullifier verification:" << std::endl;
+            std::cout << "    Expected: " << expectedNullifier << std::endl;
+            std::cout << "    Computed: " << computedNullifier << std::endl;
+        } else {
+            std::cout << "  Nullifier computation: CONSISTENT" << std::endl;
+        }
         
         // Create primary input vector
         std::vector<FieldT> primary_input;
@@ -306,7 +316,7 @@ ProofData ZkProver::createDepositProof(
         ss << proof;
         std::string proof_str = ss.str();
         
-        std::cout << "Deposit proof generated successfully" << std::endl;
+        std::cout << "Deposit proof generated successfully with REAL tree inclusion" << std::endl;
         
         return ProofData{
             std::vector<unsigned char>(proof_str.begin(), proof_str.end()),
@@ -436,7 +446,8 @@ ProofData ZkProver::createWithdrawalProof(
     }
 }
 
-bool ZkProver::verifyDepositProof(
+// UNIFIED VERIFICATION: Works for both deposits and withdrawals
+bool ZkProver::verifyProof(
     const std::vector<unsigned char>& proofData,
     const FieldT& anchor,
     const FieldT& nullifier,
@@ -448,7 +459,7 @@ bool ZkProver::verifyDepositProof(
     
     try {
         if (proofData.empty()) {
-            std::cerr << "Error verifying deposit proof: Empty proof data" << std::endl;
+            std::cerr << "Error verifying proof: Empty proof data" << std::endl;
             return false;
         }        
         
@@ -461,13 +472,12 @@ bool ZkProver::verifyDepositProof(
         primary_input.push_back(nullifier);
         primary_input.push_back(value_commitment);
 
-        std::cout << "=== DEPOSIT PROOF VERIFICATION ===" << std::endl;
+        std::cout << "=== UNIFIED PROOF VERIFICATION ===" << std::endl;
         std::cout << "Anchor: " << anchor << std::endl;
         std::cout << "Nullifier: " << nullifier << std::endl;
         std::cout << "Value commitment: " << value_commitment << std::endl;
-        std::cout << "Using verification key" << std::endl;
         
-        // Verify using verification key
+        // Verify using verification key (same algorithm for all proofs)
         bool verification_result = libsnark::r1cs_gg_ppzksnark_verifier_strong_IC<DefaultCurve>(
             *verificationKey, primary_input, proof);
         
@@ -476,9 +486,19 @@ bool ZkProver::verifyDepositProof(
         return verification_result;
             
     } catch (std::exception& e) {
-        std::cerr << "Error verifying deposit proof: " << e.what() << std::endl;
+        std::cerr << "Error verifying proof: " << e.what() << std::endl;
         return false;
     }
+}
+
+bool ZkProver::verifyDepositProof(
+    const std::vector<unsigned char>& proofData,
+    const FieldT& anchor,
+    const FieldT& nullifier,
+    const FieldT& value_commitment)
+{
+    // DEPRECATED: Redirect to unified verification
+    return verifyProof(proofData, anchor, nullifier, value_commitment);
 }
 
 bool ZkProver::verifyWithdrawalProof(
@@ -487,39 +507,8 @@ bool ZkProver::verifyWithdrawalProof(
     const FieldT& nullifier,
     const FieldT& value_commitment) 
 {
-    if (!isInitialized || !verificationKey) {
-        initialize();
-    }
-    
-    try {
-        if (proofData.empty()) {
-            std::cerr << "Error verifying withdrawal proof: Empty proof data" << std::endl;
-            return false;
-        }
-        
-        auto proof = deserializeProof(proofData);
-        
-        // Create primary input from provided public values
-        libsnark::r1cs_primary_input<libff::Fr<DefaultCurve>> primary_input;
-        primary_input.push_back(anchor);
-        primary_input.push_back(nullifier);
-        primary_input.push_back(value_commitment);
-        
-        std::cout << "=== WITHDRAWAL PROOF VERIFICATION ===" << std::endl;
-        std::cout << "Using unified verification key" << std::endl;
-        
-        // Verify using verification key (same as deposits)
-        bool verification_result = libsnark::r1cs_gg_ppzksnark_verifier_strong_IC<DefaultCurve>(
-            *verificationKey, primary_input, proof);
-            
-        std::cout << "Verification result: " << (verification_result ? "PASS" : "FAIL") << std::endl;
-        
-        return verification_result;
-            
-    } catch (std::exception& e) {
-        std::cerr << "Error verifying withdrawal proof: " << e.what() << std::endl;
-        return false;
-    }
+    // DEPRECATED: Redirect to unified verification
+    return verifyProof(proofData, anchor, nullifier, value_commitment);
 }
 
 std::vector<bool> ZkProver::uint256ToBits(const uint256& input) {

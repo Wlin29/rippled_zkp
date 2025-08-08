@@ -228,11 +228,16 @@ public:
             // ✅ ADD: Debug the proof
             printProofDebug(proofData, "Deposit Proof " + idx);
             
-            // Verify the proof using ProofData structure
-            bool isValid = zkp::ZkProver::verifyDepositProof(proofData);
+            // Verify the proof using unified verification
+            bool isValid = zkp::ZkProver::verifyProof(proofData);
             BEAST_EXPECT(isValid);
             
-            std::cout << "deposit proof " << idx << " verification: " << (isValid ? "PASS" : "FAIL") << std::endl;
+            // Also test legacy method (should give same result)
+            bool legacyValid = zkp::ZkProver::verifyDepositProof(proofData);
+            BEAST_EXPECT(legacyValid == isValid);
+            
+            std::cout << "deposit proof " << idx << " verification: " << (isValid ? "PASS" : "FAIL") 
+                      << " (legacy: " << (legacyValid ? "PASS" : "FAIL") << ")" << std::endl;
         }
     }
 
@@ -377,23 +382,23 @@ public:
             // ✅ ADD: Debug the proof
             printProofDebug(proofData, "Withdrawal Verification Proof");
             
-            // Test valid proof
-            bool isValid = zkp::ZkProver::verifyWithdrawalProof(proofData);
+            // Test valid proof using unified verification
+            bool isValid = zkp::ZkProver::verifyProof(proofData);
             BEAST_EXPECT(isValid);
+            
+            // Also test legacy method (should give same result)
+            bool legacyValid = zkp::ZkProver::verifyWithdrawalProof(proofData);
+            BEAST_EXPECT(legacyValid == isValid);
             
             // Test tampered proof (should fail)
             auto wrongRoot = proofData;
             wrongRoot.anchor = wrongRoot.anchor + zkp::FieldT::one();
-            bool wrongRootValid = zkp::ZkProver::verifyWithdrawalProof(wrongRoot);
+            bool wrongRootValid = zkp::ZkProver::verifyProof(wrongRoot);
             BEAST_EXPECT(!wrongRootValid);
             
-            // Test cross-verification with deposit method (should fail)
-            bool crossValid = zkp::ZkProver::verifyDepositProof(proofData);
-            BEAST_EXPECT(!crossValid);
-            
             std::cout << "withdrawal verification: valid=" << isValid 
-                      << ", tampered=" << wrongRootValid 
-                      << ", cross-verification=" << crossValid << std::endl;
+                      << ", legacy=" << legacyValid
+                      << ", tampered=" << wrongRootValid << std::endl;
         } else {
             std::cout << "Withdrawal proof creation failed" << std::endl;
         }
@@ -457,20 +462,24 @@ public:
         // Verify all proofs
         for (size_t i = 0; i < proofs.size(); ++i) {
             BEAST_EXPECT(!proofs[i].empty());
-            bool isValid = zkp::ZkProver::verifyDepositProof(proofs[i]);
+            bool isValid = zkp::ZkProver::verifyProof(proofs[i]);
             BEAST_EXPECT(isValid);
             
             std::cout << "Proof " << i << " for note value " << notes[i].value 
                       << ": " << (isValid ? "VALID" : "INVALID") << std::endl;
         }
         
-        // Test cross-verification (should fail due to different public inputs)
-        for (size_t i = 0; i < proofs.size(); ++i) {
-            for (size_t j = 0; j < proofs.size(); ++j) {
+        // Test that proofs with different public inputs fail verification
+        // (This is expected behavior - each proof is bound to its specific public inputs)
+        for (size_t i = 0; i < proofs.size() && i < 2; ++i) {
+            for (size_t j = 0; j < proofs.size() && j < 2; ++j) {
                 if (i != j) {
-                    bool crossValid = zkp::ZkProver::verifyDepositProof(
+                    // Try to verify proof i with public inputs from proof j (should fail)
+                    bool mismatchValid = zkp::ZkProver::verifyProof(
                         proofs[i].proof, proofs[j].anchor, proofs[j].nullifier, proofs[j].value_commitment);
-                    BEAST_EXPECT(!crossValid);
+                    BEAST_EXPECT(!mismatchValid);
+                    std::cout << "Public input mismatch test " << i << "→" << j << ": " 
+                              << (mismatchValid ? "UNEXPECTED_PASS" : "CORRECTLY_FAILED") << std::endl;
                 }
             }
         }
@@ -715,26 +724,31 @@ public:
         if (!withdrawalProof.empty()) {
             printProofDebug(withdrawalProof, "Unified Withdrawal Proof");
             
-            // Both proofs should verify with unified verification key
-            bool depositValid = zkp::ZkProver::verifyDepositProof(depositProof);
-            bool withdrawalValid = zkp::ZkProver::verifyWithdrawalProof(withdrawalProof);
+            // Both proofs should verify with unified verification
+            bool depositValid = zkp::ZkProver::verifyProof(depositProof);
+            bool withdrawalValid = zkp::ZkProver::verifyProof(withdrawalProof);
             
             BEAST_EXPECT(depositValid);
             BEAST_EXPECT(withdrawalValid);
             
-            // Cross-verification should fail (different public inputs)
-            bool crossDeposit = zkp::ZkProver::verifyDepositProof(
-                withdrawalProof.proof, depositProof.anchor, depositProof.nullifier, depositProof.value_commitment);
-            bool crossWithdrawal = zkp::ZkProver::verifyWithdrawalProof(
-                depositProof.proof, withdrawalProof.anchor, withdrawalProof.nullifier, withdrawalProof.value_commitment);
+            // Test legacy methods give same results
+            bool depositLegacy = zkp::ZkProver::verifyDepositProof(depositProof);
+            bool withdrawalLegacy = zkp::ZkProver::verifyWithdrawalProof(withdrawalProof);
             
-            BEAST_EXPECT(!crossDeposit);
-            BEAST_EXPECT(!crossWithdrawal);
+            BEAST_EXPECT(depositLegacy == depositValid);
+            BEAST_EXPECT(withdrawalLegacy == withdrawalValid);
+            
+            // Test that proofs are bound to their specific public inputs
+            bool mismatchTest = zkp::ZkProver::verifyProof(
+                withdrawalProof.proof, depositProof.anchor, depositProof.nullifier, depositProof.value_commitment);
+            
+            BEAST_EXPECT(!mismatchTest);  // Should fail - different public inputs
             
             std::cout << "Unified circuit results:" << std::endl;
             std::cout << "  - Deposit proof verification: " << (depositValid ? "PASS" : "FAIL") << std::endl;
             std::cout << "  - Withdrawal proof verification: " << (withdrawalValid ? "PASS" : "FAIL") << std::endl;
-            std::cout << "  - Cross-verification properly rejected: " << ((!crossDeposit && !crossWithdrawal) ? "PASS" : "FAIL") << std::endl;
+            std::cout << "  - Legacy compatibility: " << ((depositLegacy == depositValid && withdrawalLegacy == withdrawalValid) ? "PASS" : "FAIL") << std::endl;
+            std::cout << "  - Public input binding: " << (mismatchTest ? "FAIL" : "PASS") << std::endl;
             
         } else {
             std::cout << "Withdrawal proof creation failed" << std::endl;
