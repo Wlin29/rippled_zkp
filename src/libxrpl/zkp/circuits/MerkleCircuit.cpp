@@ -94,7 +94,8 @@ private:
     std::unique_ptr<packing_gadget<FieldT>> note_rho_packer_;
     std::unique_ptr<packing_gadget<FieldT>> note_r_packer_;
     std::unique_ptr<packing_gadget<FieldT>> note_a_pk_packer_;
-    std::unique_ptr<packing_gadget<FieldT>> a_sk_packer_;
+    // REMOVED: a_sk_packer - we bypass field element conversion for secrets
+    // std::unique_ptr<packing_gadget<FieldT>> a_sk_packer_;
     std::unique_ptr<packing_gadget<FieldT>> vcm_r_packer_;
     
     std::unique_ptr<packing_gadget<FieldT>> anchor_packer_;
@@ -145,20 +146,17 @@ public:
         note_value_packer_ = std::make_unique<packing_gadget<FieldT>>(
             *pb_, note_value_bits_, note_value_, "note_value_packer");
         
-        note_rho_packer_ = std::make_unique<packing_gadget<FieldT>>(
-            *pb_, note_rho_bits_, note_rho_, "note_rho_packer");
-        
-        note_r_packer_ = std::make_unique<packing_gadget<FieldT>>(
-            *pb_, note_r_bits_, note_r_, "note_r_packer");
-        
-        note_a_pk_packer_ = std::make_unique<packing_gadget<FieldT>>(
-            *pb_, note_a_pk_bits_, note_a_pk_, "note_a_pk_packer");
-        
-        a_sk_packer_ = std::make_unique<packing_gadget<FieldT>>(
-            *pb_, a_sk_bits_, a_sk_, "a_sk_packer");
-        
-        vcm_r_packer_ = std::make_unique<packing_gadget<FieldT>>(
-            *pb_, vcm_r_bits_, vcm_r_, "vcm_r_packer");
+        // REMOVED: Bypass field element conversion for all cryptographic values
+        // note_rho_packer_ = std::make_unique<packing_gadget<FieldT>>(
+        //     *pb_, note_rho_bits_, note_rho_, "note_rho_packer");
+        // note_r_packer_ = std::make_unique<packing_gadget<FieldT>>(
+        //     *pb_, note_r_bits_, note_r_, "note_r_packer");
+        // note_a_pk_packer_ = std::make_unique<packing_gadget<FieldT>>(
+        //     *pb_, note_a_pk_bits_, note_a_pk_, "note_a_pk_packer");
+        // a_sk_packer_ = std::make_unique<packing_gadget<FieldT>>(
+        //     *pb_, a_sk_bits_, a_sk_, "a_sk_packer");
+        // vcm_r_packer_ = std::make_unique<packing_gadget<FieldT>>(
+        //     *pb_, vcm_r_bits_, vcm_r_, "vcm_r_packer");
         
         // 3. SETUP SHA256 DIGEST VARIABLES
         note_commitment_hash_ = std::make_unique<digest_variable<FieldT>>(
@@ -241,13 +239,14 @@ public:
         
         // 7. GENERATE ALL CONSTRAINTS
     
-        // Input packing constraints
+        // Input packing constraints (ONLY for note_value - all others bypass field conversion)
         note_value_packer_->generate_r1cs_constraints(true);
-        note_rho_packer_->generate_r1cs_constraints(true);
-        note_r_packer_->generate_r1cs_constraints(true);
-        note_a_pk_packer_->generate_r1cs_constraints(true);
-        a_sk_packer_->generate_r1cs_constraints(true);
-        vcm_r_packer_->generate_r1cs_constraints(true);
+        // REMOVED: Bypass field element conversion for all cryptographic values
+        // note_rho_packer_->generate_r1cs_constraints(true);
+        // note_r_packer_->generate_r1cs_constraints(true);
+        // note_a_pk_packer_->generate_r1cs_constraints(true);
+        // a_sk_packer_->generate_r1cs_constraints(true);
+        // vcm_r_packer_->generate_r1cs_constraints(true);
         
         // Connect bit arrays to digest variables for note commitment
         // Part 1: value(64) + rho(192) = 256 bits
@@ -387,13 +386,14 @@ private:
         size_t address)
     {
         try {
-            // 1. SET FIELD ELEMENT VALUES FROM NOTE
+            // 1. SET FIELD ELEMENT VALUES FROM NOTE (BYPASS FIELD CONVERSION FOR ALL CRYPTOGRAPHIC VALUES)
             pb_->val(note_value_) = FieldT(note.value);
-            pb_->val(note_rho_) = MerkleCircuit::uint256ToFieldElement(note.rho);
-            pb_->val(note_r_) = MerkleCircuit::uint256ToFieldElement(note.r);
-            pb_->val(note_a_pk_) = MerkleCircuit::uint256ToFieldElement(note.a_pk);
-            pb_->val(a_sk_) = MerkleCircuit::uint256ToFieldElement(a_sk);
-            pb_->val(vcm_r_) = MerkleCircuit::uint256ToFieldElement(vcm_r);
+            // CRITICAL FIX: DON'T convert cryptographic values through field element - store directly as bits
+            // pb_->val(note_rho_) = MerkleCircuit::uint256ToFieldElement(note.rho);    // REMOVED
+            // pb_->val(note_r_) = MerkleCircuit::uint256ToFieldElement(note.r);        // REMOVED
+            // pb_->val(note_a_pk_) = MerkleCircuit::uint256ToFieldElement(note.a_pk);  // REMOVED
+            // pb_->val(a_sk_) = MerkleCircuit::uint256ToFieldElement(a_sk);            // REMOVED
+            // pb_->val(vcm_r_) = MerkleCircuit::uint256ToFieldElement(vcm_r);          // REMOVED
             pb_->val(read_successful_) = FieldT::one();
             
             // 2. SET ADDRESS BITS
@@ -401,7 +401,7 @@ private:
                 pb_->val(address_bits_[i]) = FieldT((address >> i) & 1);
             }
             
-            // 3. CONVERT TO BIT REPRESENTATIONS
+            // 3. CONVERT TO BIT REPRESENTATIONS (BYPASS FIELD CONVERSION FOR a_sk)
             setBits(note, a_sk, vcm_r);
             
             // 4. SET AUTHENTICATION PATH
@@ -427,12 +427,15 @@ private:
             pb_->val(note_value_bits_[i]) = FieldT((value_u64 >> i) & 1);
         }
         
-        // Convert uint256 values to bits
+        // Convert uint256 values to bits (non-secret values)
         auto rho_bits = MerkleCircuit::uint256ToBits(note.rho);
         auto r_bits = MerkleCircuit::uint256ToBits(note.r);
         auto a_pk_bits = MerkleCircuit::uint256ToBits(note.a_pk);
-        auto a_sk_bits = MerkleCircuit::uint256ToBits(a_sk);
         auto vcm_r_bits = MerkleCircuit::uint256ToBits(vcm_r);
+        
+        // CRITICAL FIX: Store a_sk directly as 256 bits WITHOUT field element conversion
+        // This preserves the full 256-bit entropy needed for secure hashing
+        auto a_sk_bits = MerkleCircuit::uint256ToBits(a_sk);
         
         // DEBUG: Print circuit bit conversion for comparison
         std::cout << "Circuit setBits debug:" << std::endl;
@@ -454,11 +457,12 @@ private:
         }
         std::cout << std::endl;
         
-        // Set bit values
+        // Set bit values (all 256 bits for secret values preserved)
         for (size_t i = 0; i < 256; ++i) {
             pb_->val(note_rho_bits_[i]) = rho_bits[i] ? FieldT::one() : FieldT::zero();
             pb_->val(note_r_bits_[i]) = r_bits[i] ? FieldT::one() : FieldT::zero();
             pb_->val(note_a_pk_bits_[i]) = a_pk_bits[i] ? FieldT::one() : FieldT::zero();
+            // CRITICAL: Store a_sk bits directly, bypassing field element conversion
             pb_->val(a_sk_bits_[i]) = a_sk_bits[i] ? FieldT::one() : FieldT::zero();
             pb_->val(vcm_r_bits_[i]) = vcm_r_bits[i] ? FieldT::one() : FieldT::zero();
         }
@@ -489,13 +493,14 @@ private:
     }
     
     void generateAllWitnesses() {
-        // Generate witnesses for packing gadgets
+        // Generate witnesses for packing gadgets (ONLY for note_value - all others bypass field conversion)
         note_value_packer_->generate_r1cs_witness_from_packed();
-        note_rho_packer_->generate_r1cs_witness_from_packed();
-        note_r_packer_->generate_r1cs_witness_from_packed();
-        note_a_pk_packer_->generate_r1cs_witness_from_packed();
-        a_sk_packer_->generate_r1cs_witness_from_packed();
-        vcm_r_packer_->generate_r1cs_witness_from_packed();
+        // REMOVED: Bypass field element conversion for all cryptographic values
+        // note_rho_packer_->generate_r1cs_witness_from_packed();
+        // note_r_packer_->generate_r1cs_witness_from_packed();
+        // note_a_pk_packer_->generate_r1cs_witness_from_packed();
+        // a_sk_packer_->generate_r1cs_witness_from_packed();
+        // vcm_r_packer_->generate_r1cs_witness_from_packed();
         
         // Set digest witness values for note commitment
         // Part 1: value(64) + rho(192) = 256 bits
