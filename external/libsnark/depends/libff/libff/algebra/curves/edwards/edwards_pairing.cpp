@@ -170,7 +170,7 @@ std::istream& operator>>(std::istream &in, edwards_ate_G1_precomp &prec_P)
 /* final exponentiations */
 edwards_Fq6 edwards_final_exponentiation_last_chunk(const edwards_Fq6 &elt, const edwards_Fq6 &elt_inv)
 {
-    enter_block("Call to edwards_final_exponentiation_last_chunk");
+    //enter_block("Call to edwards_final_exponentiation_last_chunk");
     const edwards_Fq6 elt_q = elt.Frobenius_map(1);
     edwards_Fq6 w1_part = elt_q.cyclotomic_exp(edwards_final_exponent_last_chunk_w1);
     edwards_Fq6 w0_part;
@@ -181,14 +181,14 @@ edwards_Fq6 edwards_final_exponentiation_last_chunk(const edwards_Fq6 &elt, cons
     	w0_part = elt.cyclotomic_exp(edwards_final_exponent_last_chunk_abs_of_w0);
     }
     edwards_Fq6 result = w1_part * w0_part;
-    leave_block("Call to edwards_final_exponentiation_last_chunk");
+    //leave_block("Call to edwards_final_exponentiation_last_chunk");
 
     return result;
 }
 
 edwards_Fq6 edwards_final_exponentiation_first_chunk(const edwards_Fq6 &elt, const edwards_Fq6 &elt_inv)
 {
-    enter_block("Call to edwards_final_exponentiation_first_chunk");
+    //enter_block("Call to edwards_final_exponentiation_first_chunk");
 
     /* (q^3-1)*(q+1) */
 
@@ -200,31 +200,31 @@ edwards_Fq6 edwards_final_exponentiation_first_chunk(const edwards_Fq6 &elt, con
     const edwards_Fq6 alpha = elt_q3_over_elt.Frobenius_map(1);
     /* beta = elt^((q^3-1)*(q+1) */
     const edwards_Fq6 beta = alpha * elt_q3_over_elt;
-    leave_block("Call to edwards_final_exponentiation_first_chunk");
+    //leave_block("Call to edwards_final_exponentiation_first_chunk");
     return beta;
 }
 
 edwards_GT edwards_final_exponentiation(const edwards_Fq6 &elt)
 {
-    enter_block("Call to edwards_final_exponentiation");
+    //enter_block("Call to edwards_final_exponentiation");
     const edwards_Fq6 elt_inv = elt.inverse();
     const edwards_Fq6 elt_to_first_chunk = edwards_final_exponentiation_first_chunk(elt, elt_inv);
     const edwards_Fq6 elt_inv_to_first_chunk = edwards_final_exponentiation_first_chunk(elt_inv, elt);
     edwards_GT result = edwards_final_exponentiation_last_chunk(elt_to_first_chunk, elt_inv_to_first_chunk);
-    leave_block("Call to edwards_final_exponentiation");
+    //leave_block("Call to edwards_final_exponentiation");
 
     return result;
 }
 
 edwards_tate_G2_precomp edwards_tate_precompute_G2(const edwards_G2& Q)
 {
-    enter_block("Call to edwards_tate_precompute_G2");
+    //enter_block("Call to edwards_tate_precompute_G2");
     edwards_G2 Qcopy = Q;
     Qcopy.to_affine_coordinates();
     edwards_tate_G2_precomp result;
     result.y0 = Qcopy.Y * Qcopy.Z.inverse(); // Y/Z
     result.eta = (Qcopy.Z+Qcopy.Y) * edwards_Fq6::mul_by_non_residue(Qcopy.X).inverse(); // (Z+Y)/(nqr*X)
-    leave_block("Call to edwards_tate_precompute_G2");
+    //leave_block("Call to edwards_tate_precompute_G2");
 
     return result;
 }
@@ -345,7 +345,7 @@ void mixed_addition_step_for_miller_loop(const extended_edwards_G1_projective &b
 
 edwards_tate_G1_precomp edwards_tate_precompute_G1(const edwards_G1& P)
 {
-    enter_block("Call to edwards_tate_precompute_G1");
+    //enter_block("Call to edwards_tate_precompute_G1");
     edwards_tate_G1_precomp result;
 
     edwards_G1 Pcopy = P;
@@ -384,14 +384,14 @@ edwards_tate_G1_precomp edwards_tate_precompute_G1(const edwards_G1& P)
         }
     }
 
-    leave_block("Call to edwards_tate_precompute_G1");
+    //leave_block("Call to edwards_tate_precompute_G1");
     return result;
 }
 
 edwards_Fq6 edwards_tate_miller_loop(const edwards_tate_G1_precomp &prec_P,
                           const edwards_tate_G2_precomp &prec_Q)
 {
-    enter_block("Call to edwards_tate_miller_loop");
+    //enter_block("Call to edwards_tate_miller_loop");
 
     edwards_Fq6 f = edwards_Fq6::one();
 
@@ -423,27 +423,27 @@ edwards_Fq6 edwards_tate_miller_loop(const edwards_tate_G1_precomp &prec_P,
             f = f * g_RP_at_Q;
         }
     }
-    leave_block("Call to edwards_tate_miller_loop");
+    //leave_block("Call to edwards_tate_miller_loop");
 
     return f;
 }
 
 edwards_Fq6 edwards_tate_pairing(const edwards_G1& P, const edwards_G2 &Q)
 {
-    enter_block("Call to edwards_tate_pairing");
+    //enter_block("Call to edwards_tate_pairing");
     edwards_tate_G1_precomp prec_P = edwards_tate_precompute_G1(P);
     edwards_tate_G2_precomp prec_Q = edwards_tate_precompute_G2(Q);
     edwards_Fq6 result = edwards_tate_miller_loop(prec_P, prec_Q);
-    leave_block("Call to edwards_tate_pairing");
+    //leave_block("Call to edwards_tate_pairing");
     return result;
 }
 
 edwards_GT edwards_tate_reduced_pairing(const edwards_G1 &P, const edwards_G2 &Q)
 {
-    enter_block("Call to edwards_tate_reduced_pairing");
+    //enter_block("Call to edwards_tate_reduced_pairing");
     const edwards_Fq6 f = edwards_tate_pairing(P, Q);
     const edwards_GT result = edwards_final_exponentiation(f);
-    leave_block("Call to edwards_tate_reduce_pairing");
+    //leave_block("Call to edwards_tate_reduce_pairing");
     return result;
 }
 
@@ -572,20 +572,20 @@ void mixed_addition_step_for_flipped_miller_loop(const extended_edwards_G2_proje
 
 edwards_ate_G1_precomp edwards_ate_precompute_G1(const edwards_G1& P)
 {
-    enter_block("Call to edwards_ate_precompute_G1");
+    //enter_block("Call to edwards_ate_precompute_G1");
     edwards_G1 Pcopy = P;
     Pcopy.to_affine_coordinates();
     edwards_ate_G1_precomp result;
     result.P_XY = Pcopy.X*Pcopy.Y;
     result.P_XZ = Pcopy.X; // P.X * P.Z but P.Z = 1
     result.P_ZZplusYZ = (edwards_Fq::one() + Pcopy.Y); // (P.Z + P.Y) * P.Z but P.Z = 1
-    leave_block("Call to edwards_ate_precompute_G1");
+    //leave_block("Call to edwards_ate_precompute_G1");
     return result;
 }
 
 edwards_ate_G2_precomp edwards_ate_precompute_G2(const edwards_G2& Q)
 {
-    enter_block("Call to edwards_ate_precompute_G2");
+    //enter_block("Call to edwards_ate_precompute_G2");
     const bigint<edwards_Fr::num_limbs> &loop_count = edwards_ate_loop_count;
     edwards_ate_G2_precomp result;
 
@@ -621,14 +621,14 @@ edwards_ate_G2_precomp edwards_ate_precompute_G2(const edwards_G2& Q)
         }
     }
 
-    leave_block("Call to edwards_ate_precompute_G2");
+    //leave_block("Call to edwards_ate_precompute_G2");
     return result;
 }
 
 edwards_Fq6 edwards_ate_miller_loop(const edwards_ate_G1_precomp &prec_P,
                                     const edwards_ate_G2_precomp &prec_Q)
 {
-    enter_block("Call to edwards_ate_miller_loop");
+    //enter_block("Call to edwards_ate_miller_loop");
     const bigint<edwards_Fr::num_limbs> &loop_count = edwards_ate_loop_count;
 
     edwards_Fq6 f = edwards_Fq6::one();
@@ -661,7 +661,7 @@ edwards_Fq6 edwards_ate_miller_loop(const edwards_ate_G1_precomp &prec_P,
             f = f * g_RQ_at_P;
         }
     }
-    leave_block("Call to edwards_ate_miller_loop");
+    //leave_block("Call to edwards_ate_miller_loop");
 
     return f;
 }
@@ -671,7 +671,7 @@ edwards_Fq6 edwards_ate_double_miller_loop(const edwards_ate_G1_precomp &prec_P1
                                            const edwards_ate_G1_precomp &prec_P2,
                                            const edwards_ate_G2_precomp &prec_Q2)
 {
-    enter_block("Call to edwards_ate_double_miller_loop");
+    //enter_block("Call to edwards_ate_double_miller_loop");
     const bigint<edwards_Fr::num_limbs> &loop_count = edwards_ate_loop_count;
 
     edwards_Fq6 f = edwards_Fq6::one();
@@ -714,27 +714,27 @@ edwards_Fq6 edwards_ate_double_miller_loop(const edwards_ate_G1_precomp &prec_P1
             f = f * g_RQ_at_P1 * g_RQ_at_P2;
         }
     }
-    leave_block("Call to edwards_ate_double_miller_loop");
+    //leave_block("Call to edwards_ate_double_miller_loop");
 
     return f;
 }
 
 edwards_Fq6 edwards_ate_pairing(const edwards_G1& P, const edwards_G2 &Q)
 {
-    enter_block("Call to edwards_ate_pairing");
+    //enter_block("Call to edwards_ate_pairing");
     edwards_ate_G1_precomp prec_P = edwards_ate_precompute_G1(P);
     edwards_ate_G2_precomp prec_Q = edwards_ate_precompute_G2(Q);
     edwards_Fq6 result = edwards_ate_miller_loop(prec_P, prec_Q);
-    leave_block("Call to edwards_ate_pairing");
+    //leave_block("Call to edwards_ate_pairing");
     return result;
 }
 
 edwards_GT edwards_ate_reduced_pairing(const edwards_G1 &P, const edwards_G2 &Q)
 {
-    enter_block("Call to edwards_ate_reduced_pairing");
+    //enter_block("Call to edwards_ate_reduced_pairing");
     const edwards_Fq6 f = edwards_ate_pairing(P, Q);
     const edwards_GT result = edwards_final_exponentiation(f);
-    leave_block("Call to edwards_ate_reduced_pairing");
+    //leave_block("Call to edwards_ate_reduced_pairing");
     return result;
 }
 

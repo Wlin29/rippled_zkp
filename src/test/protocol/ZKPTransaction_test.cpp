@@ -42,10 +42,12 @@ public:
     void
     run() override
     {
-        testSecp256k1Transaction();
-        testEd25519Transaction();
-        testZKTransactionPerformance();
-        testComprehensivePerformanceComparison();
+        testSecp256k1Transaction();          // standalone secp256k1 perf (already self-contained)
+        testEd25519Transaction();            // standalone ed25519 perf (already self-contained)
+        testZKTransactionPerformance();      // standalone zk deposit perf
+        testSecp256k1PlusZKPerformance();    // combined secp256k1 + zk deposit perf
+        testEd25519PlusZKPerformance();      // combined ed25519 + zk deposit perf
+        // testComprehensivePerformanceComparison();
         testMerkleTreePerformance();
         testIncrementalVsRegularMerkleTree();
     }
@@ -53,67 +55,157 @@ public:
     void
     testSecp256k1Transaction()
     {
-        testcase("Secp256k1 Full Transaction Process");
+        testcase("Secp256k1 Full Transaction Process (Performance)");
 
-        // Step 1: Key Generation
-        auto keyPair = randomKeyPair(KeyType::secp256k1);
-        auto const& sk = keyPair.second;
-        auto const& pk = keyPair.first;
+        const int iterations = 1000;  // tune as needed
+        long long totalKeygen = 0, totalSign = 0, totalVerify = 0;
+        long long minKeygen = std::numeric_limits<long long>::max();
+        long long minSign = std::numeric_limits<long long>::max();
+        long long minVerify = std::numeric_limits<long long>::max();
+        long long maxKeygen = 0, maxSign = 0, maxVerify = 0;
 
-        BEAST_EXPECT(sk.size() != 0);
-        BEAST_EXPECT(pk.size() != 0);
+        // Warm-up to avoid first-iteration skew
+        for (int w = 0; w < 5; ++w) {
+            auto kp = randomKeyPair(KeyType::secp256k1);
+            std::string msg = "warmup secp256k1";
+            auto digest = sha512Half(Slice{msg.data(), msg.size()});
+            auto sig = signDigest(kp.first, kp.second, digest);
+            (void)verifyDigest(kp.first, digest, sig);
+        }
 
-        // Step 2: Message Signing
-        std::string message = "This is a test transaction for secp256k1.";
-        uint256 digest = sha512Half(Slice{message.data(), message.size()});
-        auto sig = signDigest(pk, sk, digest);
+        for (int i = 0; i < iterations; ++i)
+        {
+            // Key generation
+            auto startK = std::chrono::high_resolution_clock::now();
+            auto keyPair = randomKeyPair(KeyType::secp256k1);
+            auto endK = std::chrono::high_resolution_clock::now();
+            auto dk = (long long)std::chrono::duration_cast<std::chrono::microseconds>(endK - startK).count();
+            totalKeygen += dk; minKeygen = std::min(minKeygen, dk); maxKeygen = std::max(maxKeygen, dk);
 
-        BEAST_EXPECT(sig.size() != 0);
+            auto const& pk = keyPair.first;
+            auto const& sk = keyPair.second;
 
-        // Step 3: Signature Verification
-        bool isValid = verifyDigest(pk, digest, sig);
-        BEAST_EXPECT(isValid); // Signature should be valid
+            BEAST_EXPECT(pk.size() != 0);
+            BEAST_EXPECT(sk.size() != 0);
+
+            // Sign
+            std::string message = "This is a test transaction for secp256k1.";
+            uint256 digest = sha512Half(Slice{message.data(), message.size()});
+
+            auto startS = std::chrono::high_resolution_clock::now();
+            auto sig = signDigest(pk, sk, digest);
+            auto endS = std::chrono::high_resolution_clock::now();
+            auto ds = (long long)std::chrono::duration_cast<std::chrono::microseconds>(endS - startS).count();
+            totalSign += ds; minSign = std::min(minSign, ds); maxSign = std::max(maxSign, ds);
+
+            BEAST_EXPECT(sig.size() != 0);
+
+            // Verify
+            auto startV = std::chrono::high_resolution_clock::now();
+            bool isValid = verifyDigest(pk, digest, sig);
+            auto endV = std::chrono::high_resolution_clock::now();
+            auto dv = (long long)std::chrono::duration_cast<std::chrono::microseconds>(endV - startV).count();
+            totalVerify += dv; minVerify = std::min(minVerify, dv); maxVerify = std::max(maxVerify, dv);
+
+            BEAST_EXPECT(isValid);
+        }
+
+        // Averages and TPS
+        long long avgK = totalKeygen / iterations;
+        long long avgS = totalSign / iterations;
+        long long avgV = totalVerify / iterations;
+        long long avgTotal = avgK + avgS + avgV;
+
+        std::cout << "\n=== Secp256k1 Performance (standalone) ===\n";
+        std::cout << "Iterations: " << iterations << "\n";
+        std::cout << "KeyGen: avg=" << avgK << " us, min=" << minKeygen << " us, max=" << maxKeygen << " us\n";
+        std::cout << "Sign:   avg=" << avgS << " us, min=" << minSign   << " us, max=" << maxSign   << " us\n";
+        std::cout << "Verify: avg=" << avgV << " us, min=" << minVerify << " us, max=" << maxVerify << " us\n";
+        std::cout << "Total/txn: " << avgTotal << " us\n";
+        std::cout << "Throughput: " << (avgTotal > 0 ? (1000000.0 / avgTotal) : 0.0) << " tx/s\n";
     }
 
     void
-    testEd25519Transaction()
-    {
-        testcase("Ed25519 Full Transaction Process");
+    testEd25519Transaction(){
+  
+        testcase("Ed25519 Full Transaction Process (Performance)");
 
-        // Step 1: Key Generation
-        auto keyPair = randomKeyPair(KeyType::ed25519);
-        auto const& sk = keyPair.second;
-        auto const& pk = keyPair.first;
+        const int iterations = 1000;  // tune as needed
+        long long totalKeygen = 0, totalSign = 0, totalVerify = 0;
+        long long minKeygen = std::numeric_limits<long long>::max();
+        long long minSign = std::numeric_limits<long long>::max();
+        long long minVerify = std::numeric_limits<long long>::max();
+        long long maxKeygen = 0, maxSign = 0, maxVerify = 0;
 
-        BEAST_EXPECT(sk.size() != 0);
-        BEAST_EXPECT(pk.size() != 0);
+        // Warm-up
+        for (int w = 0; w < 5; ++w) {
+            auto kp = randomKeyPair(KeyType::ed25519);
+            std::string msg = "warmup ed25519";
+            auto sig = sign(kp.first, kp.second, Slice{msg.data(), msg.size()});
+            (void)verify(kp.first, Slice{msg.data(), msg.size()}, sig);
+        }
 
-        // Step 2: Message Signing
-        std::string message = "This is a test transaction for ed25519.";
-        auto sig = sign(pk, sk, Slice{message.data(), message.size()});
+        for (int i = 0; i < iterations; ++i)
+        {
+            // Key generation
+            auto startK = std::chrono::high_resolution_clock::now();
+            auto keyPair = randomKeyPair(KeyType::ed25519);
+            auto endK = std::chrono::high_resolution_clock::now();
+            auto dk = (long long)std::chrono::duration_cast<std::chrono::microseconds>(endK - startK).count();
+            totalKeygen += dk; minKeygen = std::min(minKeygen, dk); maxKeygen = std::max(maxKeygen, dk);
 
-        BEAST_EXPECT(sig.size() != 0);
+            auto const& pk = keyPair.first;
+            auto const& sk = keyPair.second;
 
-        // Step 3: Signature Verification
-        bool isValid = verify(pk, Slice{message.data(), message.size()}, sig);
-        BEAST_EXPECT(isValid); // Signature should be valid
+            BEAST_EXPECT(pk.size() != 0);
+            BEAST_EXPECT(sk.size() != 0);
+
+            // Sign (Ed25519 signs the message directly, not a digest)
+            std::string message = "This is a test transaction for ed25519.";
+
+            auto startS = std::chrono::high_resolution_clock::now();
+            auto sig = sign(pk, sk, Slice{message.data(), message.size()});
+            auto endS = std::chrono::high_resolution_clock::now();
+            auto ds = (long long)std::chrono::duration_cast<std::chrono::microseconds>(endS - startS).count();
+            totalSign += ds; minSign = std::min(minSign, ds); maxSign = std::max(maxSign, ds);
+
+            BEAST_EXPECT(sig.size() != 0);
+
+            // Verify
+            auto startV = std::chrono::high_resolution_clock::now();
+            bool isValid = verify(pk, Slice{message.data(), message.size()}, sig);
+            auto endV = std::chrono::high_resolution_clock::now();
+            auto dv = (long long)std::chrono::duration_cast<std::chrono::microseconds>(endV - startV).count();
+            totalVerify += dv; minVerify = std::min(minVerify, dv); maxVerify = std::max(maxVerify, dv);
+
+            BEAST_EXPECT(isValid);
+        }
+
+        // Averages and TPS
+        long long avgK = totalKeygen / iterations;
+        long long avgS = totalSign / iterations;
+        long long avgV = totalVerify / iterations;
+        long long avgTotal = avgK + avgS + avgV;
+
+        std::cout << "\n=== Ed25519 Performance (standalone) ===\n";
+        std::cout << "Iterations: " << iterations << "\n";
+        std::cout << "KeyGen: avg=" << avgK << " us, min=" << minKeygen << " us, max=" << maxKeygen << " us\n";
+        std::cout << "Sign:   avg=" << avgS << " us, min=" << minSign   << " us, max=" << maxSign   << " us\n";
+        std::cout << "Verify: avg=" << avgV << " us, min=" << minVerify << " us, max=" << maxVerify << " us\n";
+        std::cout << "Total/txn: " << avgTotal << " us\n";
+        std::cout << "Throughput: " << (avgTotal > 0 ? (1000000.0 / avgTotal) : 0.0) << " tx/s\n";
     }
 
-    /**
-     * ZK Transaction Full Process Performance Metrics
-     * This provides comprehensive performance metrics for ZK transactions including:
-     * - Deposit proof generation and verification
-     */
+
     void
     testZKTransactionPerformance()
     {
-        testcase("ZK Transaction Full Process Performance Metrics");
+        testcase("ZK Deposit Proof (Standalone) Performance");
 
-        const int iterations = 3; // Small number for testing
-        long long totalZKDepositTime = 0;
-        
-        long long minZKDepositTime = std::numeric_limits<long long>::max();
-        long long maxZKDepositTime = 0;
+        const int iterations = 20; // tune as needed
+        long long total = 0;
+        long long minT = std::numeric_limits<long long>::max();
+        long long maxT = 0;
 
         // Initialize ZKP system once
         bool zkp_initialized = false;
@@ -123,72 +215,187 @@ public:
             std::cout << "ZKP system initialized successfully\n";
         } catch (std::exception& e) {
             std::cout << "ZKP initialization failed: " << e.what() << "\n";
+            BEAST_EXPECT(false);
             return;
+        }
+
+        // Warm-up
+        if (zkp_initialized) {
+            auto note = ripple::zkp::ZkProver::createRandomNote(1234567);
+            auto proof = ripple::zkp::ZkProver::createDepositProof(note);
+            (void)ripple::zkp::ZkProver::verifyDepositProof(proof);
         }
 
         for (int i = 0; i < iterations; ++i)
         {
-            // ===========================================
-            // ZK DEPOSIT TRANSACTION PERFORMANCE
-            // ===========================================
-            if (zkp_initialized) {
-                auto startZKDeposit = std::chrono::high_resolution_clock::now();
+            if (!zkp_initialized) break;
 
-                try {
-                    // Step 1: Create note
-                    ripple::zkp::Note depositNote = ripple::zkp::ZkProver::createRandomNote(1000000 + i * 100000);
-                    
-                    // Step 2: Generate deposit proof
-                    auto depositProof = ripple::zkp::ZkProver::createDepositProof(depositNote);
-                    BEAST_EXPECT(!depositProof.empty());
+            auto start = std::chrono::high_resolution_clock::now();
+            try {
+                ripple::zkp::Note depositNote = ripple::zkp::ZkProver::createRandomNote(1000000 + i * 100000);
+                auto depositProof = ripple::zkp::ZkProver::createDepositProof(depositNote);
+                BEAST_EXPECT(!depositProof.empty());
 
-                    // Step 3: Verify deposit proof
-                    bool depositValid = ripple::zkp::ZkProver::verifyDepositProof(depositProof);
-                    BEAST_EXPECT(depositValid);
-
-                    auto endZKDeposit = std::chrono::high_resolution_clock::now();
-                    auto zkDepositDuration = static_cast<long long>(std::chrono::duration_cast<std::chrono::microseconds>(endZKDeposit - startZKDeposit).count());
-
-                    // Update ZK deposit metrics
-                    totalZKDepositTime += zkDepositDuration;
-                    minZKDepositTime = std::min(minZKDepositTime, zkDepositDuration);
-                    maxZKDepositTime = std::max(maxZKDepositTime, zkDepositDuration);
-
-                    std::cout << "ZK Deposit " << i << " completed in " << zkDepositDuration << " microseconds\n";
-
-                } catch (std::exception& e) {
-                    std::cout << "ZK deposit test failed for " << i << ": " << e.what() << std::endl;
-                }
+                bool depositValid = ripple::zkp::ZkProver::verifyDepositProof(depositProof);
+                BEAST_EXPECT(depositValid);
+            } catch (std::exception& e) {
+                std::cout << "ZK deposit test failed for " << i << ": " << e.what() << std::endl;
+                BEAST_EXPECT(false);
             }
+            auto end = std::chrono::high_resolution_clock::now();
+
+            auto dt = (long long)std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+            total += dt;
+            minT = std::min(minT, dt);
+            maxT = std::max(maxT, dt);
         }
 
-        // Calculate averages
-        long long avgZKDepositTime = zkp_initialized && totalZKDepositTime > 0 ? totalZKDepositTime / iterations : 0;
+        long long avg = (iterations > 0) ? (total / iterations) : 0;
 
-        // Log comprehensive performance metrics for ZK transactions
-        std::cout << "\n==========================================\n";
-        std::cout << "ZK TRANSACTION PERFORMANCE METRICS\n";
-        std::cout << "==========================================\n";
-        std::cout << "Total Iterations: " << iterations << "\n\n";
+        std::cout << "\n=== ZK Deposit Performance (standalone) ===\n";
+        std::cout << "Iterations: " << iterations << "\n";
+        std::cout << "Full deposit (prove+verify): avg=" << avg << " us, min=" << minT << " us, max=" << maxT << " us\n";
+        std::cout << "Throughput: " << (avg > 0 ? (1000000.0 / avg) : 0.0) << " tx/s\n";
+    }
 
-        if (zkp_initialized && avgZKDepositTime > 0) {
-            std::cout << "ZK DEPOSIT TRANSACTIONS:\n";
-            std::cout << "  Average Latency: " << avgZKDepositTime << " microseconds\n";
-            std::cout << "  Min Latency: " << minZKDepositTime << " microseconds\n";
-            std::cout << "  Max Latency: " << maxZKDepositTime << " microseconds\n";
-            std::cout << "  Throughput: " << (1000000.0 / avgZKDepositTime) << " transactions/second\n";
-            std::cout << "  Average Latency (seconds): " << (avgZKDepositTime / 1000000.0) << " seconds\n";
-        } else {
-            std::cout << "ZK DEPOSIT TRANSACTIONS: FAILED TO INITIALIZE\n";
+    void
+    testSecp256k1PlusZKPerformance()
+    {
+        testcase("Combined: Secp256k1 Signature + ZK Deposit (Performance)");
+
+        const int iterations = 100; // tune as needed
+        long long total = 0;
+        long long minT = std::numeric_limits<long long>::max();
+        long long maxT = 0;
+
+        // Initialize ZKP system once
+        bool zkp_initialized = false;
+        try {
+            ripple::zkp::ZkProver::initialize();
+            zkp_initialized = ripple::zkp::ZkProver::generateKeys(false);
+        } catch (std::exception& e) {
+            std::cout << "ZKP init failed: " << e.what() << "\n";
+            BEAST_EXPECT(false);
+            return;
         }
-        
-        std::cout << "==========================================\n";
-        std::cout << "PERFORMANCE SUMMARY:\n";
-        std::cout << "- ZK system successfully processes deposit proofs\n";
-        std::cout << "- Each proof includes creation, generation, and verification\n";
-        std::cout << "- Proof generation time dominates overall latency\n";
-        std::cout << "- Verification is extremely fast (~4ms)\n";
-        std::cout << "==========================================\n";
+
+        // Warm-up
+        {
+            auto kp = randomKeyPair(KeyType::secp256k1);
+            std::string msg = "warmup secp+zk";
+            auto digest = sha512Half(Slice{msg.data(), msg.size()});
+            auto sig = signDigest(kp.first, kp.second, digest);
+            (void)verifyDigest(kp.first, digest, sig);
+
+            auto note = ripple::zkp::ZkProver::createRandomNote(424242);
+            auto proof = ripple::zkp::ZkProver::createDepositProof(note);
+            (void)ripple::zkp::ZkProver::verifyDepositProof(proof);
+        }
+
+        for (int i = 0; i < iterations; ++i)
+        {
+            auto start = std::chrono::high_resolution_clock::now();
+
+            // 1) Secp256k1 sign + verify
+            auto keyPair = randomKeyPair(KeyType::secp256k1);
+            auto const& pk = keyPair.first;
+            auto const& sk = keyPair.second;
+
+            std::string message = "Combined secp256k1 + ZK transaction";
+            uint256 digest = sha512Half(Slice{message.data(), message.size()});
+            auto sig = signDigest(pk, sk, digest);
+            bool sigValid = verifyDigest(pk, digest, sig);
+            BEAST_EXPECT(sigValid);
+
+            // 2) ZK deposit prove + verify
+            ripple::zkp::Note depositNote = ripple::zkp::ZkProver::createRandomNote(2000000 + i);
+            auto depositProof = ripple::zkp::ZkProver::createDepositProof(depositNote);
+            bool depositValid = ripple::zkp::ZkProver::verifyDepositProof(depositProof);
+            BEAST_EXPECT(depositValid);
+
+            auto end = std::chrono::high_resolution_clock::now();
+
+            auto dt = (long long)std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+            total += dt;
+            minT = std::min(minT, dt);
+            maxT = std::max(maxT, dt);
+        }
+
+        long long avg = (iterations > 0) ? (total / iterations) : 0;
+
+        std::cout << "\n=== Combined Secp256k1 + ZK Deposit Performance ===\n";
+        std::cout << "Iterations: " << iterations << "\n";
+        std::cout << "End-to-end: avg=" << avg << " us, min=" << minT << " us, max=" << maxT << " us\n";
+        std::cout << "Throughput: " << (avg > 0 ? (1000000.0 / avg) : 0.0) << " tx/s\n";
+    }
+
+    void
+    testEd25519PlusZKPerformance()
+    {
+        testcase("Combined: Ed25519 Signature + ZK Deposit (Performance)");
+
+        const int iterations = 100; // tune as needed
+        long long total = 0;
+        long long minT = std::numeric_limits<long long>::max();
+        long long maxT = 0;
+
+        // Initialize ZKP system once
+        bool zkp_initialized = false;
+        try {
+            ripple::zkp::ZkProver::initialize();
+            zkp_initialized = ripple::zkp::ZkProver::generateKeys(false);
+        } catch (std::exception& e) {
+            std::cout << "ZKP init failed: " << e.what() << "\n";
+            BEAST_EXPECT(false);
+            return;
+        }
+
+        // Warm-up
+        {
+            auto kp = randomKeyPair(KeyType::ed25519);
+            std::string msg = "warmup ed+zk";
+            auto sig = sign(kp.first, kp.second, Slice{msg.data(), msg.size()});
+            (void)verify(kp.first, Slice{msg.data(), msg.size()}, sig);
+
+            auto note = ripple::zkp::ZkProver::createRandomNote(737373);
+            auto proof = ripple::zkp::ZkProver::createDepositProof(note);
+            (void)ripple::zkp::ZkProver::verifyDepositProof(proof);
+        }
+
+        for (int i = 0; i < iterations; ++i)
+        {
+            auto start = std::chrono::high_resolution_clock::now();
+
+            // 1) Ed25519 sign + verify
+            auto keyPair = randomKeyPair(KeyType::ed25519);
+            auto const& pk = keyPair.first;
+            auto const& sk = keyPair.second;
+
+            std::string message = "Combined ed25519 + ZK transaction";
+            auto sig = sign(pk, sk, Slice{message.data(), message.size()});
+            bool sigValid = verify(pk, Slice{message.data(), message.size()}, sig);
+            BEAST_EXPECT(sigValid);
+
+            // 2) ZK deposit prove + verify
+            ripple::zkp::Note depositNote = ripple::zkp::ZkProver::createRandomNote(3000000 + i);
+            auto depositProof = ripple::zkp::ZkProver::createDepositProof(depositNote);
+            bool depositValid = ripple::zkp::ZkProver::verifyDepositProof(depositProof);
+            BEAST_EXPECT(depositValid);
+
+            auto end = std::chrono::high_resolution_clock::now();
+
+            auto dt = (long long)std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+            total += dt;
+            minT = std::min(minT, dt);
+            maxT = std::max(maxT, dt);
+        }
+
+        long long avg = (iterations > 0) ? (total / iterations) : 0;
+
+        std::cout << "\n=== Combined Ed25519 + ZK Deposit Performance ===\n";
+        std::cout << "Iterations: " << iterations << "\n";
+        std::cout << "End-to-end: avg=" << avg << " us, min=" << minT << " us, max=" << maxT << " us\n";
+        std::cout << "Throughput: " << (avg > 0 ? (1000000.0 / avg) : 0.0) << " tx/s\n";
     }
 
     void

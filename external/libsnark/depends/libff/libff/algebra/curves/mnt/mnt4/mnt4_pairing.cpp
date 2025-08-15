@@ -179,7 +179,7 @@ std::istream& operator>>(std::istream& in, mnt4_ate_G2_precomp &prec_Q)
 
 mnt4_Fq4 mnt4_final_exponentiation_last_chunk(const mnt4_Fq4 &elt, const mnt4_Fq4 &elt_inv)
 {
-    enter_block("Call to mnt4_final_exponentiation_last_chunk");
+    //enter_block("Call to mnt4_final_exponentiation_last_chunk");
     const mnt4_Fq4 elt_q = elt.Frobenius_map(1);
     mnt4_Fq4 w1_part = elt_q.cyclotomic_exp(mnt4_final_exponent_last_chunk_w1);
     mnt4_Fq4 w0_part;
@@ -190,14 +190,14 @@ mnt4_Fq4 mnt4_final_exponentiation_last_chunk(const mnt4_Fq4 &elt, const mnt4_Fq
     	w0_part = elt.cyclotomic_exp(mnt4_final_exponent_last_chunk_abs_of_w0);
     }
     mnt4_Fq4 result = w1_part * w0_part;
-    leave_block("Call to mnt4_final_exponentiation_last_chunk");
+    //leave_block("Call to mnt4_final_exponentiation_last_chunk");
 
     return result;
 }
 
 mnt4_Fq4 mnt4_final_exponentiation_first_chunk(const mnt4_Fq4 &elt, const mnt4_Fq4 &elt_inv)
 {
-    enter_block("Call to mnt4_final_exponentiation_first_chunk");
+    //enter_block("Call to mnt4_final_exponentiation_first_chunk");
 
     /* (q^2-1) */
 
@@ -206,18 +206,18 @@ mnt4_Fq4 mnt4_final_exponentiation_first_chunk(const mnt4_Fq4 &elt, const mnt4_F
     /* elt_q3_over_elt = elt^(q^2-1) */
     const mnt4_Fq4 elt_q2_over_elt = elt_q2 * elt_inv;
 
-    leave_block("Call to mnt4_final_exponentiation_first_chunk");
+    //leave_block("Call to mnt4_final_exponentiation_first_chunk");
     return elt_q2_over_elt;
 }
 
 mnt4_GT mnt4_final_exponentiation(const mnt4_Fq4 &elt)
 {
-    enter_block("Call to mnt4_final_exponentiation");
+    //enter_block("Call to mnt4_final_exponentiation");
     const mnt4_Fq4 elt_inv = elt.inverse();
     const mnt4_Fq4 elt_to_first_chunk = mnt4_final_exponentiation_first_chunk(elt, elt_inv);
     const mnt4_Fq4 elt_inv_to_first_chunk = mnt4_final_exponentiation_first_chunk(elt_inv, elt);
     mnt4_GT result = mnt4_final_exponentiation_last_chunk(elt_to_first_chunk, elt_inv_to_first_chunk);
-    leave_block("Call to mnt4_final_exponentiation");
+    //leave_block("Call to mnt4_final_exponentiation");
 
     return result;
 }
@@ -226,7 +226,7 @@ mnt4_GT mnt4_final_exponentiation(const mnt4_Fq4 &elt)
 
 mnt4_affine_ate_G1_precomputation mnt4_affine_ate_precompute_G1(const mnt4_G1& P)
 {
-    enter_block("Call to mnt4_affine_ate_precompute_G1");
+    //enter_block("Call to mnt4_affine_ate_precompute_G1");
 
     mnt4_G1 Pcopy = P;
     Pcopy.to_affine_coordinates();
@@ -236,13 +236,13 @@ mnt4_affine_ate_G1_precomputation mnt4_affine_ate_precompute_G1(const mnt4_G1& P
     result.PY = Pcopy.Y();
     result.PY_twist_squared = Pcopy.Y() * mnt4_twist.squared();
 
-    leave_block("Call to mnt4_affine_ate_precompute_G1");
+    //leave_block("Call to mnt4_affine_ate_precompute_G1");
     return result;
 }
 
 mnt4_affine_ate_G2_precomputation mnt4_affine_ate_precompute_G2(const mnt4_G2& Q)
 {
-    enter_block("Call to mnt4_affine_ate_precompute_G2");
+    //enter_block("Call to mnt4_affine_ate_precompute_G2");
 
     mnt4_G2 Qcopy(Q);
     Qcopy.to_affine_coordinates();
@@ -316,14 +316,14 @@ mnt4_affine_ate_G2_precomputation mnt4_affine_ate_precompute_G2(const mnt4_G2& Q
        }
     */
 
-    leave_block("Call to mnt4_affine_ate_precompute_G2");
+    //leave_block("Call to mnt4_affine_ate_precompute_G2");
     return result;
 }
 
 mnt4_Fq4 mnt4_affine_ate_miller_loop(const mnt4_affine_ate_G1_precomputation &prec_P,
                                      const mnt4_affine_ate_G2_precomputation &prec_Q)
 {
-    enter_block("Call to mnt4_affine_ate_miller_loop");
+    //enter_block("Call to mnt4_affine_ate_miller_loop");
 
     mnt4_Fq4 f = mnt4_Fq4::one();
 
@@ -379,7 +379,7 @@ mnt4_Fq4 mnt4_affine_ate_miller_loop(const mnt4_affine_ate_G1_precomputation &pr
        }
     */
 
-    leave_block("Call to mnt4_affine_ate_miller_loop");
+    //leave_block("Call to mnt4_affine_ate_miller_loop");
 
     return f;
 }
@@ -465,7 +465,7 @@ void mixed_addition_step_for_flipped_miller_loop(const mnt4_Fq2 base_X, const mn
 
 mnt4_ate_G1_precomp mnt4_ate_precompute_G1(const mnt4_G1& P)
 {
-    enter_block("Call to mnt4_ate_precompute_G1");
+    //enter_block("Call to mnt4_ate_precompute_G1");
 
     mnt4_G1 Pcopy = P;
     Pcopy.to_affine_coordinates();
@@ -476,13 +476,13 @@ mnt4_ate_G1_precomp mnt4_ate_precompute_G1(const mnt4_G1& P)
     result.PX_twist = Pcopy.X() * mnt4_twist;
     result.PY_twist = Pcopy.Y() * mnt4_twist;
 
-    leave_block("Call to mnt4_ate_precompute_G1");
+    //leave_block("Call to mnt4_ate_precompute_G1");
     return result;
 }
 
 mnt4_ate_G2_precomp mnt4_ate_precompute_G2(const mnt4_G2& Q)
 {
-    enter_block("Call to mnt4_ate_precompute_G2");
+    //enter_block("Call to mnt4_ate_precompute_G2");
 
     mnt4_G2 Qcopy(Q);
     Qcopy.to_affine_coordinates();
@@ -537,14 +537,14 @@ mnt4_ate_G2_precomp mnt4_ate_precompute_G2(const mnt4_G2& Q)
         result.add_coeffs.push_back(ac);
     }
 
-    leave_block("Call to mnt4_ate_precompute_G2");
+    //leave_block("Call to mnt4_ate_precompute_G2");
     return result;
 }
 
 mnt4_Fq4 mnt4_ate_miller_loop(const mnt4_ate_G1_precomp &prec_P,
                               const mnt4_ate_G2_precomp &prec_Q)
 {
-    enter_block("Call to mnt4_ate_miller_loop");
+    //enter_block("Call to mnt4_ate_miller_loop");
 
     mnt4_Fq2 L1_coeff = mnt4_Fq2(prec_P.PX, mnt4_Fq::zero()) - prec_Q.QX_over_twist;
 
@@ -592,7 +592,7 @@ mnt4_Fq4 mnt4_ate_miller_loop(const mnt4_ate_G1_precomp &prec_P,
     	f = (f * g_RnegR_at_P).inverse();
     }
 
-    leave_block("Call to mnt4_ate_miller_loop");
+    //leave_block("Call to mnt4_ate_miller_loop");
 
     return f;
 }
@@ -602,7 +602,7 @@ mnt4_Fq4 mnt4_ate_double_miller_loop(const mnt4_ate_G1_precomp &prec_P1,
                                      const mnt4_ate_G1_precomp &prec_P2,
                                      const mnt4_ate_G2_precomp &prec_Q2)
 {
-    enter_block("Call to mnt4_ate_double_miller_loop");
+    //enter_block("Call to mnt4_ate_double_miller_loop");
 
     mnt4_Fq2 L1_coeff1 = mnt4_Fq2(prec_P1.PX, mnt4_Fq::zero()) - prec_Q1.QX_over_twist;
     mnt4_Fq2 L1_coeff2 = mnt4_Fq2(prec_P2.PX, mnt4_Fq::zero()) - prec_Q2.QX_over_twist;
@@ -668,27 +668,27 @@ mnt4_Fq4 mnt4_ate_double_miller_loop(const mnt4_ate_G1_precomp &prec_P1,
     	f = (f * g_RnegR_at_P1 * g_RnegR_at_P2).inverse();
     }
 
-    leave_block("Call to mnt4_ate_double_miller_loop");
+    //leave_block("Call to mnt4_ate_double_miller_loop");
 
     return f;
 }
 
 mnt4_Fq4 mnt4_ate_pairing(const mnt4_G1& P, const mnt4_G2 &Q)
 {
-    enter_block("Call to mnt4_ate_pairing");
+    //enter_block("Call to mnt4_ate_pairing");
     mnt4_ate_G1_precomp prec_P = mnt4_ate_precompute_G1(P);
     mnt4_ate_G2_precomp prec_Q = mnt4_ate_precompute_G2(Q);
     mnt4_Fq4 result = mnt4_ate_miller_loop(prec_P, prec_Q);
-    leave_block("Call to mnt4_ate_pairing");
+    //leave_block("Call to mnt4_ate_pairing");
     return result;
 }
 
 mnt4_GT mnt4_ate_reduced_pairing(const mnt4_G1 &P, const mnt4_G2 &Q)
 {
-    enter_block("Call to mnt4_ate_reduced_pairing");
+    //enter_block("Call to mnt4_ate_reduced_pairing");
     const mnt4_Fq4 f = mnt4_ate_pairing(P, Q);
     const mnt4_GT result = mnt4_final_exponentiation(f);
-    leave_block("Call to mnt4_ate_reduced_pairing");
+    //leave_block("Call to mnt4_ate_reduced_pairing");
     return result;
 }
 

@@ -181,7 +181,7 @@ std::istream& operator>>(std::istream& in, mnt6_ate_G2_precomp &prec_Q)
 
 mnt6_Fq6 mnt6_final_exponentiation_last_chunk(const mnt6_Fq6 &elt, const mnt6_Fq6 &elt_inv)
 {
-    enter_block("Call to mnt6_final_exponentiation_last_chunk");
+    //enter_block("Call to mnt6_final_exponentiation_last_chunk");
     const mnt6_Fq6 elt_q = elt.Frobenius_map(1);
     mnt6_Fq6 w1_part = elt_q.cyclotomic_exp(mnt6_final_exponent_last_chunk_w1);
     mnt6_Fq6 w0_part;
@@ -192,14 +192,14 @@ mnt6_Fq6 mnt6_final_exponentiation_last_chunk(const mnt6_Fq6 &elt, const mnt6_Fq
     	w0_part = elt.cyclotomic_exp(mnt6_final_exponent_last_chunk_abs_of_w0);
     }
     mnt6_Fq6 result = w1_part * w0_part;
-    leave_block("Call to mnt6_final_exponentiation_last_chunk");
+    //leave_block("Call to mnt6_final_exponentiation_last_chunk");
 
     return result;
 }
 
 mnt6_Fq6 mnt6_final_exponentiation_first_chunk(const mnt6_Fq6 &elt, const mnt6_Fq6 &elt_inv)
 {
-    enter_block("Call to mnt6_final_exponentiation_first_chunk");
+    //enter_block("Call to mnt6_final_exponentiation_first_chunk");
 
     /* (q^3-1)*(q+1) */
 
@@ -211,18 +211,18 @@ mnt6_Fq6 mnt6_final_exponentiation_first_chunk(const mnt6_Fq6 &elt, const mnt6_F
     const mnt6_Fq6 alpha = elt_q3_over_elt.Frobenius_map(1);
     /* beta = elt^((q^3-1)*(q+1) */
     const mnt6_Fq6 beta = alpha * elt_q3_over_elt;
-    leave_block("Call to mnt6_final_exponentiation_first_chunk");
+    //leave_block("Call to mnt6_final_exponentiation_first_chunk");
     return beta;
 }
 
 mnt6_GT mnt6_final_exponentiation(const mnt6_Fq6 &elt)
 {
-    enter_block("Call to mnt6_final_exponentiation");
+    //enter_block("Call to mnt6_final_exponentiation");
     const mnt6_Fq6 elt_inv = elt.inverse();
     const mnt6_Fq6 elt_to_first_chunk = mnt6_final_exponentiation_first_chunk(elt, elt_inv);
     const mnt6_Fq6 elt_inv_to_first_chunk = mnt6_final_exponentiation_first_chunk(elt_inv, elt);
     mnt6_GT result = mnt6_final_exponentiation_last_chunk(elt_to_first_chunk, elt_inv_to_first_chunk);
-    leave_block("Call to mnt6_final_exponentiation");
+    //leave_block("Call to mnt6_final_exponentiation");
 
     return result;
 }
@@ -231,7 +231,7 @@ mnt6_GT mnt6_final_exponentiation(const mnt6_Fq6 &elt)
 
 mnt6_affine_ate_G1_precomputation mnt6_affine_ate_precompute_G1(const mnt6_G1& P)
 {
-    enter_block("Call to mnt6_affine_ate_precompute_G1");
+    //enter_block("Call to mnt6_affine_ate_precompute_G1");
 
     mnt6_G1 Pcopy = P;
     Pcopy.to_affine_coordinates();
@@ -241,13 +241,13 @@ mnt6_affine_ate_G1_precomputation mnt6_affine_ate_precompute_G1(const mnt6_G1& P
     result.PY = Pcopy.Y();
     result.PY_twist_squared = Pcopy.Y() * mnt6_twist.squared();
 
-    leave_block("Call to mnt6_affine_ate_precompute_G1");
+    //leave_block("Call to mnt6_affine_ate_precompute_G1");
     return result;
 }
 
 mnt6_affine_ate_G2_precomputation mnt6_affine_ate_precompute_G2(const mnt6_G2& Q)
 {
-    enter_block("Call to mnt6_affine_ate_precompute_G2");
+    //enter_block("Call to mnt6_affine_ate_precompute_G2");
 
     mnt6_G2 Qcopy(Q);
     Qcopy.to_affine_coordinates();
@@ -321,14 +321,14 @@ mnt6_affine_ate_G2_precomputation mnt6_affine_ate_precompute_G2(const mnt6_G2& Q
     }
     */
 
-    leave_block("Call to mnt6_affine_ate_precompute_G2");
+    //leave_block("Call to mnt6_affine_ate_precompute_G2");
     return result;
 }
 
 mnt6_Fq6 mnt6_affine_ate_miller_loop(const mnt6_affine_ate_G1_precomputation &prec_P,
                                      const mnt6_affine_ate_G2_precomputation &prec_Q)
 {
-    enter_block("Call to mnt6_affine_ate_miller_loop");
+    //enter_block("Call to mnt6_affine_ate_miller_loop");
 
     mnt6_Fq6 f = mnt6_Fq6::one();
 
@@ -385,7 +385,7 @@ mnt6_Fq6 mnt6_affine_ate_miller_loop(const mnt6_affine_ate_G1_precomputation &pr
     }
     */
 
-    leave_block("Call to mnt6_affine_ate_miller_loop");
+    //leave_block("Call to mnt6_affine_ate_miller_loop");
 
     return f;
 }
@@ -471,7 +471,7 @@ void mixed_addition_step_for_flipped_miller_loop(const mnt6_Fq3 base_X, const mn
 
 mnt6_ate_G1_precomp mnt6_ate_precompute_G1(const mnt6_G1& P)
 {
-    enter_block("Call to mnt6_ate_precompute_G1");
+    //enter_block("Call to mnt6_ate_precompute_G1");
 
     mnt6_G1 Pcopy = P;
     Pcopy.to_affine_coordinates();
@@ -482,13 +482,13 @@ mnt6_ate_G1_precomp mnt6_ate_precompute_G1(const mnt6_G1& P)
     result.PX_twist = Pcopy.X() * mnt6_twist;
     result.PY_twist = Pcopy.Y() * mnt6_twist;
 
-    leave_block("Call to mnt6_ate_precompute_G1");
+    //leave_block("Call to mnt6_ate_precompute_G1");
     return result;
 }
 
 mnt6_ate_G2_precomp mnt6_ate_precompute_G2(const mnt6_G2& Q)
 {
-    enter_block("Call to mnt6_ate_precompute_G2");
+    //enter_block("Call to mnt6_ate_precompute_G2");
 
     mnt6_G2 Qcopy(Q);
     Qcopy.to_affine_coordinates();
@@ -546,14 +546,14 @@ mnt6_ate_G2_precomp mnt6_ate_precompute_G2(const mnt6_G2& Q)
         result.add_coeffs.push_back(ac);
     }
 
-    leave_block("Call to mnt6_ate_precompute_G2");
+    //leave_block("Call to mnt6_ate_precompute_G2");
     return result;
 }
 
 mnt6_Fq6 mnt6_ate_miller_loop(const mnt6_ate_G1_precomp &prec_P,
                               const mnt6_ate_G2_precomp &prec_Q)
 {
-    enter_block("Call to mnt6_ate_miller_loop");
+    //enter_block("Call to mnt6_ate_miller_loop");
 
     mnt6_Fq3 L1_coeff = mnt6_Fq3(prec_P.PX, mnt6_Fq::zero(), mnt6_Fq::zero()) - prec_Q.QX_over_twist;
 
@@ -603,7 +603,7 @@ mnt6_Fq6 mnt6_ate_miller_loop(const mnt6_ate_G1_precomp &prec_P,
     	f = (f * g_RnegR_at_P).inverse();
     }
 
-    leave_block("Call to mnt6_ate_miller_loop");
+    //leave_block("Call to mnt6_ate_miller_loop");
 
     return f;
 }
@@ -613,7 +613,7 @@ mnt6_Fq6 mnt6_ate_double_miller_loop(const mnt6_ate_G1_precomp &prec_P1,
                                      const mnt6_ate_G1_precomp &prec_P2,
                                      const mnt6_ate_G2_precomp &prec_Q2)
 {
-    enter_block("Call to mnt6_ate_double_miller_loop");
+    //enter_block("Call to mnt6_ate_double_miller_loop");
 
     mnt6_Fq3 L1_coeff1 = mnt6_Fq3(prec_P1.PX, mnt6_Fq::zero(), mnt6_Fq::zero()) - prec_Q1.QX_over_twist;
     mnt6_Fq3 L1_coeff2 = mnt6_Fq3(prec_P2.PX, mnt6_Fq::zero(), mnt6_Fq::zero()) - prec_Q2.QX_over_twist;
@@ -680,27 +680,27 @@ mnt6_Fq6 mnt6_ate_double_miller_loop(const mnt6_ate_G1_precomp &prec_P1,
     	f = (f * g_RnegR_at_P1 * g_RnegR_at_P2).inverse();
     }
 
-    leave_block("Call to mnt6_ate_double_miller_loop");
+    //leave_block("Call to mnt6_ate_double_miller_loop");
 
     return f;
 }
 
 mnt6_Fq6 mnt6_ate_pairing(const mnt6_G1& P, const mnt6_G2 &Q)
 {
-    enter_block("Call to mnt6_ate_pairing");
+    //enter_block("Call to mnt6_ate_pairing");
     mnt6_ate_G1_precomp prec_P = mnt6_ate_precompute_G1(P);
     mnt6_ate_G2_precomp prec_Q = mnt6_ate_precompute_G2(Q);
     mnt6_Fq6 result = mnt6_ate_miller_loop(prec_P, prec_Q);
-    leave_block("Call to mnt6_ate_pairing");
+    //leave_block("Call to mnt6_ate_pairing");
     return result;
 }
 
 mnt6_GT mnt6_ate_reduced_pairing(const mnt6_G1 &P, const mnt6_G2 &Q)
 {
-    enter_block("Call to mnt6_ate_reduced_pairing");
+    //enter_block("Call to mnt6_ate_reduced_pairing");
     const mnt6_Fq6 f = mnt6_ate_pairing(P, Q);
     const mnt6_GT result = mnt6_final_exponentiation(f);
-    leave_block("Call to mnt6_ate_reduced_pairing");
+    //leave_block("Call to mnt6_ate_reduced_pairing");
     return result;
 }
 
