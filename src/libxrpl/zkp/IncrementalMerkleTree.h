@@ -61,6 +61,7 @@ private:
     void setNode(size_t level, size_t position, const uint256& value);
     void updateFrontier(size_t position);
     uint256 computeRoot(size_t upToPosition) const;
+    uint256 computeNodeAtLevel(size_t level, size_t position) const;
     
     // Constants for empty tree optimization
     std::vector<uint256> empty_hashes_;

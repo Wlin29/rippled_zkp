@@ -219,12 +219,23 @@ std::vector<uint256> IncrementalMerkleTree::authPath(size_t position) const {
         size_t sibling_pos = current_pos ^ 1;
         
         uint256 sibling;
-        if (sibling_pos < next_position_) {
-            // Sibling exists in tree
-            sibling = getNode(level, sibling_pos);
+        
+        // For level 0 (leaves), check if sibling position exists in tree
+        if (level == 0) {
+            if (sibling_pos < next_position_) {
+                sibling = getNode(level, sibling_pos);
+            } else {
+                sibling = empty_hashes_[level];
+            }
         } else {
-            // Sibling is empty (beyond current tree size)
-            sibling = empty_hashes_[level];
+            // For higher levels, compute the sibling node if not cached
+            auto it = cached_nodes_[level].find(sibling_pos);
+            if (it != cached_nodes_[level].end()) {
+                sibling = it->second;
+            } else {
+                // Compute the sibling node on-demand
+                sibling = computeNodeAtLevel(level, sibling_pos);
+            }
         }
         
         path.push_back(sibling);
@@ -281,6 +292,55 @@ bool IncrementalMerkleTree::verify(
     }
     
     return valid;
+}
+
+uint256 IncrementalMerkleTree::computeNodeAtLevel(size_t level, size_t position) const {
+    if (level == 0) {
+        // For leaves, return the stored leaf or empty hash
+        if (position < next_position_) {
+            auto it = cached_nodes_[0].find(position);
+            if (it != cached_nodes_[0].end()) {
+                return it->second;
+            }
+        }
+        return empty_hashes_[0];
+    }
+    
+    // For internal nodes, compute from children
+    size_t left_child_pos = position << 1;
+    size_t right_child_pos = left_child_pos + 1;
+    
+    // Get left and right children from the level below
+    uint256 left_child, right_child;
+    
+    // Check if children exist at this level of the tree
+    size_t max_position_at_child_level = (next_position_ + (1ULL << (level - 1)) - 1) >> (level - 1);
+    
+    if (left_child_pos < max_position_at_child_level) {
+        // Check cache first, then compute recursively
+        auto it = cached_nodes_[level - 1].find(left_child_pos);
+        if (it != cached_nodes_[level - 1].end()) {
+            left_child = it->second;
+        } else {
+            left_child = computeNodeAtLevel(level - 1, left_child_pos);
+        }
+    } else {
+        left_child = empty_hashes_[level - 1];
+    }
+    
+    if (right_child_pos < max_position_at_child_level) {
+        // Check cache first, then compute recursively
+        auto it = cached_nodes_[level - 1].find(right_child_pos);
+        if (it != cached_nodes_[level - 1].end()) {
+            right_child = it->second;
+        } else {
+            right_child = computeNodeAtLevel(level - 1, right_child_pos);
+        }
+    } else {
+        right_child = empty_hashes_[level - 1];
+    }
+    
+    return hash(left_child, right_child);
 }
 
 uint256 IncrementalMerkleTree::getNode(size_t level, size_t position) const {
