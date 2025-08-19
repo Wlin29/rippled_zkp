@@ -22,7 +22,7 @@ namespace libsnark {
 template<typename FieldT>
 r1cs_constraint_system<FieldT> bacs_to_r1cs_instance_map(const bacs_circuit<FieldT> &circuit)
 {
-    libff::enter_block("Call to bacs_to_r1cs_instance_map");
+    //libff::enter_block("Call to bacs_to_r1cs_instance_map");
     assert(circuit.is_valid());
     r1cs_constraint_system<FieldT> result;
 
@@ -57,7 +57,7 @@ r1cs_constraint_system<FieldT> bacs_to_r1cs_instance_map(const bacs_circuit<Fiel
         }
     }
 
-    libff::leave_block("Call to bacs_to_r1cs_instance_map");
+    //libff::leave_block("Call to bacs_to_r1cs_instance_map");
 
     return result;
 }
@@ -67,9 +67,9 @@ r1cs_variable_assignment<FieldT> bacs_to_r1cs_witness_map(const bacs_circuit<Fie
                                                                const bacs_primary_input<FieldT> &primary_input,
                                                                const bacs_auxiliary_input<FieldT> &auxiliary_input)
 {
-    libff::enter_block("Call to bacs_to_r1cs_witness_map");
+    //libff::enter_block("Call to bacs_to_r1cs_witness_map");
     const r1cs_variable_assignment<FieldT> result = circuit.get_all_wires(primary_input, auxiliary_input);
-    libff::leave_block("Call to bacs_to_r1cs_witness_map");
+    //libff::leave_block("Call to bacs_to_r1cs_witness_map");
 
     return result;
 }

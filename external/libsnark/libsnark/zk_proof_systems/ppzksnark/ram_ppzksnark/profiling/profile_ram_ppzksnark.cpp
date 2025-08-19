@@ -47,11 +47,11 @@ int main(int argc, const char * argv[])
 
     const ram_ppzksnark_architecture_params<default_ram_ppzksnark_pp> ap(w, k);
 
-    libff::enter_block("Generate RAM example");
+    //libff::enter_block("Generate RAM example");
     const size_t boot_trace_size_bound = program_size + input_size;
     const bool satisfiable = true;
     ram_example<machine_ppT> example = gen_ram_example_complex<machine_ppT>(ap, boot_trace_size_bound, time_bound, satisfiable);
-    libff::leave_block("Generate RAM example");
+    //libff::leave_block("Generate RAM example");
 
     libff::print_header("(enter) Profile RAM ppzkSNARK");
     const bool test_serialization = true;

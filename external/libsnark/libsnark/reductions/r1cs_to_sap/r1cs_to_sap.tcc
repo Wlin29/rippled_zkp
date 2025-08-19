@@ -54,7 +54,7 @@ std::shared_ptr<libfqfft::evaluation_domain<FieldT> > r1cs_to_sap_get_domain(con
 template<typename FieldT>
 sap_instance<FieldT> r1cs_to_sap_instance_map(const r1cs_constraint_system<FieldT> &cs)
 {
-    libff::enter_block("Call to r1cs_to_sap_instance_map");
+    //libff::enter_block("Call to r1cs_to_sap_instance_map");
 
     const std::shared_ptr<libfqfft::evaluation_domain<FieldT> > domain =
         r1cs_to_sap_get_domain(cs);
@@ -64,7 +64,7 @@ sap_instance<FieldT> r1cs_to_sap_instance_map(const r1cs_constraint_system<Field
     std::vector<std::map<size_t, FieldT> > A_in_Lagrange_basis(sap_num_variables + 1);
     std::vector<std::map<size_t, FieldT> > C_in_Lagrange_basis(sap_num_variables + 1);
 
-    libff::enter_block("Compute polynomials A, C in Lagrange basis");
+    //libff::enter_block("Compute polynomials A, C in Lagrange basis");
     /**
      * process R1CS constraints, converting a constraint of the form
      *   \sum a_i x_i * \sum b_i x_i = \sum c_i x_i
@@ -152,9 +152,9 @@ sap_instance<FieldT> r1cs_to_sap_instance_map(const r1cs_constraint_system<Field
         C_in_Lagrange_basis[extra_var_offset2 + i][2 * cs.num_constraints() + 2 * i] += FieldT::one();
     }
 
-    libff::leave_block("Compute polynomials A, C in Lagrange basis");
+    //libff::leave_block("Compute polynomials A, C in Lagrange basis");
 
-    libff::leave_block("Call to r1cs_to_sap_instance_map");
+    //libff::leave_block("Call to r1cs_to_sap_instance_map");
 
     return sap_instance<FieldT>(domain,
                                 sap_num_variables,
@@ -172,7 +172,7 @@ template<typename FieldT>
 sap_instance_evaluation<FieldT> r1cs_to_sap_instance_map_with_evaluation(const r1cs_constraint_system<FieldT> &cs,
                                                                          const FieldT &t)
 {
-    libff::enter_block("Call to r1cs_to_sap_instance_map_with_evaluation");
+    //libff::enter_block("Call to r1cs_to_sap_instance_map_with_evaluation");
 
     const std::shared_ptr<libfqfft::evaluation_domain<FieldT> > domain =
         r1cs_to_sap_get_domain(cs);
@@ -187,7 +187,7 @@ sap_instance_evaluation<FieldT> r1cs_to_sap_instance_map_with_evaluation(const r
 
     const FieldT Zt = domain->compute_vanishing_polynomial(t);
 
-    libff::enter_block("Compute evaluations of A, C, H at t");
+    //libff::enter_block("Compute evaluations of A, C, H at t");
     const std::vector<FieldT> u = domain->evaluate_all_lagrange_polynomials(t);
     /**
      * add and process all constraints as in r1cs_to_sap_instance_map
@@ -245,9 +245,9 @@ sap_instance_evaluation<FieldT> r1cs_to_sap_instance_map_with_evaluation(const r
         Ht.emplace_back(ti);
         ti *= t;
     }
-    libff::leave_block("Compute evaluations of A, C, H at t");
+    //libff::leave_block("Compute evaluations of A, C, H at t");
 
-    libff::leave_block("Call to r1cs_to_sap_instance_map_with_evaluation");
+    //libff::leave_block("Call to r1cs_to_sap_instance_map_with_evaluation");
 
     return sap_instance_evaluation<FieldT>(domain,
                                            sap_num_variables,
@@ -296,7 +296,7 @@ sap_witness<FieldT> r1cs_to_sap_witness_map(const r1cs_constraint_system<FieldT>
                                             const FieldT &d1,
                                             const FieldT &d2)
 {
-    libff::enter_block("Call to r1cs_to_sap_witness_map");
+    //libff::enter_block("Call to r1cs_to_sap_witness_map");
 
     /* sanity check */
     assert(cs.is_satisfied(primary_input, auxiliary_input));
@@ -341,7 +341,7 @@ sap_witness<FieldT> r1cs_to_sap_witness_map(const r1cs_constraint_system<FieldT>
         full_variable_assignment.push_back(extra_var);
     }
 
-    libff::enter_block("Compute evaluation of polynomial A on set S");
+    //libff::enter_block("Compute evaluation of polynomial A on set S");
     std::vector<FieldT> aA(domain->m, FieldT::zero());
 
     /* account for all constraints, as in r1cs_to_sap_instance_map */
@@ -367,13 +367,13 @@ sap_witness<FieldT> r1cs_to_sap_witness_map(const r1cs_constraint_system<FieldT>
         aA[extra_constr_offset + 2 * i] -= FieldT::one();
     }
 
-    libff::leave_block("Compute evaluation of polynomial A on set S");
+    //libff::leave_block("Compute evaluation of polynomial A on set S");
 
-    libff::enter_block("Compute coefficients of polynomial A");
+    //libff::enter_block("Compute coefficients of polynomial A");
     domain->iFFT(aA);
-    libff::leave_block("Compute coefficients of polynomial A");
+    //libff::leave_block("Compute coefficients of polynomial A");
 
-    libff::enter_block("Compute ZK-patch");
+    //libff::enter_block("Compute ZK-patch");
     std::vector<FieldT> coefficients_for_H(domain->m+1, FieldT::zero());
 #ifdef MULTICORE
 #pragma omp parallel for
@@ -385,13 +385,13 @@ sap_witness<FieldT> r1cs_to_sap_witness_map(const r1cs_constraint_system<FieldT>
     }
     coefficients_for_H[0] -= d2;
     domain->add_poly_Z(d1 * d1, coefficients_for_H);
-    libff::leave_block("Compute ZK-patch");
+    //libff::leave_block("Compute ZK-patch");
 
-    libff::enter_block("Compute evaluation of polynomial A on set T");
+    //libff::enter_block("Compute evaluation of polynomial A on set T");
     domain->cosetFFT(aA, FieldT::multiplicative_generator);
-    libff::leave_block("Compute evaluation of polynomial A on set T");
+    //libff::leave_block("Compute evaluation of polynomial A on set T");
 
-    libff::enter_block("Compute evaluation of polynomial H on set T");
+    //libff::enter_block("Compute evaluation of polynomial H on set T");
     std::vector<FieldT> &H_tmp = aA; // can overwrite aA because it is not used later
 #ifdef MULTICORE
 #pragma omp parallel for
@@ -401,7 +401,7 @@ sap_witness<FieldT> r1cs_to_sap_witness_map(const r1cs_constraint_system<FieldT>
         H_tmp[i] = aA[i]*aA[i];
     }
 
-    libff::enter_block("Compute evaluation of polynomial C on set S");
+    //libff::enter_block("Compute evaluation of polynomial C on set S");
     std::vector<FieldT> aC(domain->m, FieldT::zero());
     /* again, accounting for all constraints */
     size_t extra_var_offset = cs.num_variables() + 1;
@@ -428,15 +428,15 @@ sap_witness<FieldT> r1cs_to_sap_witness_map(const r1cs_constraint_system<FieldT>
             full_variable_assignment[extra_var_offset2 + i - 1];
     }
 
-    libff::leave_block("Compute evaluation of polynomial C on set S");
+    //libff::leave_block("Compute evaluation of polynomial C on set S");
 
-    libff::enter_block("Compute coefficients of polynomial C");
+    //libff::enter_block("Compute coefficients of polynomial C");
     domain->iFFT(aC);
-    libff::leave_block("Compute coefficients of polynomial C");
+    //libff::leave_block("Compute coefficients of polynomial C");
 
-    libff::enter_block("Compute evaluation of polynomial C on set T");
+    //libff::enter_block("Compute evaluation of polynomial C on set T");
     domain->cosetFFT(aC, FieldT::multiplicative_generator);
-    libff::leave_block("Compute evaluation of polynomial C on set T");
+    //libff::leave_block("Compute evaluation of polynomial C on set T");
 
 #ifdef MULTICORE
 #pragma omp parallel for
@@ -446,17 +446,17 @@ sap_witness<FieldT> r1cs_to_sap_witness_map(const r1cs_constraint_system<FieldT>
         H_tmp[i] = (H_tmp[i]-aC[i]);
     }
 
-    libff::enter_block("Divide by Z on set T");
+    //libff::enter_block("Divide by Z on set T");
     domain->divide_by_Z_on_coset(H_tmp);
-    libff::leave_block("Divide by Z on set T");
+    //libff::leave_block("Divide by Z on set T");
 
-    libff::leave_block("Compute evaluation of polynomial H on set T");
+    //libff::leave_block("Compute evaluation of polynomial H on set T");
 
-    libff::enter_block("Compute coefficients of polynomial H");
+    //libff::enter_block("Compute coefficients of polynomial H");
     domain->icosetFFT(H_tmp, FieldT::multiplicative_generator);
-    libff::leave_block("Compute coefficients of polynomial H");
+    //libff::leave_block("Compute coefficients of polynomial H");
 
-    libff::enter_block("Compute sum of H and ZK-patch");
+    //libff::enter_block("Compute sum of H and ZK-patch");
 #ifdef MULTICORE
 #pragma omp parallel for
 #endif
@@ -464,9 +464,9 @@ sap_witness<FieldT> r1cs_to_sap_witness_map(const r1cs_constraint_system<FieldT>
     {
         coefficients_for_H[i] += H_tmp[i];
     }
-    libff::leave_block("Compute sum of H and ZK-patch");
+    //libff::leave_block("Compute sum of H and ZK-patch");
 
-    libff::leave_block("Call to r1cs_to_sap_witness_map");
+    //libff::leave_block("Call to r1cs_to_sap_witness_map");
 
     return sap_witness<FieldT>(sap_num_variables,
                                domain->m,

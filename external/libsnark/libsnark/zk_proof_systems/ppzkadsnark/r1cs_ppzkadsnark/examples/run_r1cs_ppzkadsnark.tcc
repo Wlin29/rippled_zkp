@@ -42,7 +42,7 @@ template<typename ppT>
 bool run_r1cs_ppzkadsnark(const r1cs_example<libff::Fr<snark_pp<ppT>> > &example,
                           const bool test_serialization)
 {
-    libff::enter_block("Call to run_r1cs_ppzkadsnark");
+    //libff::enter_block("Call to run_r1cs_ppzkadsnark");
 
     r1cs_ppzkadsnark_auth_keys<ppT> auth_keys = r1cs_ppzkadsnark_auth_generator<ppT>();
 
@@ -55,11 +55,11 @@ bool run_r1cs_ppzkadsnark(const r1cs_example<libff::Fr<snark_pp<ppT>> > &example
 
     if (test_serialization)
     {
-        libff::enter_block("Test serialization of keys");
+        //libff::enter_block("Test serialization of keys");
         keypair.pk = libff::reserialize<r1cs_ppzkadsnark_proving_key<ppT> >(keypair.pk);
         keypair.vk = libff::reserialize<r1cs_ppzkadsnark_verification_key<ppT> >(keypair.vk);
         pvk = libff::reserialize<r1cs_ppzkadsnark_processed_verification_key<ppT> >(pvk);
-        libff::leave_block("Test serialization of keys");
+        //libff::leave_block("Test serialization of keys");
     }
 
     libff::print_header("R1CS ppzkADSNARK Authenticate");
@@ -90,9 +90,9 @@ bool run_r1cs_ppzkadsnark(const r1cs_example<libff::Fr<snark_pp<ppT>> > &example
 
     if (test_serialization)
     {
-        libff::enter_block("Test serialization of proof");
+        //libff::enter_block("Test serialization of proof");
         proof = libff::reserialize<r1cs_ppzkadsnark_proof<ppT> >(proof);
-        libff::leave_block("Test serialization of proof");
+        //libff::leave_block("Test serialization of proof");
     }
 
     libff::print_header("R1CS ppzkADSNARK Symmetric Verifier");
@@ -113,7 +113,7 @@ bool run_r1cs_ppzkadsnark(const r1cs_example<libff::Fr<snark_pp<ppT>> > &example
     ans2 = r1cs_ppzkadsnark_online_verifier<ppT>(pvk, auth_data, proof,auth_keys.pak,labels);
     assert(ans == ans2);
 
-    libff::leave_block("Call to run_r1cs_ppzkadsnark");
+    //libff::leave_block("Call to run_r1cs_ppzkadsnark");
 
     return ans;
 }

@@ -59,7 +59,7 @@ ram_ppzksnark_verification_key<ram_ppzksnark_ppT> ram_ppzksnark_verification_key
     typedef ram_ppzksnark_machine_pp<ram_ppzksnark_ppT> ram_ppT;
     typedef ram_base_field<ram_ppT> FieldT;
 
-    libff::enter_block("Call to ram_ppzksnark_verification_key::bind_primary_input");
+    //libff::enter_block("Call to ram_ppzksnark_verification_key::bind_primary_input");
     ram_ppzksnark_verification_key<ram_ppzksnark_ppT> result(*this);
 
     const size_t packed_input_element_size = ram_universal_gadget<ram_ppT>::packed_input_element_size(ap);
@@ -78,7 +78,7 @@ ram_ppzksnark_verification_key<ram_ppzksnark_ppT> ram_ppzksnark_verification_key
         result.bound_primary_input_locations.insert(input_pos);
     }
 
-    libff::leave_block("Call to ram_ppzksnark_verification_key::bind_primary_input");
+    //libff::leave_block("Call to ram_ppzksnark_verification_key::bind_primary_input");
     return result;
 }
 
@@ -123,11 +123,11 @@ ram_ppzksnark_keypair<ram_ppzksnark_ppT> ram_ppzksnark_generator(const ram_ppzks
     typedef ram_ppzksnark_machine_pp<ram_ppzksnark_ppT> ram_ppT;
     typedef ram_ppzksnark_snark_pp<ram_ppzksnark_ppT> snark_ppT;
 
-    libff::enter_block("Call to ram_ppzksnark_generator");
+    //libff::enter_block("Call to ram_ppzksnark_generator");
     ram_to_r1cs<ram_ppT> universal_r1cs(ap, primary_input_size_bound, time_bound);
     universal_r1cs.instance_map();
     r1cs_ppzksnark_keypair<snark_ppT> ppzksnark_keypair = r1cs_ppzksnark_generator<snark_ppT>(universal_r1cs.get_constraint_system());
-    libff::leave_block("Call to ram_ppzksnark_generator");
+    //libff::leave_block("Call to ram_ppzksnark_generator");
 
     ram_ppzksnark_proving_key<ram_ppzksnark_ppT> pk = ram_ppzksnark_proving_key<ram_ppzksnark_ppT>(std::move(ppzksnark_keypair.pk), ap, primary_input_size_bound, time_bound);
     ram_ppzksnark_verification_key<ram_ppzksnark_ppT> vk = ram_ppzksnark_verification_key<ram_ppzksnark_ppT>(std::move(ppzksnark_keypair.vk), ap, primary_input_size_bound, time_bound);
@@ -144,7 +144,7 @@ ram_ppzksnark_proof<ram_ppzksnark_ppT> ram_ppzksnark_prover(const ram_ppzksnark_
     typedef ram_ppzksnark_snark_pp<ram_ppzksnark_ppT> snark_ppT;
     typedef libff::Fr<snark_ppT> FieldT;
 
-    libff::enter_block("Call to ram_ppzksnark_prover");
+    //libff::enter_block("Call to ram_ppzksnark_prover");
     ram_to_r1cs<ram_ppT> universal_r1cs(pk.ap, pk.primary_input_size_bound, pk.time_bound);
     const r1cs_primary_input<FieldT> r1cs_primary_input = ram_to_r1cs<ram_ppT>::primary_input_map(pk.ap, pk.primary_input_size_bound, primary_input);
 
@@ -154,7 +154,7 @@ ram_ppzksnark_proof<ram_ppzksnark_ppT> ram_ppzksnark_prover(const ram_ppzksnark_
     universal_r1cs.print_memory_trace();
 #endif
     const r1cs_ppzksnark_proof<snark_ppT> proof = r1cs_ppzksnark_prover<snark_ppT>(pk.r1cs_pk, r1cs_primary_input, r1cs_auxiliary_input);
-    libff::leave_block("Call to ram_ppzksnark_prover");
+    //libff::leave_block("Call to ram_ppzksnark_prover");
 
     return proof;
 }
@@ -166,10 +166,10 @@ bool ram_ppzksnark_verifier(const ram_ppzksnark_verification_key<ram_ppzksnark_p
 {
     typedef ram_ppzksnark_snark_pp<ram_ppzksnark_ppT> snark_ppT;
 
-    libff::enter_block("Call to ram_ppzksnark_verifier");
+    //libff::enter_block("Call to ram_ppzksnark_verifier");
     const ram_ppzksnark_verification_key<ram_ppzksnark_ppT> input_specific_vk = vk.bind_primary_input(primary_input);
     const bool ans = r1cs_ppzksnark_verifier_weak_IC<snark_ppT>(input_specific_vk.r1cs_vk, r1cs_primary_input<libff::Fr<snark_ppT> >(), proof);
-    libff::leave_block("Call to ram_ppzksnark_verifier");
+    //libff::leave_block("Call to ram_ppzksnark_verifier");
 
     return ans;
 }

@@ -356,7 +356,7 @@ T multi_exp_inner(
             // opt_result = opt_result + (a.r * g[a.idx]);
             opt_result = opt_result + opt_window_wnaf_exp(g[a.idx], a.r, abits);
 #ifdef DEBUG
-            printf("Skipping the following pair (%zu bit number vs %zu bit):\n", abits, bbits);
+            // printf("Skipping the following pair (%zu bit number vs %zu bit):\n", abits, bbits);
             a.r.print();
             b.r.print();
 #endif
@@ -452,7 +452,7 @@ T multi_exp_with_mixed_addition(typename std::vector<T>::const_iterator vec_star
 #else
     libff::UNUSED(vec_end);
 #endif
-    enter_block("Process scalar vector");
+    // enter_block("Process scalar vector");
     auto value_it = vec_start;
     auto scalar_it = scalar_start;
 
@@ -490,11 +490,11 @@ T multi_exp_with_mixed_addition(typename std::vector<T>::const_iterator vec_star
             ++num_other;
         }
     }
-    print_indent(); printf("* Elements of w skipped: %zu (%0.2f%%)\n", num_skip, 100.*num_skip/(num_skip+num_add+num_other));
-    print_indent(); printf("* Elements of w processed with special addition: %zu (%0.2f%%)\n", num_add, 100.*num_add/(num_skip+num_add+num_other));
-    print_indent(); printf("* Elements of w remaining: %zu (%0.2f%%)\n", num_other, 100.*num_other/(num_skip+num_add+num_other));
+    print_indent(); // printf("* Elements of w skipped: %zu (%0.2f%%)\n", num_skip, 100.*num_skip/(num_skip+num_add+num_other));
+    print_indent(); // printf("* Elements of w processed with special addition: %zu (%0.2f%%)\n", num_add, 100.*num_add/(num_skip+num_add+num_other));
+    print_indent(); // printf("* Elements of w remaining: %zu (%0.2f%%)\n", num_other, 100.*num_other/(num_skip+num_add+num_other));
 
-    leave_block("Process scalar vector");
+    // leave_block("Process scalar vector");
 
     return acc + multi_exp<T, FieldT, Method>(g.begin(), g.end(), p.begin(), p.end(), chunks);
 }
@@ -527,7 +527,7 @@ size_t get_exp_window_size(const size_t num_scalars)
 #ifdef DEBUG
         if (!inhibit_profiling_info)
         {
-            printf("%ld %zu %zu\n", i, num_scalars, T::fixed_base_exp_window_table[i]);
+            // printf("%ld %zu %zu\n", i, num_scalars, T::fixed_base_exp_window_table[i]);
         }
 #endif
         if (T::fixed_base_exp_window_table[i] != 0 && num_scalars >= T::fixed_base_exp_window_table[i])
@@ -539,7 +539,7 @@ size_t get_exp_window_size(const size_t num_scalars)
 
     if (!inhibit_profiling_info)
     {
-        print_indent(); printf("Choosing window size %zu for %zu elements\n", window, num_scalars);
+        print_indent(); // printf("Choosing window size %zu for %zu elements\n", window, num_scalars);
     }
 
 #ifdef LOWMEM
@@ -559,7 +559,7 @@ window_table<T> get_window_table(const size_t scalar_size,
 #ifdef DEBUG
     if (!inhibit_profiling_info)
     {
-        print_indent(); printf("* scalar_size=%zu; window=%zu; in_window=%zu; outerc=%zu\n", scalar_size, window, in_window, outerc);
+        print_indent(); // printf("* scalar_size=%zu; window=%zu; in_window=%zu; outerc=%zu\n", scalar_size, window, in_window, outerc);
     }
 #endif
 
@@ -636,14 +636,14 @@ std::vector<T> batch_exp(const size_t scalar_size,
 
         if (!inhibit_profiling_info && (i % 10000 == 0))
         {
-            printf(".");
+            // printf(".");
             fflush(stdout);
         }
     }
 
     if (!inhibit_profiling_info)
     {
-        printf(" DONE!\n");
+        // printf(" DONE!\n");
     }
 
     return res;
@@ -671,14 +671,14 @@ std::vector<T> batch_exp_with_coeff(const size_t scalar_size,
 
         if (!inhibit_profiling_info && (i % 10000 == 0))
         {
-            printf(".");
+            // printf(".");
             fflush(stdout);
         }
     }
 
     if (!inhibit_profiling_info)
     {
-        printf(" DONE!\n");
+        // printf(" DONE!\n");
     }
 
     return res;

@@ -48,23 +48,23 @@ int main(void)
 {
     libff::start_profiling();
 
-    libff::enter_block("Test routing algorithms");
+    //libff::enter_block("Test routing algorithms");
 
-    libff::enter_block("Test Benes network routing algorithm");
+    //libff::enter_block("Test Benes network routing algorithm");
     size_t bn_size = 8;
     libff::print_indent(); printf("* for all permutations on %zu elements\n", bn_size);
     test_benes(bn_size);
-    libff::leave_block("Test Benes network routing algorithm");
+    //libff::leave_block("Test Benes network routing algorithm");
 
 
-    libff::enter_block("Test AS-Waksman network routing algorithm");
+    //libff::enter_block("Test AS-Waksman network routing algorithm");
     size_t asw_max_size = 9;
     for (size_t i = 2; i <= asw_max_size; ++i)
     {
         libff::print_indent(); printf("* for all permutations on %zu elements\n", i);
         test_as_waksman(i);
     }
-    libff::leave_block("Test AS-Waksman network routing algorithm");
+    //libff::leave_block("Test AS-Waksman network routing algorithm");
 
-    libff::leave_block("Test routing algorithms");
+    //libff::leave_block("Test routing algorithms");
 }

@@ -181,9 +181,9 @@ void r1cs_constraint_system<FieldT>::add_constraint(const r1cs_constraint<FieldT
 template<typename FieldT>
 void r1cs_constraint_system<FieldT>::swap_AB_if_beneficial()
 {
-    libff::enter_block("Call to r1cs_constraint_system::swap_AB_if_beneficial");
+    //libff::enter_block("Call to r1cs_constraint_system::swap_AB_if_beneficial");
 
-    libff::enter_block("Estimate densities");
+    //libff::enter_block("Estimate densities");
     libff::bit_vector touched_by_A(this->num_variables() + 1, false), touched_by_B(this->num_variables() + 1, false);
 
     for (size_t i = 0; i < this->constraints.size(); ++i)
@@ -211,23 +211,23 @@ void r1cs_constraint_system<FieldT>::swap_AB_if_beneficial()
         libff::print_indent(); printf("* Non-zero A-count (estimate): %zu\n", non_zero_A_count);
         libff::print_indent(); printf("* Non-zero B-count (estimate): %zu\n", non_zero_B_count);
     }
-    libff::leave_block("Estimate densities");
+    //libff::leave_block("Estimate densities");
 
     if (non_zero_B_count > non_zero_A_count)
     {
-        libff::enter_block("Perform the swap");
+        //libff::enter_block("Perform the swap");
         for (size_t i = 0; i < this->constraints.size(); ++i)
         {
             std::swap(this->constraints[i].a, this->constraints[i].b);
         }
-        libff::leave_block("Perform the swap");
+        //libff::leave_block("Perform the swap");
     }
     else
     {
         libff::print_indent(); printf("Swap is not beneficial, not performing\n");
     }
 
-    libff::leave_block("Call to r1cs_constraint_system::swap_AB_if_beneficial");
+    //libff::leave_block("Call to r1cs_constraint_system::swap_AB_if_beneficial");
 }
 
 template<typename FieldT>

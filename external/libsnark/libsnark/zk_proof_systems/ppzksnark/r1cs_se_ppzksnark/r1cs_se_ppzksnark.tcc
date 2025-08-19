@@ -226,7 +226,7 @@ r1cs_se_ppzksnark_verification_key<ppT> r1cs_se_ppzksnark_verification_key<ppT>:
 template <typename ppT>
 r1cs_se_ppzksnark_keypair<ppT> r1cs_se_ppzksnark_generator(const r1cs_se_ppzksnark_constraint_system<ppT> &cs)
 {
-    libff::enter_block("Call to r1cs_se_ppzksnark_generator");
+    //libff::enter_block("Call to r1cs_se_ppzksnark_generator");
 
     /**
      * draw random element t at which the SAP is evaluated.
@@ -246,7 +246,7 @@ r1cs_se_ppzksnark_keypair<ppT> r1cs_se_ppzksnark_generator(const r1cs_se_ppzksna
     libff::print_indent(); printf("* SAP degree: %zu\n", sap_inst.degree());
     libff::print_indent(); printf("* SAP number of input variables: %zu\n", sap_inst.num_inputs());
 
-    libff::enter_block("Compute query densities");
+    //libff::enter_block("Compute query densities");
     size_t non_zero_At = 0;
     for (size_t i = 0; i < sap_inst.num_variables()+1; ++i)
     {
@@ -255,7 +255,7 @@ r1cs_se_ppzksnark_keypair<ppT> r1cs_se_ppzksnark_generator(const r1cs_se_ppzksna
             ++non_zero_At;
         }
     }
-    libff::leave_block("Compute query densities");
+    //libff::leave_block("Compute query densities");
 
     libff::Fr_vector<ppT> At = std::move(sap_inst.At);
     libff::Fr_vector<ppT> Ct = std::move(sap_inst.Ct);
@@ -271,7 +271,7 @@ r1cs_se_ppzksnark_keypair<ppT> r1cs_se_ppzksnark_generator(const r1cs_se_ppzksna
     const libff::G1<ppT> G = libff::G1<ppT>::random_element();
     const libff::G2<ppT> H = libff::G2<ppT>::random_element();
 
-    libff::enter_block("Generating G multiexp table");
+    //libff::enter_block("Generating G multiexp table");
     size_t G_exp_count = sap_inst.num_inputs() + 1 // verifier_query
                          + non_zero_At // A_query
                          + sap_inst.degree() + 1 // G_gamma2_Z_t
@@ -282,18 +282,18 @@ r1cs_se_ppzksnark_keypair<ppT> r1cs_se_ppzksnark_generator(const r1cs_se_ppzksna
     libff::print_indent(); printf("* G window: %zu\n", G_window);
     libff::window_table<libff::G1<ppT> > G_table = get_window_table(
         libff::Fr<ppT>::size_in_bits(), G_window, G);
-    libff::leave_block("Generating G multiexp table");
+    //libff::leave_block("Generating G multiexp table");
 
-    libff::enter_block("Generating H_gamma multiexp table");
+    //libff::enter_block("Generating H_gamma multiexp table");
     libff::G2<ppT> H_gamma = gamma * H;
     size_t H_gamma_exp_count = non_zero_At, // B_query
            H_gamma_window = libff::get_exp_window_size<libff::G2<ppT> >(H_gamma_exp_count);
     libff::print_indent(); printf("* H_gamma window: %zu\n", H_gamma_window);
     libff::window_table<libff::G2<ppT> > H_gamma_table = get_window_table(
         libff::Fr<ppT>::size_in_bits(), H_gamma_window, H_gamma);
-    libff::leave_block("Generating H_gamma multiexp table");
+    //libff::leave_block("Generating H_gamma multiexp table");
 
-    libff::enter_block("Generate R1CS verification key");
+    //libff::enter_block("Generate R1CS verification key");
     libff::G1<ppT> G_alpha = alpha * G;
     libff::G2<ppT> H_beta = beta * H;
 
@@ -311,11 +311,11 @@ r1cs_se_ppzksnark_keypair<ppT> r1cs_se_ppzksnark_generator(const r1cs_se_ppzksna
         tmp_exponents);
     tmp_exponents.clear();
 
-    libff::leave_block("Generate R1CS verification key");
+    //libff::leave_block("Generate R1CS verification key");
 
-    libff::enter_block("Generate R1CS proving key");
+    //libff::enter_block("Generate R1CS proving key");
 
-    libff::enter_block("Compute the A-query", false);
+    //libff::enter_block("Compute the A-query", false);
     tmp_exponents.reserve(sap_inst.num_variables() + 1);
     for (size_t i = 0; i < At.size(); i++)
     {
@@ -332,9 +332,9 @@ r1cs_se_ppzksnark_keypair<ppT> r1cs_se_ppzksnark_generator(const r1cs_se_ppzksna
 #ifdef USE_MIXED_ADDITION
     libff::batch_to_special<libff::G1<ppT> >(A_query);
 #endif
-    libff::leave_block("Compute the A-query", false);
+    //libff::leave_block("Compute the A-query", false);
 
-    libff::enter_block("Compute the B-query", false);
+    //libff::enter_block("Compute the B-query", false);
     libff::G2_vector<ppT> B_query = libff::batch_exp<libff::G2<ppT>,
                                                      libff::Fr<ppT> >(
         libff::Fr<ppT>::size_in_bits(),
@@ -344,9 +344,9 @@ r1cs_se_ppzksnark_keypair<ppT> r1cs_se_ppzksnark_generator(const r1cs_se_ppzksna
 #ifdef USE_MIXED_ADDITION
     libff::batch_to_special<libff::G2<ppT> >(B_query);
 #endif
-    libff::leave_block("Compute the B-query", false);
+    //libff::leave_block("Compute the B-query", false);
 
-    libff::enter_block("Compute the G_gamma-query", false);
+    //libff::enter_block("Compute the G_gamma-query", false);
     libff::G1<ppT> G_gamma = gamma * G;
     libff::G1<ppT> G_gamma_Z = sap_inst.Zt * G_gamma;
     libff::G2<ppT> H_gamma_Z = sap_inst.Zt * H_gamma;
@@ -372,9 +372,9 @@ r1cs_se_ppzksnark_keypair<ppT> r1cs_se_ppzksnark_generator(const r1cs_se_ppzksna
 #ifdef USE_MIXED_ADDITION
     libff::batch_to_special<libff::G1<ppT> >(G_gamma2_Z_t);
 #endif
-    libff::leave_block("Compute the G_gamma-query", false);
+    //libff::leave_block("Compute the G_gamma-query", false);
 
-    libff::enter_block("Compute the C_1-query", false);
+    //libff::enter_block("Compute the C_1-query", false);
     tmp_exponents.reserve(sap_inst.num_variables() - sap_inst.num_inputs());
     for (size_t i = sap_inst.num_inputs() + 1;
          i <= sap_inst.num_variables();
@@ -393,9 +393,9 @@ r1cs_se_ppzksnark_keypair<ppT> r1cs_se_ppzksnark_generator(const r1cs_se_ppzksna
 #ifdef USE_MIXED_ADDITION
     libff::batch_to_special<libff::G1<ppT> >(C_query_1);
 #endif
-    libff::leave_block("Compute the C_1-query", false);
+    //libff::leave_block("Compute the C_1-query", false);
 
-    libff::enter_block("Compute the C_2-query", false);
+    //libff::enter_block("Compute the C_2-query", false);
     tmp_exponents.reserve(sap_inst.num_variables() + 1);
     libff::Fr<ppT> double_gamma2_Z = gamma * gamma * sap_inst.Zt;
     double_gamma2_Z = double_gamma2_Z + double_gamma2_Z;
@@ -413,11 +413,11 @@ r1cs_se_ppzksnark_keypair<ppT> r1cs_se_ppzksnark_generator(const r1cs_se_ppzksna
 #ifdef USE_MIXED_ADDITION
     libff::batch_to_special<libff::G1<ppT> >(C_query_2);
 #endif
-    libff::leave_block("Compute the C_2-query", false);
+    //libff::leave_block("Compute the C_2-query", false);
 
-    libff::leave_block("Generate R1CS proving key");
+    //libff::leave_block("Generate R1CS proving key");
 
-    libff::leave_block("Call to r1cs_se_ppzksnark_generator");
+    //libff::leave_block("Call to r1cs_se_ppzksnark_generator");
 
     r1cs_se_ppzksnark_verification_key<ppT> vk =
         r1cs_se_ppzksnark_verification_key<ppT>(H, G_alpha, H_beta, G_gamma,
@@ -441,7 +441,7 @@ r1cs_se_ppzksnark_proof<ppT> r1cs_se_ppzksnark_prover(const r1cs_se_ppzksnark_pr
                                                 const r1cs_se_ppzksnark_primary_input<ppT> &primary_input,
                                                 const r1cs_se_ppzksnark_auxiliary_input<ppT> &auxiliary_input)
 {
-    libff::enter_block("Call to r1cs_se_ppzksnark_prover");
+    //libff::enter_block("Call to r1cs_se_ppzksnark_prover");
 
 #ifdef DEBUG
     assert(pk.constraint_system.is_satisfied(primary_input, auxiliary_input));
@@ -450,10 +450,10 @@ r1cs_se_ppzksnark_proof<ppT> r1cs_se_ppzksnark_prover(const r1cs_se_ppzksnark_pr
     const libff::Fr<ppT> d1 = libff::Fr<ppT>::random_element(),
         d2 = libff::Fr<ppT>::random_element();
 
-    libff::enter_block("Compute the polynomial H");
+    //libff::enter_block("Compute the polynomial H");
     const sap_witness<libff::Fr<ppT> > sap_wit = r1cs_to_sap_witness_map(
         pk.constraint_system, primary_input, auxiliary_input, d1, d2);
-    libff::leave_block("Compute the polynomial H");
+    //libff::leave_block("Compute the polynomial H");
 
 #ifdef DEBUG
     const libff::Fr<ppT> t = libff::Fr<ppT>::random_element();
@@ -477,9 +477,9 @@ r1cs_se_ppzksnark_proof<ppT> r1cs_se_ppzksnark_prover(const r1cs_se_ppzksnark_pr
 
     const libff::Fr<ppT> r = libff::Fr<ppT>::random_element();
 
-    libff::enter_block("Compute the proof");
+    //libff::enter_block("Compute the proof");
 
-    libff::enter_block("Compute answer to A-query", false);
+    //libff::enter_block("Compute answer to A-query", false);
     /**
      * compute A = G^{gamma * (\sum_{i=0}^m input_i * A_i(t) + r * Z(t))}
      *           = \prod_{i=0}^m (G^{gamma * A_i(t)})^{input_i)
@@ -498,9 +498,9 @@ r1cs_se_ppzksnark_proof<ppT> r1cs_se_ppzksnark_prover(const r1cs_se_ppzksnark_pr
             sap_wit.coefficients_for_ACs.end(),
             chunks);
 
-    libff::leave_block("Compute answer to A-query", false);
+    //libff::leave_block("Compute answer to A-query", false);
 
-    libff::enter_block("Compute answer to B-query", false);
+    //libff::enter_block("Compute answer to B-query", false);
     /**
      * compute B exactly as A, except with H as the base
      */
@@ -515,9 +515,9 @@ r1cs_se_ppzksnark_proof<ppT> r1cs_se_ppzksnark_prover(const r1cs_se_ppzksnark_pr
             sap_wit.coefficients_for_ACs.begin(),
             sap_wit.coefficients_for_ACs.end(),
             chunks);
-    libff::leave_block("Compute answer to B-query", false);
+    //libff::leave_block("Compute answer to B-query", false);
 
-    libff::enter_block("Compute answer to C-query", false);
+    //libff::enter_block("Compute answer to C-query", false);
     /**
      * compute C = G^{f(input) +
      *                r^2 * gamma^2 * Z(t)^2 +
@@ -558,11 +558,11 @@ r1cs_se_ppzksnark_proof<ppT> r1cs_se_ppzksnark_prover(const r1cs_se_ppzksnark_pr
             sap_wit.coefficients_for_H.begin(),
             sap_wit.coefficients_for_H.end(),
             chunks);
-    libff::leave_block("Compute answer to C-query", false);
+    //libff::leave_block("Compute answer to C-query", false);
 
-    libff::leave_block("Compute the proof");
+    //libff::leave_block("Compute the proof");
 
-    libff::leave_block("Call to r1cs_se_ppzksnark_prover");
+    //libff::leave_block("Call to r1cs_se_ppzksnark_prover");
 
     r1cs_se_ppzksnark_proof<ppT> proof = r1cs_se_ppzksnark_proof<ppT>(
         std::move(A), std::move(B), std::move(C));
@@ -574,7 +574,7 @@ r1cs_se_ppzksnark_proof<ppT> r1cs_se_ppzksnark_prover(const r1cs_se_ppzksnark_pr
 template <typename ppT>
 r1cs_se_ppzksnark_processed_verification_key<ppT> r1cs_se_ppzksnark_verifier_process_vk(const r1cs_se_ppzksnark_verification_key<ppT> &vk)
 {
-    libff::enter_block("Call to r1cs_se_ppzksnark_verifier_process_vk");
+    //libff::enter_block("Call to r1cs_se_ppzksnark_verifier_process_vk");
 
     libff::G1_precomp<ppT> G_alpha_pc = ppT::precompute_G1(vk.G_alpha);
     libff::G2_precomp<ppT> H_beta_pc = ppT::precompute_G2(vk.H_beta);
@@ -589,7 +589,7 @@ r1cs_se_ppzksnark_processed_verification_key<ppT> r1cs_se_ppzksnark_verifier_pro
 
     pvk.query = vk.query;
 
-    libff::leave_block("Call to r1cs_se_ppzksnark_verifier_process_vk");
+    //libff::leave_block("Call to r1cs_se_ppzksnark_verifier_process_vk");
 
     return pvk;
 }
@@ -599,11 +599,11 @@ bool r1cs_se_ppzksnark_online_verifier_weak_IC(const r1cs_se_ppzksnark_processed
                                                const r1cs_se_ppzksnark_primary_input<ppT> &primary_input,
                                                const r1cs_se_ppzksnark_proof<ppT> &proof)
 {
-    libff::enter_block("Call to r1cs_se_ppzksnark_online_verifier_weak_IC");
+    //libff::enter_block("Call to r1cs_se_ppzksnark_online_verifier_weak_IC");
 
     bool result = true;
 
-    libff::enter_block("Check if the proof is well-formed");
+    //libff::enter_block("Check if the proof is well-formed");
     if (!proof.is_well_formed())
     {
         if (!libff::inhibit_profiling_info)
@@ -612,9 +612,9 @@ bool r1cs_se_ppzksnark_online_verifier_weak_IC(const r1cs_se_ppzksnark_processed
         }
         result = false;
     }
-    libff::leave_block("Check if the proof is well-formed");
+    //libff::leave_block("Check if the proof is well-formed");
 
-    libff::enter_block("Pairing computations");
+    //libff::enter_block("Pairing computations");
 
 #ifdef MULTICORE
     const size_t chunks = omp_get_max_threads(); // to override, set OMP_NUM_THREADS env var or call omp_set_num_threads()
@@ -622,7 +622,7 @@ bool r1cs_se_ppzksnark_online_verifier_weak_IC(const r1cs_se_ppzksnark_processed
     const size_t chunks = 1;
 #endif
 
-    libff::enter_block("Check first test");
+    //libff::enter_block("Check first test");
     /**
      * e(A*G^{alpha}, B*H^{beta}) = e(G^{alpha}, H^{beta}) * e(G^{psi}, H^{gamma})
      *                              * e(C, H)
@@ -654,9 +654,9 @@ bool r1cs_se_ppzksnark_online_verifier_weak_IC(const r1cs_se_ppzksnark_processed
         }
         result = false;
     }
-    libff::leave_block("Check first test");
+    //libff::leave_block("Check first test");
 
-    libff::enter_block("Check second test");
+    //libff::enter_block("Check second test");
     /**
      * e(A, H^{gamma}) = e(G^{gamma}, B)
      */
@@ -675,9 +675,9 @@ bool r1cs_se_ppzksnark_online_verifier_weak_IC(const r1cs_se_ppzksnark_processed
         }
         result = false;
     }
-    libff::leave_block("Check second test");
-    libff::leave_block("Pairing computations");
-    libff::leave_block("Call to r1cs_se_ppzksnark_online_verifier_weak_IC");
+    //libff::leave_block("Check second test");
+    //libff::leave_block("Pairing computations");
+    //libff::leave_block("Call to r1cs_se_ppzksnark_online_verifier_weak_IC");
 
     return result;
 }
@@ -687,10 +687,10 @@ bool r1cs_se_ppzksnark_verifier_weak_IC(const r1cs_se_ppzksnark_verification_key
                                         const r1cs_se_ppzksnark_primary_input<ppT> &primary_input,
                                         const r1cs_se_ppzksnark_proof<ppT> &proof)
 {
-    libff::enter_block("Call to r1cs_se_ppzksnark_verifier_weak_IC");
+    //libff::enter_block("Call to r1cs_se_ppzksnark_verifier_weak_IC");
     r1cs_se_ppzksnark_processed_verification_key<ppT> pvk = r1cs_se_ppzksnark_verifier_process_vk<ppT>(vk);
     bool result = r1cs_se_ppzksnark_online_verifier_weak_IC<ppT>(pvk, primary_input, proof);
-    libff::leave_block("Call to r1cs_se_ppzksnark_verifier_weak_IC");
+    //libff::leave_block("Call to r1cs_se_ppzksnark_verifier_weak_IC");
     return result;
 }
 
@@ -699,7 +699,7 @@ bool r1cs_se_ppzksnark_online_verifier_strong_IC(const r1cs_se_ppzksnark_process
                                                  const r1cs_se_ppzksnark_primary_input<ppT> &primary_input,
                                                  const r1cs_se_ppzksnark_proof<ppT> &proof)
 {
-    libff::enter_block("Call to r1cs_se_ppzksnark_online_verifier_strong_IC");
+    //libff::enter_block("Call to r1cs_se_ppzksnark_online_verifier_strong_IC");
     bool result = true;
 
     if (pvk.query.size() != primary_input.size() + 1)
@@ -714,7 +714,7 @@ bool r1cs_se_ppzksnark_online_verifier_strong_IC(const r1cs_se_ppzksnark_process
         result = r1cs_se_ppzksnark_online_verifier_weak_IC(pvk, primary_input, proof);
     }
 
-    libff::leave_block("Call to r1cs_se_ppzksnark_online_verifier_strong_IC");
+    //libff::leave_block("Call to r1cs_se_ppzksnark_online_verifier_strong_IC");
     return result;
 }
 
@@ -723,10 +723,10 @@ bool r1cs_se_ppzksnark_verifier_strong_IC(const r1cs_se_ppzksnark_verification_k
                                           const r1cs_se_ppzksnark_primary_input<ppT> &primary_input,
                                           const r1cs_se_ppzksnark_proof<ppT> &proof)
 {
-    libff::enter_block("Call to r1cs_se_ppzksnark_verifier_strong_IC");
+    //libff::enter_block("Call to r1cs_se_ppzksnark_verifier_strong_IC");
     r1cs_se_ppzksnark_processed_verification_key<ppT> pvk = r1cs_se_ppzksnark_verifier_process_vk<ppT>(vk);
     bool result = r1cs_se_ppzksnark_online_verifier_strong_IC<ppT>(pvk, primary_input, proof);
-    libff::leave_block("Call to r1cs_se_ppzksnark_verifier_strong_IC");
+    //libff::leave_block("Call to r1cs_se_ppzksnark_verifier_strong_IC");
     return result;
 }
 

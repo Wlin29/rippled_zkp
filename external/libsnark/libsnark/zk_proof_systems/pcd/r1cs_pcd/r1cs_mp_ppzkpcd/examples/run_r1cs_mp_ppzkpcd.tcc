@@ -28,13 +28,13 @@ bool run_r1cs_mp_ppzkpcd_tally_example(const size_t wordsize,
                                        const bool test_multi_type,
                                        const bool test_same_type_optimization)
 {
-    libff::enter_block("Call to run_r1cs_mp_ppzkpcd_tally_example");
+    //libff::enter_block("Call to run_r1cs_mp_ppzkpcd_tally_example");
 
     typedef libff::Fr<typename PCD_ppT::curve_A_pp> FieldT;
 
     bool all_accept = true;
 
-    libff::enter_block("Generate all messages");
+    //libff::enter_block("Generate all messages");
     size_t tree_size = 0;
     size_t nodes_in_layer = 1;
     for (size_t layer = 0; layer <= depth; ++layer)
@@ -79,12 +79,12 @@ bool run_r1cs_mp_ppzkpcd_tally_example(const size_t wordsize,
         nodes_in_layer *= max_arity;
     }
 
-    libff::leave_block("Generate all messages");
+    //libff::leave_block("Generate all messages");
 
     std::vector<r1cs_mp_ppzkpcd_proof<PCD_ppT> > tree_proofs(tree_size);
     std::vector<std::shared_ptr<r1cs_pcd_message<FieldT> > > tree_messages(tree_size);
 
-    libff::enter_block("Generate compliance predicates");
+    //libff::enter_block("Generate compliance predicates");
     std::set<size_t> tally_1_accepted_types, tally_2_accepted_types;
     if (test_same_type_optimization)
     {
@@ -106,7 +106,7 @@ bool run_r1cs_mp_ppzkpcd_tally_example(const size_t wordsize,
     tally_2.generate_r1cs_constraints();
     r1cs_pcd_compliance_predicate<FieldT> cp_1 = tally_1.get_compliance_predicate();
     r1cs_pcd_compliance_predicate<FieldT> cp_2 = tally_2.get_compliance_predicate();
-    libff::leave_block("Generate compliance predicates");
+    //libff::leave_block("Generate compliance predicates");
 
     libff::print_header("R1CS ppzkPCD Generator");
     r1cs_mp_ppzkpcd_keypair<PCD_ppT> keypair = r1cs_mp_ppzkpcd_generator<PCD_ppT>({ cp_1, cp_2 });
@@ -116,11 +116,11 @@ bool run_r1cs_mp_ppzkpcd_tally_example(const size_t wordsize,
 
     if (test_serialization)
     {
-        libff::enter_block("Test serialization of keys");
+        //libff::enter_block("Test serialization of keys");
         keypair.pk = libff::reserialize<r1cs_mp_ppzkpcd_proving_key<PCD_ppT> >(keypair.pk);
         keypair.vk = libff::reserialize<r1cs_mp_ppzkpcd_verification_key<PCD_ppT> >(keypair.vk);
         pvk = libff::reserialize<r1cs_mp_ppzkpcd_processed_verification_key<PCD_ppT> >(pvk);
-        libff::leave_block("Test serialization of keys");
+        //libff::leave_block("Test serialization of keys");
     }
 
     std::shared_ptr<r1cs_pcd_message<FieldT> > base_msg = tally_1.get_base_case_message(); /* we choose the base to always be tally_1 */
@@ -162,9 +162,9 @@ bool run_r1cs_mp_ppzkpcd_tally_example(const size_t wordsize,
 
             if (test_serialization)
             {
-                libff::enter_block("Test serialization of proof");
+                //libff::enter_block("Test serialization of proof");
                 proof = libff::reserialize<r1cs_mp_ppzkpcd_proof<PCD_ppT> >(proof);
-                libff::leave_block("Test serialization of proof");
+                //libff::leave_block("Test serialization of proof");
             }
 
             tree_proofs[cur_idx] = proof;
@@ -195,7 +195,7 @@ bool run_r1cs_mp_ppzkpcd_tally_example(const size_t wordsize,
         }
     }
 
-    libff::leave_block("Call to run_r1cs_mp_ppzkpcd_tally_example");
+    //libff::leave_block("Call to run_r1cs_mp_ppzkpcd_tally_example");
 
     return all_accept;
 }

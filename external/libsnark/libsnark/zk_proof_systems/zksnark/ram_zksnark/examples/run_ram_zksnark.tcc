@@ -39,7 +39,7 @@ template<typename ram_zksnark_ppT>
 bool run_ram_zksnark(const ram_example<ram_zksnark_machine_pp<ram_zksnark_ppT> > &example,
                      const bool test_serialization)
 {
-    libff::enter_block("Call to run_ram_zksnark");
+    //libff::enter_block("Call to run_ram_zksnark");
 
     printf("This run uses an example with the following parameters:\n");
     example.ap.print();
@@ -51,10 +51,10 @@ bool run_ram_zksnark(const ram_example<ram_zksnark_machine_pp<ram_zksnark_ppT> >
 
     if (test_serialization)
     {
-        libff::enter_block("Test serialization of keys");
+        //libff::enter_block("Test serialization of keys");
         keypair.pk = libff::reserialize<ram_zksnark_proving_key<ram_zksnark_ppT> >(keypair.pk);
         keypair.vk = libff::reserialize<ram_zksnark_verification_key<ram_zksnark_ppT> >(keypair.vk);
-        libff::leave_block("Test serialization of keys");
+        //libff::leave_block("Test serialization of keys");
     }
 
     libff::print_header("RAM zkSNARK Prover");
@@ -63,9 +63,9 @@ bool run_ram_zksnark(const ram_example<ram_zksnark_machine_pp<ram_zksnark_ppT> >
 
     if (test_serialization)
     {
-        libff::enter_block("Test serialization of proof");
+        //libff::enter_block("Test serialization of proof");
         proof = libff::reserialize<ram_zksnark_proof<ram_zksnark_ppT> >(proof);
-        libff::leave_block("Test serialization of proof");
+        //libff::leave_block("Test serialization of proof");
     }
 
     libff::print_header("RAM zkSNARK Verifier");
@@ -73,7 +73,7 @@ bool run_ram_zksnark(const ram_example<ram_zksnark_machine_pp<ram_zksnark_ppT> >
     printf("\n"); libff::print_indent(); libff::print_mem("after verifier");
     printf("* The verification result is: %s\n", (ans ? "PASS" : "FAIL"));
 
-    libff::leave_block("Call to run_ram_zksnark");
+    //libff::leave_block("Call to run_ram_zksnark");
 
     return ans;
 }

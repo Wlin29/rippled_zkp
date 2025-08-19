@@ -205,7 +205,7 @@ uscs_ppzksnark_verification_key<ppT> uscs_ppzksnark_verification_key<ppT>::dummy
 template <typename ppT>
 uscs_ppzksnark_keypair<ppT> uscs_ppzksnark_generator(const uscs_ppzksnark_constraint_system<ppT> &cs)
 {
-    libff::enter_block("Call to uscs_ppzksnark_generator");
+    //libff::enter_block("Call to uscs_ppzksnark_generator");
 
     /* draw random element at which the SSP is evaluated */
 
@@ -244,7 +244,7 @@ uscs_ppzksnark_keypair<ppT> uscs_ppzksnark_generator(const uscs_ppzksnark_constr
 
     const libff::Fr<ppT> alpha = libff::Fr<ppT>::random_element();
 
-    libff::enter_block("Generate USCS proving key");
+    //libff::enter_block("Generate USCS proving key");
 
     const size_t g1_exp_count = Vt_table.size() + Vt_table_minus_Xt_table.size() + Ht_table.size();
     const size_t g2_exp_count = Vt_table_minus_Xt_table.size();
@@ -255,63 +255,63 @@ uscs_ppzksnark_keypair<ppT> uscs_ppzksnark_generator(const uscs_ppzksnark_constr
     libff::print_indent(); printf("* G1 window: %zu\n", g1_window);
     libff::print_indent(); printf("* G2 window: %zu\n", g2_window);
 
-    libff::enter_block("Generating G1 multiexp table");
+    //libff::enter_block("Generating G1 multiexp table");
     libff::window_table<libff::G1<ppT> > g1_table = get_window_table(libff::Fr<ppT>::size_in_bits(), g1_window, libff::G1<ppT>::one());
-    libff::leave_block("Generating G1 multiexp table");
+    //libff::leave_block("Generating G1 multiexp table");
 
-    libff::enter_block("Generating G2 multiexp table");
+    //libff::enter_block("Generating G2 multiexp table");
     libff::window_table<libff::G2<ppT> > g2_table = get_window_table(libff::Fr<ppT>::size_in_bits(), g2_window, libff::G2<ppT>::one());
-    libff::leave_block("Generating G2 multiexp table");
+    //libff::leave_block("Generating G2 multiexp table");
 
-    libff::enter_block("Generate proof components");
+    //libff::enter_block("Generate proof components");
 
-    libff::enter_block("Compute the query for V_g1", false);
+    //libff::enter_block("Compute the query for V_g1", false);
     libff::G1_vector<ppT> V_g1_query = batch_exp(libff::Fr<ppT>::size_in_bits(), g1_window, g1_table, Vt_table_minus_Xt_table);
 #ifdef USE_MIXED_ADDITION
     libff::batch_to_special<libff::G1<ppT> >(V_g1_query);
 #endif
-    libff::leave_block("Compute the query for V_g1", false);
+    //libff::leave_block("Compute the query for V_g1", false);
 
-    libff::enter_block("Compute the query for alpha_V_g1", false);
+    //libff::enter_block("Compute the query for alpha_V_g1", false);
     libff::G1_vector<ppT> alpha_V_g1_query = batch_exp_with_coeff(libff::Fr<ppT>::size_in_bits(), g1_window, g1_table, alpha, Vt_table_minus_Xt_table);
 #ifdef USE_MIXED_ADDITION
     libff::batch_to_special<libff::G1<ppT> >(alpha_V_g1_query);
 #endif
-    libff::leave_block("Compute the query for alpha_V_g1", false);
+    //libff::leave_block("Compute the query for alpha_V_g1", false);
 
-    libff::enter_block("Compute the query for H_g1", false);
+    //libff::enter_block("Compute the query for H_g1", false);
     libff::G1_vector<ppT> H_g1_query = batch_exp(libff::Fr<ppT>::size_in_bits(), g1_window, g1_table, Ht_table);
 #ifdef USE_MIXED_ADDITION
     libff::batch_to_special<libff::G1<ppT> >(H_g1_query);
 #endif
-    libff::leave_block("Compute the query for H_g1", false);
+    //libff::leave_block("Compute the query for H_g1", false);
 
-    libff::enter_block("Compute the query for V_g2", false);
+    //libff::enter_block("Compute the query for V_g2", false);
     libff::G2_vector<ppT> V_g2_query = batch_exp(libff::Fr<ppT>::size_in_bits(), g2_window, g2_table, Vt_table);
 #ifdef USE_MIXED_ADDITION
     libff::batch_to_special<libff::G2<ppT> >(V_g2_query);
 #endif
-    libff::leave_block("Compute the query for V_g2", false);
+    //libff::leave_block("Compute the query for V_g2", false);
 
-    libff::leave_block("Generate proof components");
+    //libff::leave_block("Generate proof components");
 
-    libff::leave_block("Generate USCS proving key");
+    //libff::leave_block("Generate USCS proving key");
 
-    libff::enter_block("Generate USCS verification key");
+    //libff::enter_block("Generate USCS verification key");
 
     const libff::Fr<ppT> tilde    = libff::Fr<ppT>::random_element();
     libff::G2<ppT> tilde_g2       = tilde * libff::G2<ppT>::one();
     libff::G2<ppT> alpha_tilde_g2 = (alpha * tilde) * libff::G2<ppT>::one();
     libff::G2<ppT> Z_g2           = ssp_inst.Zt * libff::G2<ppT>::one();
 
-    libff::enter_block("Encode IC query for USCS verification key");
+    //libff::enter_block("Encode IC query for USCS verification key");
     libff::G1<ppT> encoded_IC_base = Xt_table[0] * libff::G1<ppT>::one();
     libff::G1_vector<ppT> encoded_IC_values = batch_exp(libff::Fr<ppT>::size_in_bits(), g1_window, g1_table, libff::Fr_vector<ppT>(Xt_table.begin() + 1, Xt_table.end()));
-    libff::leave_block("Encode IC query for USCS verification key");
+    //libff::leave_block("Encode IC query for USCS verification key");
 
-    libff::leave_block("Generate USCS verification key");
+    //libff::leave_block("Generate USCS verification key");
 
-    libff::leave_block("Call to uscs_ppzksnark_generator");
+    //libff::leave_block("Call to uscs_ppzksnark_generator");
 
     accumulation_vector<libff::G1<ppT> > encoded_IC_query(std::move(encoded_IC_base), std::move(encoded_IC_values));
 
@@ -338,13 +338,13 @@ uscs_ppzksnark_proof<ppT> uscs_ppzksnark_prover(const uscs_ppzksnark_proving_key
                                                 const uscs_ppzksnark_primary_input<ppT> &primary_input,
                                                 const uscs_ppzksnark_auxiliary_input<ppT> &auxiliary_input)
 {
-    libff::enter_block("Call to uscs_ppzksnark_prover");
+    //libff::enter_block("Call to uscs_ppzksnark_prover");
 
     const libff::Fr<ppT> d = libff::Fr<ppT>::random_element();
 
-    libff::enter_block("Compute the polynomial H");
+    //libff::enter_block("Compute the polynomial H");
     const ssp_witness<libff::Fr<ppT> > ssp_wit = uscs_to_ssp_witness_map(pk.constraint_system, primary_input, auxiliary_input, d);
-    libff::leave_block("Compute the polynomial H");
+    //libff::leave_block("Compute the polynomial H");
 
     /* sanity checks */
     assert(pk.constraint_system.is_satisfied(primary_input, auxiliary_input));
@@ -372,47 +372,47 @@ uscs_ppzksnark_proof<ppT> uscs_ppzksnark_prover(const uscs_ppzksnark_proving_key
 
     // MAYBE LATER: do queries 1,2,4 at once for slightly better speed
 
-    libff::enter_block("Compute the proof");
+    //libff::enter_block("Compute the proof");
 
-    libff::enter_block("Compute V_g1, the 1st component of the proof", false);
+    //libff::enter_block("Compute V_g1, the 1st component of the proof", false);
     V_g1 = V_g1 + libff::multi_exp_with_mixed_addition<libff::G1<ppT>,
                                                        libff::Fr<ppT>,
                                                        libff::multi_exp_method_BDLO12>(
         pk.V_g1_query.begin(), pk.V_g1_query.begin()+(ssp_wit.num_variables()-ssp_wit.num_inputs()),
         ssp_wit.coefficients_for_Vs.begin()+ssp_wit.num_inputs(), ssp_wit.coefficients_for_Vs.begin()+ssp_wit.num_variables(),
         chunks);
-    libff::leave_block("Compute V_g1, the 1st component of the proof", false);
+    //libff::leave_block("Compute V_g1, the 1st component of the proof", false);
 
-    libff::enter_block("Compute alpha_V_g1, the 2nd component of the proof", false);
+    //libff::enter_block("Compute alpha_V_g1, the 2nd component of the proof", false);
     alpha_V_g1 = alpha_V_g1 + libff::multi_exp_with_mixed_addition<libff::G1<ppT>,
                                                                    libff::Fr<ppT>,
                                                                    libff::multi_exp_method_BDLO12>(
         pk.alpha_V_g1_query.begin(), pk.alpha_V_g1_query.begin()+(ssp_wit.num_variables()-ssp_wit.num_inputs()),
         ssp_wit.coefficients_for_Vs.begin()+ssp_wit.num_inputs(), ssp_wit.coefficients_for_Vs.begin()+ssp_wit.num_variables(),
         chunks);
-    libff::leave_block("Compute alpha_V_g1, the 2nd component of the proof", false);
+    //libff::leave_block("Compute alpha_V_g1, the 2nd component of the proof", false);
 
-    libff::enter_block("Compute H_g1, the 3rd component of the proof", false);
+    //libff::enter_block("Compute H_g1, the 3rd component of the proof", false);
     H_g1 = H_g1 + libff::multi_exp<libff::G1<ppT>,
                                    libff::Fr<ppT>,
                                    libff::multi_exp_method_BDLO12>(
         pk.H_g1_query.begin(), pk.H_g1_query.begin()+ssp_wit.degree()+1,
         ssp_wit.coefficients_for_H.begin(), ssp_wit.coefficients_for_H.begin()+ssp_wit.degree()+1,
         chunks);
-    libff::leave_block("Compute H_g1, the 3rd component of the proof", false);
+    //libff::leave_block("Compute H_g1, the 3rd component of the proof", false);
 
-    libff::enter_block("Compute V_g2, the 4th component of the proof", false);
+    //libff::enter_block("Compute V_g2, the 4th component of the proof", false);
     V_g2 = V_g2 + libff::multi_exp<libff::G2<ppT>,
                                    libff::Fr<ppT>,
                                    libff::multi_exp_method_BDLO12>(
         pk.V_g2_query.begin()+1, pk.V_g2_query.begin()+ssp_wit.num_variables()+1,
         ssp_wit.coefficients_for_Vs.begin(), ssp_wit.coefficients_for_Vs.begin()+ssp_wit.num_variables(),
         chunks);
-    libff::leave_block("Compute V_g2, the 4th component of the proof", false);
+    //libff::leave_block("Compute V_g2, the 4th component of the proof", false);
 
-    libff::leave_block("Compute the proof");
+    //libff::leave_block("Compute the proof");
 
-    libff::leave_block("Call to uscs_ppzksnark_prover");
+    //libff::leave_block("Call to uscs_ppzksnark_prover");
 
     uscs_ppzksnark_proof<ppT> proof = uscs_ppzksnark_proof<ppT>(std::move(V_g1), std::move(alpha_V_g1), std::move(H_g1), std::move(V_g2));
 
@@ -424,7 +424,7 @@ uscs_ppzksnark_proof<ppT> uscs_ppzksnark_prover(const uscs_ppzksnark_proving_key
 template <typename ppT>
 uscs_ppzksnark_processed_verification_key<ppT> uscs_ppzksnark_verifier_process_vk(const uscs_ppzksnark_verification_key<ppT> &vk)
 {
-    libff::enter_block("Call to uscs_ppzksnark_verifier_process_vk");
+    //libff::enter_block("Call to uscs_ppzksnark_verifier_process_vk");
 
     uscs_ppzksnark_processed_verification_key<ppT> pvk;
 
@@ -439,7 +439,7 @@ uscs_ppzksnark_processed_verification_key<ppT> uscs_ppzksnark_verifier_process_v
 
     pvk.encoded_IC_query = vk.encoded_IC_query;
 
-    libff::leave_block("Call to uscs_ppzksnark_verifier_process_vk");
+    //libff::leave_block("Call to uscs_ppzksnark_verifier_process_vk");
 
     return pvk;
 }
@@ -449,18 +449,18 @@ bool uscs_ppzksnark_online_verifier_weak_IC(const uscs_ppzksnark_processed_verif
                                             const uscs_ppzksnark_primary_input<ppT> &primary_input,
                                             const uscs_ppzksnark_proof<ppT> &proof)
 {
-    libff::enter_block("Call to uscs_ppzksnark_online_verifier_weak_IC");
+    //libff::enter_block("Call to uscs_ppzksnark_online_verifier_weak_IC");
     assert(pvk.encoded_IC_query.domain_size() >= primary_input.size());
 
-    libff::enter_block("Compute input-dependent part of V");
+    //libff::enter_block("Compute input-dependent part of V");
     const accumulation_vector<libff::G1<ppT> > accumulated_IC = pvk.encoded_IC_query.template accumulate_chunk<libff::Fr<ppT> >(primary_input.begin(), primary_input.end(), 0);
     assert(accumulated_IC.is_fully_accumulated());
     const libff::G1<ppT> &acc = accumulated_IC.first;
-    libff::leave_block("Compute input-dependent part of V");
+    //libff::leave_block("Compute input-dependent part of V");
 
     bool result = true;
 
-    libff::enter_block("Check if the proof is well-formed");
+    //libff::enter_block("Check if the proof is well-formed");
     if (!proof.is_well_formed())
     {
         if (!libff::inhibit_profiling_info)
@@ -469,11 +469,11 @@ bool uscs_ppzksnark_online_verifier_weak_IC(const uscs_ppzksnark_processed_verif
         }
         result = false;
     }
-    libff::leave_block("Check if the proof is well-formed");
+    //libff::leave_block("Check if the proof is well-formed");
 
-    libff::enter_block("Online pairing computations");
+    //libff::enter_block("Online pairing computations");
 
-    libff::enter_block("Check knowledge commitment for V is valid");
+    //libff::enter_block("Check knowledge commitment for V is valid");
     libff::G1_precomp<ppT> proof_V_g1_with_acc_precomp = ppT::precompute_G1(proof.V_g1 + acc);
     libff::G2_precomp<ppT> proof_V_g2_precomp = ppT::precompute_G2(proof.V_g2);
     libff::Fqk<ppT> V_1 = ppT::miller_loop(proof_V_g1_with_acc_precomp,    pvk.pp_G2_one_precomp);
@@ -487,9 +487,9 @@ bool uscs_ppzksnark_online_verifier_weak_IC(const uscs_ppzksnark_processed_verif
         }
         result = false;
     }
-    libff::leave_block("Check knowledge commitment for V is valid");
+    //libff::leave_block("Check knowledge commitment for V is valid");
 
-    libff::enter_block("Check SSP divisibility"); // i.e., check that V^2=H*Z+1
+    //libff::enter_block("Check SSP divisibility"); // i.e., check that V^2=H*Z+1
     libff::G1_precomp<ppT> proof_H_g1_precomp = ppT::precompute_G1(proof.H_g1);
     libff::Fqk<ppT> SSP_1  = ppT::miller_loop(proof_V_g1_with_acc_precomp,  proof_V_g2_precomp);
     libff::Fqk<ppT> SSP_2  = ppT::miller_loop(proof_H_g1_precomp, pvk.vk_Z_g2_precomp);
@@ -502,9 +502,9 @@ bool uscs_ppzksnark_online_verifier_weak_IC(const uscs_ppzksnark_processed_verif
         }
         result = false;
     }
-    libff::leave_block("Check SSP divisibility");
+    //libff::leave_block("Check SSP divisibility");
 
-    libff::enter_block("Check same coefficients were used");
+    //libff::enter_block("Check same coefficients were used");
     libff::G1_precomp<ppT> proof_V_g1_precomp = ppT::precompute_G1(proof.V_g1);
     libff::G1_precomp<ppT> proof_alpha_V_g1_precomp = ppT::precompute_G1(proof.alpha_V_g1);
     libff::Fqk<ppT> alpha_V_1 = ppT::miller_loop(proof_V_g1_precomp, pvk.vk_alpha_tilde_g2_precomp);
@@ -518,11 +518,11 @@ bool uscs_ppzksnark_online_verifier_weak_IC(const uscs_ppzksnark_processed_verif
         }
         result = false;
     }
-    libff::leave_block("Check same coefficients were used");
+    //libff::leave_block("Check same coefficients were used");
 
-    libff::leave_block("Online pairing computations");
+    //libff::leave_block("Online pairing computations");
 
-    libff::leave_block("Call to uscs_ppzksnark_online_verifier_weak_IC");
+    //libff::leave_block("Call to uscs_ppzksnark_online_verifier_weak_IC");
 
     return result;
 }
@@ -532,10 +532,10 @@ bool uscs_ppzksnark_verifier_weak_IC(const uscs_ppzksnark_verification_key<ppT> 
                                      const uscs_ppzksnark_primary_input<ppT> &primary_input,
                                      const uscs_ppzksnark_proof<ppT> &proof)
 {
-    libff::enter_block("Call to uscs_ppzksnark_verifier_weak_IC");
+    //libff::enter_block("Call to uscs_ppzksnark_verifier_weak_IC");
     uscs_ppzksnark_processed_verification_key<ppT> pvk = uscs_ppzksnark_verifier_process_vk<ppT>(vk);
     bool result = uscs_ppzksnark_online_verifier_weak_IC<ppT>(pvk, primary_input, proof);
-    libff::leave_block("Call to uscs_ppzksnark_verifier_weak_IC");
+    //libff::leave_block("Call to uscs_ppzksnark_verifier_weak_IC");
     return result;
 }
 
@@ -545,7 +545,7 @@ bool uscs_ppzksnark_online_verifier_strong_IC(const uscs_ppzksnark_processed_ver
                                               const uscs_ppzksnark_proof<ppT> &proof)
 {
     bool result = true;
-    libff::enter_block("Call to uscs_ppzksnark_online_verifier_strong_IC");
+    //libff::enter_block("Call to uscs_ppzksnark_online_verifier_strong_IC");
 
     if (pvk.encoded_IC_query.domain_size() != primary_input.size())
     {
@@ -557,7 +557,7 @@ bool uscs_ppzksnark_online_verifier_strong_IC(const uscs_ppzksnark_processed_ver
         result = uscs_ppzksnark_online_verifier_weak_IC(pvk, primary_input, proof);
     }
 
-    libff::leave_block("Call to uscs_ppzksnark_online_verifier_strong_IC");
+    //libff::leave_block("Call to uscs_ppzksnark_online_verifier_strong_IC");
     return result;
 }
 
@@ -566,10 +566,10 @@ bool uscs_ppzksnark_verifier_strong_IC(const uscs_ppzksnark_verification_key<ppT
                                        const uscs_ppzksnark_primary_input<ppT> &primary_input,
                                        const uscs_ppzksnark_proof<ppT> &proof)
 {
-    libff::enter_block("Call to uscs_ppzksnark_verifier_strong_IC");
+    //libff::enter_block("Call to uscs_ppzksnark_verifier_strong_IC");
     uscs_ppzksnark_processed_verification_key<ppT> pvk = uscs_ppzksnark_verifier_process_vk<ppT>(vk);
     bool result = uscs_ppzksnark_online_verifier_strong_IC<ppT>(pvk, primary_input, proof);
-    libff::leave_block("Call to uscs_ppzksnark_verifier_strong_IC");
+    //libff::leave_block("Call to uscs_ppzksnark_verifier_strong_IC");
     return result;
 }
 

@@ -55,9 +55,9 @@ int main(int argc, const char * argv[])
     const int num_constraints = atoi(argv[1]);
     const int input_size = atoi(argv[2]);
 
-    libff::enter_block("Generate USCS example");
+    //libff::enter_block("Generate USCS example");
     uscs_example<libff::Fr<default_uscs_ppzksnark_pp> > example = generate_uscs_example_with_field_input<libff::Fr<default_uscs_ppzksnark_pp> >(num_constraints, input_size);
-    libff::leave_block("Generate USCS example");
+    //libff::leave_block("Generate USCS example");
 
     libff::print_header("(enter) Profile USCS ppzkSNARK");
     const bool test_serialization = true;

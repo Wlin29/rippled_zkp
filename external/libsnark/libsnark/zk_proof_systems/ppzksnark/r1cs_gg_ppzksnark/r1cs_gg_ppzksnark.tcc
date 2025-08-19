@@ -211,7 +211,7 @@ r1cs_gg_ppzksnark_verification_key<ppT> r1cs_gg_ppzksnark_verification_key<ppT>:
 template <typename ppT>
 r1cs_gg_ppzksnark_keypair<ppT> r1cs_gg_ppzksnark_generator(const r1cs_gg_ppzksnark_constraint_system<ppT> &r1cs)
 {
-    libff::enter_block("Call to r1cs_gg_ppzksnark_generator");
+    //libff::enter_block("Call to r1cs_gg_ppzksnark_generator");
 
     /* Make the B_query "lighter" if possible */
     r1cs_gg_ppzksnark_constraint_system<ppT> r1cs_copy(r1cs);
@@ -234,7 +234,7 @@ r1cs_gg_ppzksnark_keypair<ppT> r1cs_gg_ppzksnark_generator(const r1cs_gg_ppzksna
     libff::print_indent(); printf("* QAP degree: %zu\n", qap.degree());
     libff::print_indent(); printf("* QAP number of input variables: %zu\n", qap.num_inputs());
 
-    libff::enter_block("Compute query densities");
+    //libff::enter_block("Compute query densities");
     size_t non_zero_At = 0;
     size_t non_zero_Bt = 0;
     for (size_t i = 0; i < qap.num_variables() + 1; ++i)
@@ -248,7 +248,7 @@ r1cs_gg_ppzksnark_keypair<ppT> r1cs_gg_ppzksnark_generator(const r1cs_gg_ppzksna
             ++non_zero_Bt;
         }
     }
-    libff::leave_block("Compute query densities");
+    //libff::leave_block("Compute query densities");
 
     /* qap.{At,Bt,Ct,Ht} are now in unspecified state, but we do not use them later */
     libff::Fr_vector<ppT> At = std::move(qap.At);
@@ -257,7 +257,7 @@ r1cs_gg_ppzksnark_keypair<ppT> r1cs_gg_ppzksnark_generator(const r1cs_gg_ppzksna
     libff::Fr_vector<ppT> Ht = std::move(qap.Ht);
 
     /* The gamma inverse product component: (beta*A_i(t) + alpha*B_i(t) + C_i(t)) * gamma^{-1}. */
-    libff::enter_block("Compute gamma_ABC for R1CS verification key");
+    //libff::enter_block("Compute gamma_ABC for R1CS verification key");
     libff::Fr_vector<ppT> gamma_ABC;
     gamma_ABC.reserve(qap.num_inputs());
 
@@ -266,10 +266,10 @@ r1cs_gg_ppzksnark_keypair<ppT> r1cs_gg_ppzksnark_generator(const r1cs_gg_ppzksna
     {
         gamma_ABC.emplace_back((beta * At[i] + alpha * Bt[i] + Ct[i]) * gamma_inverse);
     }
-    libff::leave_block("Compute gamma_ABC for R1CS verification key");
+    //libff::leave_block("Compute gamma_ABC for R1CS verification key");
 
     /* The delta inverse product component: (beta*A_i(t) + alpha*B_i(t) + C_i(t)) * delta^{-1}. */
-    libff::enter_block("Compute L query for R1CS proving key");
+    //libff::enter_block("Compute L query for R1CS proving key");
     libff::Fr_vector<ppT> Lt;
     Lt.reserve(qap.num_variables() - qap.num_inputs());
 
@@ -278,7 +278,7 @@ r1cs_gg_ppzksnark_keypair<ppT> r1cs_gg_ppzksnark_generator(const r1cs_gg_ppzksna
     {
         Lt.emplace_back((beta * At[Lt_offset + i] + alpha * Bt[Lt_offset + i] + Ct[Lt_offset + i]) * delta_inverse);
     }
-    libff::leave_block("Compute L query for R1CS proving key");
+    //libff::leave_block("Compute L query for R1CS proving key");
 
     /**
      * Note that H for Groth's proof system is degree d-2, but the QAP
@@ -293,7 +293,7 @@ r1cs_gg_ppzksnark_keypair<ppT> r1cs_gg_ppzksnark_generator(const r1cs_gg_ppzksna
     const size_t chunks = 1;
 #endif
 
-    libff::enter_block("Generating G1 MSM window table");
+    //libff::enter_block("Generating G1 MSM window table");
     const libff::G1<ppT> g1_generator = libff::G1<ppT>::random_element();
     const size_t g1_scalar_count = non_zero_At + non_zero_Bt + qap.num_variables();
     const size_t g1_scalar_size = libff::Fr<ppT>::size_in_bits();
@@ -301,9 +301,9 @@ r1cs_gg_ppzksnark_keypair<ppT> r1cs_gg_ppzksnark_generator(const r1cs_gg_ppzksna
 
     libff::print_indent(); printf("* G1 window: %zu\n", g1_window_size);
     libff::window_table<libff::G1<ppT> > g1_table = libff::get_window_table(g1_scalar_size, g1_window_size, g1_generator);
-    libff::leave_block("Generating G1 MSM window table");
+    //libff::leave_block("Generating G1 MSM window table");
 
-    libff::enter_block("Generating G2 MSM window table");
+    //libff::enter_block("Generating G2 MSM window table");
     const libff::G2<ppT> G2_gen = libff::G2<ppT>::random_element();
     const size_t g2_scalar_count = non_zero_Bt;
     const size_t g2_scalar_size = libff::Fr<ppT>::size_in_bits();
@@ -311,57 +311,57 @@ r1cs_gg_ppzksnark_keypair<ppT> r1cs_gg_ppzksnark_generator(const r1cs_gg_ppzksna
 
     libff::print_indent(); printf("* G2 window: %zu\n", g2_window_size);
     libff::window_table<libff::G2<ppT> > g2_table = libff::get_window_table(g2_scalar_size, g2_window_size, G2_gen);
-    libff::leave_block("Generating G2 MSM window table");
+    //libff::leave_block("Generating G2 MSM window table");
 
-    libff::enter_block("Generate R1CS proving key");
+    //libff::enter_block("Generate R1CS proving key");
     libff::G1<ppT> alpha_g1 = alpha * g1_generator;
     libff::G1<ppT> beta_g1 = beta * g1_generator;
     libff::G2<ppT> beta_g2 = beta * G2_gen;
     libff::G1<ppT> delta_g1 = delta * g1_generator;
     libff::G2<ppT> delta_g2 = delta * G2_gen;
 
-    libff::enter_block("Generate queries");
-    libff::enter_block("Compute the A-query", false);
+    //libff::enter_block("Generate queries");
+    //libff::enter_block("Compute the A-query", false);
     libff::G1_vector<ppT> A_query = batch_exp(g1_scalar_size, g1_window_size, g1_table, At);
 #ifdef USE_MIXED_ADDITION
     libff::batch_to_special<libff::G1<ppT> >(A_query);
 #endif
-    libff::leave_block("Compute the A-query", false);
+    //libff::leave_block("Compute the A-query", false);
 
-    libff::enter_block("Compute the B-query", false);
+    //libff::enter_block("Compute the B-query", false);
     knowledge_commitment_vector<libff::G2<ppT>, libff::G1<ppT> > B_query = kc_batch_exp(libff::Fr<ppT>::size_in_bits(), g2_window_size, g1_window_size, g2_table, g1_table, libff::Fr<ppT>::one(), libff::Fr<ppT>::one(), Bt, chunks);
     // NOTE: if USE_MIXED_ADDITION is defined,
     // kc_batch_exp will convert its output to special form internally
-    libff::leave_block("Compute the B-query", false);
+    //libff::leave_block("Compute the B-query", false);
 
-    libff::enter_block("Compute the H-query", false);
+    //libff::enter_block("Compute the H-query", false);
     libff::G1_vector<ppT> H_query = batch_exp_with_coeff(g1_scalar_size, g1_window_size, g1_table, qap.Zt * delta_inverse, Ht);
 #ifdef USE_MIXED_ADDITION
     libff::batch_to_special<libff::G1<ppT> >(H_query);
 #endif
-    libff::leave_block("Compute the H-query", false);
+    //libff::leave_block("Compute the H-query", false);
 
-    libff::enter_block("Compute the L-query", false);
+    //libff::enter_block("Compute the L-query", false);
     libff::G1_vector<ppT> L_query = batch_exp(g1_scalar_size, g1_window_size, g1_table, Lt);
 #ifdef USE_MIXED_ADDITION
     libff::batch_to_special<libff::G1<ppT> >(L_query);
 #endif
-    libff::leave_block("Compute the L-query", false);
-    libff::leave_block("Generate queries");
+    //libff::leave_block("Compute the L-query", false);
+    //libff::leave_block("Generate queries");
 
-    libff::leave_block("Generate R1CS proving key");
+    //libff::leave_block("Generate R1CS proving key");
 
-    libff::enter_block("Generate R1CS verification key");
+    //libff::enter_block("Generate R1CS verification key");
     libff::GT<ppT> alpha_g1_beta_g2 = ppT::reduced_pairing(alpha_g1, beta_g2);
     libff::G2<ppT> gamma_g2 = gamma * G2_gen;
 
-    libff::enter_block("Encode gamma_ABC for R1CS verification key");
+    //libff::enter_block("Encode gamma_ABC for R1CS verification key");
     libff::G1<ppT> gamma_ABC_g1_0 = gamma_ABC_0 * g1_generator;
     libff::G1_vector<ppT> gamma_ABC_g1_values = batch_exp(g1_scalar_size, g1_window_size, g1_table, gamma_ABC);
-    libff::leave_block("Encode gamma_ABC for R1CS verification key");
-    libff::leave_block("Generate R1CS verification key");
+    //libff::leave_block("Encode gamma_ABC for R1CS verification key");
+    //libff::leave_block("Generate R1CS verification key");
 
-    libff::leave_block("Call to r1cs_gg_ppzksnark_generator");
+    //libff::leave_block("Call to r1cs_gg_ppzksnark_generator");
 
     accumulation_vector<libff::G1<ppT> > gamma_ABC_g1(std::move(gamma_ABC_g1_0), std::move(gamma_ABC_g1_values));
 
@@ -392,13 +392,13 @@ r1cs_gg_ppzksnark_proof<ppT> r1cs_gg_ppzksnark_prover(const r1cs_gg_ppzksnark_pr
                                                       const r1cs_gg_ppzksnark_primary_input<ppT> &primary_input,
                                                       const r1cs_gg_ppzksnark_auxiliary_input<ppT> &auxiliary_input)
 {
-    libff::enter_block("Call to r1cs_gg_ppzksnark_prover");
+    //libff::enter_block("Call to r1cs_gg_ppzksnark_prover");
 
 #ifdef DEBUG
     assert(pk.constraint_system.is_satisfied(primary_input, auxiliary_input));
 #endif
 
-    libff::enter_block("Compute the polynomial H");
+    //libff::enter_block("Compute the polynomial H");
     const qap_witness<libff::Fr<ppT> > qap_wit = r1cs_to_qap_witness_map(pk.constraint_system, primary_input, auxiliary_input, libff::Fr<ppT>::zero(), libff::Fr<ppT>::zero(), libff::Fr<ppT>::zero());
 
     /* We are dividing degree 2(d-1) polynomial by degree d polynomial
@@ -406,7 +406,7 @@ r1cs_gg_ppzksnark_proof<ppT> r1cs_gg_ppzksnark_prover(const r1cs_gg_ppzksnark_pr
     assert(!qap_wit.coefficients_for_H[qap_wit.degree()-2].is_zero());
     assert(qap_wit.coefficients_for_H[qap_wit.degree()-1].is_zero());
     assert(qap_wit.coefficients_for_H[qap_wit.degree()].is_zero());
-    libff::leave_block("Compute the polynomial H");
+    //libff::leave_block("Compute the polynomial H");
 
 #ifdef DEBUG
     const libff::Fr<ppT> t = libff::Fr<ppT>::random_element();
@@ -432,9 +432,9 @@ r1cs_gg_ppzksnark_proof<ppT> r1cs_gg_ppzksnark_prover(const r1cs_gg_ppzksnark_pr
     const size_t chunks = 1;
 #endif
 
-    libff::enter_block("Compute the proof");
+    //libff::enter_block("Compute the proof");
 
-    libff::enter_block("Compute evaluation to A-query", false);
+    //libff::enter_block("Compute evaluation to A-query", false);
     // TODO: sort out indexing
     libff::Fr_vector<ppT> const_padded_assignment(1, libff::Fr<ppT>::one());
     const_padded_assignment.insert(const_padded_assignment.end(), qap_wit.coefficients_for_ABCs.begin(), qap_wit.coefficients_for_ABCs.end());
@@ -447,9 +447,9 @@ r1cs_gg_ppzksnark_proof<ppT> r1cs_gg_ppzksnark_prover(const r1cs_gg_ppzksnark_pr
         const_padded_assignment.begin(),
         const_padded_assignment.begin() + qap_wit.num_variables() + 1,
         chunks);
-    libff::leave_block("Compute evaluation to A-query", false);
+    //libff::leave_block("Compute evaluation to A-query", false);
 
-    libff::enter_block("Compute evaluation to B-query", false);
+    //libff::enter_block("Compute evaluation to B-query", false);
     knowledge_commitment<libff::G2<ppT>, libff::G1<ppT> > evaluation_Bt = kc_multi_exp_with_mixed_addition<libff::G2<ppT>,
                                                                                                            libff::G1<ppT>,
                                                                                                            libff::Fr<ppT>,
@@ -460,9 +460,9 @@ r1cs_gg_ppzksnark_proof<ppT> r1cs_gg_ppzksnark_prover(const r1cs_gg_ppzksnark_pr
         const_padded_assignment.begin(),
         const_padded_assignment.begin() + qap_wit.num_variables() + 1,
         chunks);
-    libff::leave_block("Compute evaluation to B-query", false);
+    //libff::leave_block("Compute evaluation to B-query", false);
 
-    libff::enter_block("Compute evaluation to H-query", false);
+    //libff::enter_block("Compute evaluation to H-query", false);
     libff::G1<ppT> evaluation_Ht = libff::multi_exp<libff::G1<ppT>,
                                                     libff::Fr<ppT>,
                                                     libff::multi_exp_method_BDLO12>(
@@ -471,9 +471,9 @@ r1cs_gg_ppzksnark_proof<ppT> r1cs_gg_ppzksnark_prover(const r1cs_gg_ppzksnark_pr
         qap_wit.coefficients_for_H.begin(),
         qap_wit.coefficients_for_H.begin() + (qap_wit.degree() - 1),
         chunks);
-    libff::leave_block("Compute evaluation to H-query", false);
+    //libff::leave_block("Compute evaluation to H-query", false);
 
-    libff::enter_block("Compute evaluation to L-query", false);
+    //libff::enter_block("Compute evaluation to L-query", false);
     libff::G1<ppT> evaluation_Lt = libff::multi_exp_with_mixed_addition<libff::G1<ppT>,
                                                                         libff::Fr<ppT>,
                                                                         libff::multi_exp_method_BDLO12>(
@@ -482,7 +482,7 @@ r1cs_gg_ppzksnark_proof<ppT> r1cs_gg_ppzksnark_prover(const r1cs_gg_ppzksnark_pr
         const_padded_assignment.begin() + qap_wit.num_inputs() + 1,
         const_padded_assignment.begin() + qap_wit.num_variables() + 1,
         chunks);
-    libff::leave_block("Compute evaluation to L-query", false);
+    //libff::leave_block("Compute evaluation to L-query", false);
 
     /* A = alpha + sum_i(a_i*A_i(t)) + r*delta */
     libff::G1<ppT> g1_A = pk.alpha_g1 + evaluation_At + r * pk.delta_g1;
@@ -494,9 +494,9 @@ r1cs_gg_ppzksnark_proof<ppT> r1cs_gg_ppzksnark_prover(const r1cs_gg_ppzksnark_pr
     /* C = sum_i(a_i*((beta*A_i(t) + alpha*B_i(t) + C_i(t)) + H(t)*Z(t))/delta) + A*s + r*b - r*s*delta */
     libff::G1<ppT> g1_C = evaluation_Ht + evaluation_Lt + s *  g1_A + r * g1_B - (r * s) * pk.delta_g1;
 
-    libff::leave_block("Compute the proof");
+    //libff::leave_block("Compute the proof");
 
-    libff::leave_block("Call to r1cs_gg_ppzksnark_prover");
+    //libff::leave_block("Call to r1cs_gg_ppzksnark_prover");
 
     r1cs_gg_ppzksnark_proof<ppT> proof = r1cs_gg_ppzksnark_proof<ppT>(std::move(g1_A), std::move(g2_B), std::move(g1_C));
     proof.print_size();
@@ -507,7 +507,7 @@ r1cs_gg_ppzksnark_proof<ppT> r1cs_gg_ppzksnark_prover(const r1cs_gg_ppzksnark_pr
 template <typename ppT>
 r1cs_gg_ppzksnark_processed_verification_key<ppT> r1cs_gg_ppzksnark_verifier_process_vk(const r1cs_gg_ppzksnark_verification_key<ppT> &vk)
 {
-    libff::enter_block("Call to r1cs_gg_ppzksnark_verifier_process_vk");
+    //libff::enter_block("Call to r1cs_gg_ppzksnark_verifier_process_vk");
 
     r1cs_gg_ppzksnark_processed_verification_key<ppT> pvk;
     pvk.vk_alpha_g1_beta_g2 = vk.alpha_g1_beta_g2;
@@ -515,7 +515,7 @@ r1cs_gg_ppzksnark_processed_verification_key<ppT> r1cs_gg_ppzksnark_verifier_pro
     pvk.vk_delta_g2_precomp = ppT::precompute_G2(vk.delta_g2);
     pvk.gamma_ABC_g1 = vk.gamma_ABC_g1;
 
-    libff::leave_block("Call to r1cs_gg_ppzksnark_verifier_process_vk");
+    //libff::leave_block("Call to r1cs_gg_ppzksnark_verifier_process_vk");
 
     return pvk;
 }
@@ -525,17 +525,17 @@ bool r1cs_gg_ppzksnark_online_verifier_weak_IC(const r1cs_gg_ppzksnark_processed
                                                const r1cs_gg_ppzksnark_primary_input<ppT> &primary_input,
                                                const r1cs_gg_ppzksnark_proof<ppT> &proof)
 {
-    libff::enter_block("Call to r1cs_gg_ppzksnark_online_verifier_weak_IC");
+    //libff::enter_block("Call to r1cs_gg_ppzksnark_online_verifier_weak_IC");
     assert(pvk.gamma_ABC_g1.domain_size() >= primary_input.size());
 
-    libff::enter_block("Accumulate input");
+    //libff::enter_block("Accumulate input");
     const accumulation_vector<libff::G1<ppT> > accumulated_IC = pvk.gamma_ABC_g1.template accumulate_chunk<libff::Fr<ppT> >(primary_input.begin(), primary_input.end(), 0);
     const libff::G1<ppT> &acc = accumulated_IC.first;
-    libff::leave_block("Accumulate input");
+    //libff::leave_block("Accumulate input");
 
     bool result = true;
 
-    libff::enter_block("Check if the proof is well-formed");
+    //libff::enter_block("Check if the proof is well-formed");
     if (!proof.is_well_formed())
     {
         if (!libff::inhibit_profiling_info)
@@ -544,10 +544,10 @@ bool r1cs_gg_ppzksnark_online_verifier_weak_IC(const r1cs_gg_ppzksnark_processed
         }
         result = false;
     }
-    libff::leave_block("Check if the proof is well-formed");
+    //libff::leave_block("Check if the proof is well-formed");
 
-    libff::enter_block("Online pairing computations");
-    libff::enter_block("Check QAP divisibility");
+    //libff::enter_block("Online pairing computations");
+    //libff::enter_block("Check QAP divisibility");
     const libff::G1_precomp<ppT> proof_g_A_precomp = ppT::precompute_G1(proof.g_A);
     const libff::G2_precomp<ppT> proof_g_B_precomp = ppT::precompute_G2(proof.g_B);
     const libff::G1_precomp<ppT> proof_g_C_precomp = ppT::precompute_G1(proof.g_C);
@@ -567,10 +567,10 @@ bool r1cs_gg_ppzksnark_online_verifier_weak_IC(const r1cs_gg_ppzksnark_processed
         }
         result = false;
     }
-    libff::leave_block("Check QAP divisibility");
-    libff::leave_block("Online pairing computations");
+    //libff::leave_block("Check QAP divisibility");
+    //libff::leave_block("Online pairing computations");
 
-    libff::leave_block("Call to r1cs_gg_ppzksnark_online_verifier_weak_IC");
+    //libff::leave_block("Call to r1cs_gg_ppzksnark_online_verifier_weak_IC");
 
     return result;
 }
@@ -580,10 +580,10 @@ bool r1cs_gg_ppzksnark_verifier_weak_IC(const r1cs_gg_ppzksnark_verification_key
                                         const r1cs_gg_ppzksnark_primary_input<ppT> &primary_input,
                                         const r1cs_gg_ppzksnark_proof<ppT> &proof)
 {
-    libff::enter_block("Call to r1cs_gg_ppzksnark_verifier_weak_IC");
+    //libff::enter_block("Call to r1cs_gg_ppzksnark_verifier_weak_IC");
     r1cs_gg_ppzksnark_processed_verification_key<ppT> pvk = r1cs_gg_ppzksnark_verifier_process_vk<ppT>(vk);
     bool result = r1cs_gg_ppzksnark_online_verifier_weak_IC<ppT>(pvk, primary_input, proof);
-    libff::leave_block("Call to r1cs_gg_ppzksnark_verifier_weak_IC");
+    //libff::leave_block("Call to r1cs_gg_ppzksnark_verifier_weak_IC");
     return result;
 }
 
@@ -593,7 +593,7 @@ bool r1cs_gg_ppzksnark_online_verifier_strong_IC(const r1cs_gg_ppzksnark_process
                                                  const r1cs_gg_ppzksnark_proof<ppT> &proof)
 {
     bool result = true;
-    libff::enter_block("Call to r1cs_gg_ppzksnark_online_verifier_strong_IC");
+    //libff::enter_block("Call to r1cs_gg_ppzksnark_online_verifier_strong_IC");
 
     if (pvk.gamma_ABC_g1.domain_size() != primary_input.size())
     {
@@ -605,7 +605,7 @@ bool r1cs_gg_ppzksnark_online_verifier_strong_IC(const r1cs_gg_ppzksnark_process
         result = r1cs_gg_ppzksnark_online_verifier_weak_IC(pvk, primary_input, proof);
     }
 
-    libff::leave_block("Call to r1cs_gg_ppzksnark_online_verifier_strong_IC");
+    //libff::leave_block("Call to r1cs_gg_ppzksnark_online_verifier_strong_IC");
     return result;
 }
 
@@ -614,10 +614,10 @@ bool r1cs_gg_ppzksnark_verifier_strong_IC(const r1cs_gg_ppzksnark_verification_k
                                           const r1cs_gg_ppzksnark_primary_input<ppT> &primary_input,
                                           const r1cs_gg_ppzksnark_proof<ppT> &proof)
 {
-    libff::enter_block("Call to r1cs_gg_ppzksnark_verifier_strong_IC");
+    //libff::enter_block("Call to r1cs_gg_ppzksnark_verifier_strong_IC");
     r1cs_gg_ppzksnark_processed_verification_key<ppT> pvk = r1cs_gg_ppzksnark_verifier_process_vk<ppT>(vk);
     bool result = r1cs_gg_ppzksnark_online_verifier_strong_IC<ppT>(pvk, primary_input, proof);
-    libff::leave_block("Call to r1cs_gg_ppzksnark_verifier_strong_IC");
+    //libff::leave_block("Call to r1cs_gg_ppzksnark_verifier_strong_IC");
     return result;
 }
 
@@ -626,20 +626,20 @@ bool r1cs_gg_ppzksnark_affine_verifier_weak_IC(const r1cs_gg_ppzksnark_verificat
                                                const r1cs_gg_ppzksnark_primary_input<ppT> &primary_input,
                                                const r1cs_gg_ppzksnark_proof<ppT> &proof)
 {
-    libff::enter_block("Call to r1cs_gg_ppzksnark_affine_verifier_weak_IC");
+    //libff::enter_block("Call to r1cs_gg_ppzksnark_affine_verifier_weak_IC");
     assert(vk.gamma_ABC_g1.domain_size() >= primary_input.size());
 
     libff::affine_ate_G2_precomp<ppT> pvk_vk_gamma_g2_precomp = ppT::affine_ate_precompute_G2(vk.gamma_g2);
     libff::affine_ate_G2_precomp<ppT> pvk_vk_delta_g2_precomp = ppT::affine_ate_precompute_G2(vk.delta_g2);
 
-    libff::enter_block("Accumulate input");
+    //libff::enter_block("Accumulate input");
     const accumulation_vector<libff::G1<ppT> > accumulated_IC = vk.gamma_ABC_g1.template accumulate_chunk<libff::Fr<ppT> >(primary_input.begin(), primary_input.end(), 0);
     const libff::G1<ppT> &acc = accumulated_IC.first;
-    libff::leave_block("Accumulate input");
+    //libff::leave_block("Accumulate input");
 
     bool result = true;
 
-    libff::enter_block("Check if the proof is well-formed");
+    //libff::enter_block("Check if the proof is well-formed");
     if (!proof.is_well_formed())
     {
         if (!libff::inhibit_profiling_info)
@@ -648,9 +648,9 @@ bool r1cs_gg_ppzksnark_affine_verifier_weak_IC(const r1cs_gg_ppzksnark_verificat
         }
         result = false;
     }
-    libff::leave_block("Check if the proof is well-formed");
+    //libff::leave_block("Check if the proof is well-formed");
 
-    libff::enter_block("Check QAP divisibility");
+    //libff::enter_block("Check QAP divisibility");
     const libff::affine_ate_G1_precomp<ppT> proof_g_A_precomp = ppT::affine_ate_precompute_G1(proof.g_A);
     const libff::affine_ate_G2_precomp<ppT> proof_g_B_precomp = ppT::affine_ate_precompute_G2(proof.g_B);
     const libff::affine_ate_G1_precomp<ppT> proof_g_C_precomp = ppT::affine_ate_precompute_G1(proof.g_C);
@@ -670,9 +670,9 @@ bool r1cs_gg_ppzksnark_affine_verifier_weak_IC(const r1cs_gg_ppzksnark_verificat
         }
         result = false;
     }
-    libff::leave_block("Check QAP divisibility");
+    //libff::leave_block("Check QAP divisibility");
 
-    libff::leave_block("Call to r1cs_gg_ppzksnark_affine_verifier_weak_IC");
+    //libff::leave_block("Call to r1cs_gg_ppzksnark_affine_verifier_weak_IC");
 
     return result;
 }

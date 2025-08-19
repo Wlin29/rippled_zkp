@@ -117,13 +117,13 @@ int main(int argc, const char * argv[])
     std::ifstream f_primary_input(primary_input_fn);
     std::ifstream f_auxiliary_input(auxiliary_input_fn);
 
-    libff::enter_block("Loading primary input");
+    //libff::enter_block("Loading primary input");
     tinyram_input_tape primary_input = load_tape(f_primary_input);
-    libff::leave_block("Loading primary input");
+    //libff::leave_block("Loading primary input");
 
-    libff::enter_block("Loading auxiliary input");
+    //libff::enter_block("Loading auxiliary input");
     tinyram_input_tape auxiliary_input = load_tape(f_auxiliary_input);
-    libff::leave_block("Loading auxiliary input");
+    //libff::leave_block("Loading auxiliary input");
 
     printf("\nPress enter to continue.\n");
     std::cin.get();

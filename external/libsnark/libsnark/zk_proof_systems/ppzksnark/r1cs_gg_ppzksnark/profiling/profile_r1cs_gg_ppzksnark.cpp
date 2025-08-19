@@ -61,9 +61,9 @@ int main(int argc, const char * argv[])
         }
     }
 
-    libff::enter_block("Generate R1CS example");
+    //libff::enter_block("Generate R1CS example");
     r1cs_example<libff::Fr<default_r1cs_gg_ppzksnark_pp> > example = generate_r1cs_example_with_field_input<libff::Fr<default_r1cs_gg_ppzksnark_pp> >(num_constraints, input_size);
-    libff::leave_block("Generate R1CS example");
+    //libff::leave_block("Generate R1CS example");
 
     libff::print_header("(enter) Profile R1CS GG-ppzkSNARK");
     const bool test_serialization = true;

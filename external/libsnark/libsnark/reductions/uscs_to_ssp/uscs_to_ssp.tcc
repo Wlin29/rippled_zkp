@@ -33,11 +33,11 @@ namespace libsnark {
 template<typename FieldT>
 ssp_instance<FieldT> uscs_to_ssp_instance_map(const uscs_constraint_system<FieldT> &cs)
 {
-    libff::enter_block("Call to uscs_to_ssp_instance_map");
+    //libff::enter_block("Call to uscs_to_ssp_instance_map");
 
     const std::shared_ptr<libfqfft::evaluation_domain<FieldT> > domain = libfqfft::get_evaluation_domain<FieldT>(cs.num_constraints());
 
-    libff::enter_block("Compute polynomials V in Lagrange basis");
+    //libff::enter_block("Compute polynomials V in Lagrange basis");
     std::vector<std::map<size_t, FieldT> > V_in_Lagrange_basis(cs.num_variables()+1);
     for (size_t i = 0; i < cs.num_constraints(); ++i)
     {
@@ -50,9 +50,9 @@ ssp_instance<FieldT> uscs_to_ssp_instance_map(const uscs_constraint_system<Field
     {
         V_in_Lagrange_basis[0][i] += FieldT::one();
     }
-    libff::leave_block("Compute polynomials V in Lagrange basis");
+    //libff::leave_block("Compute polynomials V in Lagrange basis");
 
-    libff::leave_block("Call to uscs_to_ssp_instance_map");
+    //libff::leave_block("Call to uscs_to_ssp_instance_map");
 
     return ssp_instance<FieldT>(domain,
                                 cs.num_variables(),
@@ -77,7 +77,7 @@ template<typename FieldT>
 ssp_instance_evaluation<FieldT> uscs_to_ssp_instance_map_with_evaluation(const uscs_constraint_system<FieldT> &cs,
                                                                          const FieldT &t)
 {
-    libff::enter_block("Call to uscs_to_ssp_instance_map_with_evaluation");
+    //libff::enter_block("Call to uscs_to_ssp_instance_map_with_evaluation");
 
     const std::shared_ptr<libfqfft::evaluation_domain<FieldT> > domain = libfqfft::get_evaluation_domain<FieldT>(cs.num_constraints());
 
@@ -86,7 +86,7 @@ ssp_instance_evaluation<FieldT> uscs_to_ssp_instance_map_with_evaluation(const u
 
     const FieldT Zt = domain->compute_vanishing_polynomial(t);
 
-    libff::enter_block("Compute evaluations of V and H at t");
+    //libff::enter_block("Compute evaluations of V and H at t");
     const std::vector<FieldT> u = domain->evaluate_all_lagrange_polynomials(t);
     for (size_t i = 0; i < cs.num_constraints(); ++i)
     {
@@ -105,9 +105,9 @@ ssp_instance_evaluation<FieldT> uscs_to_ssp_instance_map_with_evaluation(const u
         Ht[i] = ti;
         ti *= t;
     }
-    libff::leave_block("Compute evaluations of V and H at t");
+    //libff::leave_block("Compute evaluations of V and H at t");
 
-    libff::leave_block("Call to uscs_to_ssp_instance_map_with_evaluation");
+    //libff::leave_block("Call to uscs_to_ssp_instance_map_with_evaluation");
 
     return ssp_instance_evaluation<FieldT>(domain,
                                            cs.num_variables(),
@@ -152,7 +152,7 @@ ssp_witness<FieldT> uscs_to_ssp_witness_map(const uscs_constraint_system<FieldT>
                                             const uscs_auxiliary_input<FieldT> &auxiliary_input,
                                             const FieldT &d)
 {
-    libff::enter_block("Call to uscs_to_ssp_witness_map");
+    //libff::enter_block("Call to uscs_to_ssp_witness_map");
 
     /* sanity check */
 
@@ -163,7 +163,7 @@ ssp_witness<FieldT> uscs_to_ssp_witness_map(const uscs_constraint_system<FieldT>
 
     const std::shared_ptr<libfqfft::evaluation_domain<FieldT> > domain = libfqfft::get_evaluation_domain<FieldT>(cs.num_constraints());
 
-    libff::enter_block("Compute evaluation of polynomial V on set S");
+    //libff::enter_block("Compute evaluation of polynomial V on set S");
     std::vector<FieldT> aA(domain->m, FieldT::zero());
     assert(domain->m >= cs.num_constraints());
     for (size_t i = 0; i < cs.num_constraints(); ++i)
@@ -174,13 +174,13 @@ ssp_witness<FieldT> uscs_to_ssp_witness_map(const uscs_constraint_system<FieldT>
     {
         aA[i] += FieldT::one();
     }
-    libff::leave_block("Compute evaluation of polynomial V on set S");
+    //libff::leave_block("Compute evaluation of polynomial V on set S");
 
-    libff::enter_block("Compute coefficients of polynomial V");
+    //libff::enter_block("Compute coefficients of polynomial V");
     domain->iFFT(aA);
-    libff::leave_block("Compute coefficients of polynomial V");
+    //libff::leave_block("Compute coefficients of polynomial V");
 
-    libff::enter_block("Compute ZK-patch");
+    //libff::enter_block("Compute ZK-patch");
     std::vector<FieldT> coefficients_for_H(domain->m+1, FieldT::zero());
 #ifdef MULTICORE
 #pragma omp parallel for
@@ -191,13 +191,13 @@ ssp_witness<FieldT> uscs_to_ssp_witness_map(const uscs_constraint_system<FieldT>
         coefficients_for_H[i] = FieldT(2)*d*aA[i];
     }
     domain->add_poly_Z(d.squared(), coefficients_for_H);
-    libff::leave_block("Compute ZK-patch");
+    //libff::leave_block("Compute ZK-patch");
 
-    libff::enter_block("Compute evaluation of polynomial V on set T");
+    //libff::enter_block("Compute evaluation of polynomial V on set T");
     domain->cosetFFT(aA, FieldT::multiplicative_generator);
-    libff::leave_block("Compute evaluation of polynomial V on set T");
+    //libff::leave_block("Compute evaluation of polynomial V on set T");
 
-    libff::enter_block("Compute evaluation of polynomial H on set T");
+    //libff::enter_block("Compute evaluation of polynomial H on set T");
     std::vector<FieldT> &H_tmp = aA; // can overwrite aA because it is not used later
 #ifdef MULTICORE
 #pragma omp parallel for
@@ -207,17 +207,17 @@ ssp_witness<FieldT> uscs_to_ssp_witness_map(const uscs_constraint_system<FieldT>
         H_tmp[i] = aA[i].squared()-FieldT::one();
     }
 
-    libff::enter_block("Divide by Z on set T");
+    //libff::enter_block("Divide by Z on set T");
     domain->divide_by_Z_on_coset(H_tmp);
-    libff::leave_block("Divide by Z on set T");
+    //libff::leave_block("Divide by Z on set T");
 
-    libff::leave_block("Compute evaluation of polynomial H on set T");
+    //libff::leave_block("Compute evaluation of polynomial H on set T");
 
-    libff::enter_block("Compute coefficients of polynomial H");
+    //libff::enter_block("Compute coefficients of polynomial H");
     domain->icosetFFT(H_tmp, FieldT::multiplicative_generator);
-    libff::leave_block("Compute coefficients of polynomial H");
+    //libff::leave_block("Compute coefficients of polynomial H");
 
-    libff::enter_block("Compute sum of H and ZK-patch");
+    //libff::enter_block("Compute sum of H and ZK-patch");
 #ifdef MULTICORE
 #pragma omp parallel for
 #endif
@@ -225,9 +225,9 @@ ssp_witness<FieldT> uscs_to_ssp_witness_map(const uscs_constraint_system<FieldT>
     {
         coefficients_for_H[i] += H_tmp[i];
     }
-    libff::leave_block("Compute sum of H and ZK-patch");
+    //libff::leave_block("Compute sum of H and ZK-patch");
 
-    libff::leave_block("Call to uscs_to_ssp_witness_map");
+    //libff::leave_block("Call to uscs_to_ssp_witness_map");
 
     return ssp_witness<FieldT>(cs.num_variables(),
                                domain->m,

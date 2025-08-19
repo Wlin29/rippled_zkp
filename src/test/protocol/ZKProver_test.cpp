@@ -201,13 +201,13 @@ public:
         // testDepositProofVerification();
         // testWithdrawalProofVerification();
         // testInvalidProofVerification();
-        // testMultipleProofs();
-        // testEdgeCases();
+        testMultipleProofs();
+        testEdgeCases();
         // testIncrementalMerkleTree();
-        // testMerkleTreeVerificationDebug();
-        // testMerkleVerificationEnforcement();
-        // testUnifiedCircuitBehavior();
-        // testZcashStyleWorkflow();
+        testMerkleTreeVerificationDebug();
+        testMerkleVerificationEnforcement();
+        testUnifiedCircuitBehavior();
+        testZcashStyleWorkflow();
     }
 
     void testKeyGeneration()

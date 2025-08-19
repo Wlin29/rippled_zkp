@@ -656,7 +656,7 @@ template<typename ramT>
 std::shared_ptr<r1cs_pcd_message<ram_base_field<ramT> > > ram_compliance_predicate_handler<ramT>::get_base_case_message(const ram_architecture_params<ramT> &ap,
                                                                                                                         const ram_boot_trace<ramT> &primary_input)
 {
-    libff::enter_block("Call to ram_compliance_predicate_handler::get_base_case_message");
+    //libff::enter_block("Call to ram_compliance_predicate_handler::get_base_case_message");
     const size_t num_addresses = 1ul << ap.address_size();
     const size_t value_size = ap.value_size();
     delegated_ra_memory<CRH_with_bit_out_gadget<FieldT> > mem(num_addresses, value_size, primary_input.as_memory_contents());
@@ -677,7 +677,7 @@ std::shared_ptr<r1cs_pcd_message<ram_base_field<ramT> > > ram_compliance_predica
 
     std::shared_ptr<r1cs_pcd_message<FieldT> > result;
     result.reset(new ram_pcd_message<ramT>(type, ap, timestamp, root_initial, root, pc_addr, cpu_state, pc_addr_initial, cpu_state_initial, has_accepted));
-    libff::leave_block("Call to ram_compliance_predicate_handler::get_base_case_message");
+    //libff::leave_block("Call to ram_compliance_predicate_handler::get_base_case_message");
     return result;
 }
 
@@ -686,7 +686,7 @@ std::shared_ptr<r1cs_pcd_message<ram_base_field<ramT> > > ram_compliance_predica
                                                                                                                      const ram_boot_trace<ramT> &primary_input,
                                                                                                                      const size_t time_bound)
 {
-    libff::enter_block("Call to ram_compliance_predicate_handler::get_final_case_msg");
+    //libff::enter_block("Call to ram_compliance_predicate_handler::get_final_case_msg");
     const size_t num_addresses = 1ul << ap.address_size();
     const size_t value_size = ap.value_size();
     delegated_ra_memory<CRH_with_bit_out_gadget<FieldT> > mem(num_addresses, value_size, primary_input.as_memory_contents());
@@ -707,7 +707,7 @@ std::shared_ptr<r1cs_pcd_message<ram_base_field<ramT> > > ram_compliance_predica
 
     std::shared_ptr<r1cs_pcd_message<FieldT> > result;
     result.reset(new ram_pcd_message<ramT>(type, ap, timestamp, root_initial, root, pc_addr, cpu_state, pc_addr_initial, cpu_state_initial, has_accepted));
-    libff::leave_block("Call to ram_compliance_predicate_handler::get_final_case_msg");
+    //libff::leave_block("Call to ram_compliance_predicate_handler::get_final_case_msg");
 
     return result;
 }

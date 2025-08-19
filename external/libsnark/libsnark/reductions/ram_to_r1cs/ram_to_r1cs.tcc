@@ -39,9 +39,9 @@ ram_to_r1cs<ramT>::ram_to_r1cs(const ram_architecture_params<ramT> &ap,
 template<typename ramT>
 void ram_to_r1cs<ramT>::instance_map()
 {
-    libff::enter_block("Call to instance_map of ram_to_r1cs");
+    //libff::enter_block("Call to instance_map of ram_to_r1cs");
     universal_gadget->generate_r1cs_constraints();
-    libff::leave_block("Call to instance_map of ram_to_r1cs");
+    //libff::leave_block("Call to instance_map of ram_to_r1cs");
 }
 
 template<typename ramT>
@@ -54,14 +54,14 @@ template<typename ramT>
 r1cs_primary_input<ram_base_field<ramT> > ram_to_r1cs<ramT>::auxiliary_input_map(const ram_boot_trace<ramT> &boot_trace,
                                                                                  const ram_input_tape<ramT> &auxiliary_input)
 {
-    libff::enter_block("Call to witness_map of ram_to_r1cs");
+    //libff::enter_block("Call to witness_map of ram_to_r1cs");
     universal_gadget->generate_r1cs_witness(boot_trace, auxiliary_input);
 #ifdef DEBUG
     const r1cs_primary_input<FieldT> primary_input_from_input_map = ram_to_r1cs<ramT>::primary_input_map(main_protoboard.ap, boot_trace_size_bound, boot_trace);
     const r1cs_primary_input<FieldT> primary_input_from_witness_map = main_protoboard.primary_input();
     assert(primary_input_from_input_map == primary_input_from_witness_map);
 #endif
-    libff::leave_block("Call to witness_map of ram_to_r1cs");
+    //libff::leave_block("Call to witness_map of ram_to_r1cs");
     return main_protoboard.auxiliary_input();
 }
 

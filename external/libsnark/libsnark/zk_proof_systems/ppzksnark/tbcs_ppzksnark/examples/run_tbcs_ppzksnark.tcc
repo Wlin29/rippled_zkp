@@ -39,7 +39,7 @@ template<typename ppT>
 bool run_tbcs_ppzksnark(const tbcs_example &example,
                         const bool test_serialization)
 {
-    libff::enter_block("Call to run_tbcs_ppzksnark");
+    //libff::enter_block("Call to run_tbcs_ppzksnark");
 
     libff::print_header("TBCS ppzkSNARK Generator");
     tbcs_ppzksnark_keypair<ppT> keypair = tbcs_ppzksnark_generator<ppT>(example.circuit);
@@ -50,11 +50,11 @@ bool run_tbcs_ppzksnark(const tbcs_example &example,
 
     if (test_serialization)
     {
-        libff::enter_block("Test serialization of keys");
+        //libff::enter_block("Test serialization of keys");
         keypair.pk = libff::reserialize<tbcs_ppzksnark_proving_key<ppT> >(keypair.pk);
         keypair.vk = libff::reserialize<tbcs_ppzksnark_verification_key<ppT> >(keypair.vk);
         pvk = libff::reserialize<tbcs_ppzksnark_processed_verification_key<ppT> >(pvk);
-        libff::leave_block("Test serialization of keys");
+        //libff::leave_block("Test serialization of keys");
     }
 
     libff::print_header("TBCS ppzkSNARK Prover");
@@ -63,9 +63,9 @@ bool run_tbcs_ppzksnark(const tbcs_example &example,
 
     if (test_serialization)
     {
-        libff::enter_block("Test serialization of proof");
+        //libff::enter_block("Test serialization of proof");
         proof = libff::reserialize<tbcs_ppzksnark_proof<ppT> >(proof);
-        libff::leave_block("Test serialization of proof");
+        //libff::leave_block("Test serialization of proof");
     }
 
     libff::print_header("TBCS ppzkSNARK Verifier");
@@ -77,7 +77,7 @@ bool run_tbcs_ppzksnark(const tbcs_example &example,
     bool ans2 = tbcs_ppzksnark_online_verifier_strong_IC<ppT>(pvk, example.primary_input, proof);
     assert(ans == ans2);
 
-    libff::leave_block("Call to run_tbcs_ppzksnark");
+    //libff::leave_block("Call to run_tbcs_ppzksnark");
 
     return ans;
 }

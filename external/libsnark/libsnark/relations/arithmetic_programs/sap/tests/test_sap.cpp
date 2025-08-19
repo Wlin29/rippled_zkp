@@ -30,7 +30,7 @@ void test_sap(const size_t sap_degree, const size_t num_inputs, const bool binar
       So we generate an instance of R1CS where the number of constraints is
         (sap_degree - 1) / 2 - num_inputs.
     */
-    libff::enter_block("Call to test_sap");
+    //libff::enter_block("Call to test_sap");
 
     const size_t num_constraints = (sap_degree - 1) / 2 - num_inputs;
     assert(num_constraints >= 1);
@@ -41,7 +41,7 @@ void test_sap(const size_t sap_degree, const size_t num_inputs, const bool binar
     libff::print_indent(); printf("* Number of R1CS constraints: %zu\n", num_constraints);
     libff::print_indent(); printf("* Input type: %s\n", binary_input ? "binary" : "field");
 
-    libff::enter_block("Generate constraint system and assignment");
+    //libff::enter_block("Generate constraint system and assignment");
     r1cs_example<FieldT> example;
     if (binary_input)
     {
@@ -51,37 +51,37 @@ void test_sap(const size_t sap_degree, const size_t num_inputs, const bool binar
     {
         example = generate_r1cs_example_with_field_input<FieldT>(num_constraints, num_inputs);
     }
-    libff::leave_block("Generate constraint system and assignment");
+    //libff::leave_block("Generate constraint system and assignment");
 
-    libff::enter_block("Check satisfiability of constraint system");
+    //libff::enter_block("Check satisfiability of constraint system");
     assert(example.constraint_system.is_satisfied(example.primary_input, example.auxiliary_input));
-    libff::leave_block("Check satisfiability of constraint system");
+    //libff::leave_block("Check satisfiability of constraint system");
 
     const FieldT t = FieldT::random_element(),
     d1 = FieldT::random_element(),
     d2 = FieldT::random_element();
 
-    libff::enter_block("Compute SAP instance 1");
+    //libff::enter_block("Compute SAP instance 1");
     sap_instance<FieldT> sap_inst_1 = r1cs_to_sap_instance_map(example.constraint_system);
-    libff::leave_block("Compute SAP instance 1");
+    //libff::leave_block("Compute SAP instance 1");
 
-    libff::enter_block("Compute SAP instance 2");
+    //libff::enter_block("Compute SAP instance 2");
     sap_instance_evaluation<FieldT> sap_inst_2 = r1cs_to_sap_instance_map_with_evaluation(example.constraint_system, t);
-    libff::leave_block("Compute SAP instance 2");
+    //libff::leave_block("Compute SAP instance 2");
 
-    libff::enter_block("Compute SAP witness");
+    //libff::enter_block("Compute SAP witness");
     sap_witness<FieldT> sap_wit = r1cs_to_sap_witness_map(example.constraint_system, example.primary_input, example.auxiliary_input, d1, d2);
-    libff::leave_block("Compute SAP witness");
+    //libff::leave_block("Compute SAP witness");
 
-    libff::enter_block("Check satisfiability of SAP instance 1");
+    //libff::enter_block("Check satisfiability of SAP instance 1");
     assert(sap_inst_1.is_satisfied(sap_wit));
-    libff::leave_block("Check satisfiability of SAP instance 1");
+    //libff::leave_block("Check satisfiability of SAP instance 1");
 
-    libff::enter_block("Check satisfiability of SAP instance 2");
+    //libff::enter_block("Check satisfiability of SAP instance 2");
     assert(sap_inst_2.is_satisfied(sap_wit));
-    libff::leave_block("Check satisfiability of SAP instance 2");
+    //libff::leave_block("Check satisfiability of SAP instance 2");
 
-    libff::leave_block("Call to test_sap");
+    //libff::leave_block("Call to test_sap");
 }
 
 int main()
@@ -101,19 +101,19 @@ int main()
     const size_t step_domain_size_special = (1ul<<10) + (1ul<<8) - 1ul;
     const size_t extended_domain_size_special = (1ul<<(libff::mnt6_Fr::s+1)) - 1ul;
 
-    libff::enter_block("Test SAP with binary input");
+    //libff::enter_block("Test SAP with binary input");
 
     test_sap<libff::Fr<libff::mnt6_pp> >(basic_domain_size_special, num_inputs, true);
     test_sap<libff::Fr<libff::mnt6_pp> >(step_domain_size_special, num_inputs, true);
     test_sap<libff::Fr<libff::mnt6_pp> >(extended_domain_size_special, num_inputs, true);
 
-    libff::leave_block("Test SAP with binary input");
+    //libff::leave_block("Test SAP with binary input");
 
-    libff::enter_block("Test SAP with field input");
+    //libff::enter_block("Test SAP with field input");
 
     test_sap<libff::Fr<libff::mnt6_pp> >(basic_domain_size_special, num_inputs, false);
     test_sap<libff::Fr<libff::mnt6_pp> >(step_domain_size_special, num_inputs, false);
     test_sap<libff::Fr<libff::mnt6_pp> >(extended_domain_size_special, num_inputs, false);
 
-    libff::leave_block("Test SAP with field input");
+    //libff::leave_block("Test SAP with field input");
 }

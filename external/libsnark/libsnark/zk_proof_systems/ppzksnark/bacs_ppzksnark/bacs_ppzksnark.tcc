@@ -52,10 +52,10 @@ bacs_ppzksnark_keypair<ppT> bacs_ppzksnark_generator(const bacs_ppzksnark_circui
 {
     typedef libff::Fr<ppT> FieldT;
 
-    libff::enter_block("Call to bacs_ppzksnark_generator");
+    //libff::enter_block("Call to bacs_ppzksnark_generator");
     const r1cs_constraint_system<FieldT> r1cs_cs = bacs_to_r1cs_instance_map<FieldT>(circuit);
     const r1cs_ppzksnark_keypair<ppT> r1cs_keypair = r1cs_ppzksnark_generator<ppT>(r1cs_cs);
-    libff::leave_block("Call to bacs_ppzksnark_generator");
+    //libff::leave_block("Call to bacs_ppzksnark_generator");
 
     return bacs_ppzksnark_keypair<ppT>(bacs_ppzksnark_proving_key<ppT>(circuit, r1cs_keypair.pk),
                                        r1cs_keypair.vk);
@@ -68,11 +68,11 @@ bacs_ppzksnark_proof<ppT> bacs_ppzksnark_prover(const bacs_ppzksnark_proving_key
 {
     typedef libff::Fr<ppT> FieldT;
 
-    libff::enter_block("Call to bacs_ppzksnark_prover");
+    //libff::enter_block("Call to bacs_ppzksnark_prover");
     const r1cs_variable_assignment<FieldT> r1cs_va = bacs_to_r1cs_witness_map<FieldT>(pk.circuit, primary_input, auxiliary_input);
     const r1cs_auxiliary_input<FieldT> r1cs_ai(r1cs_va.begin() + primary_input.size(), r1cs_va.end()); // TODO: faster to just change bacs_to_r1cs_witness_map into two :(
     const r1cs_ppzksnark_proof<ppT> r1cs_proof = r1cs_ppzksnark_prover<ppT>(pk.r1cs_pk, primary_input, r1cs_ai);
-    libff::leave_block("Call to bacs_ppzksnark_prover");
+    //libff::leave_block("Call to bacs_ppzksnark_prover");
 
     return r1cs_proof;
 }
@@ -80,9 +80,9 @@ bacs_ppzksnark_proof<ppT> bacs_ppzksnark_prover(const bacs_ppzksnark_proving_key
 template<typename ppT>
 bacs_ppzksnark_processed_verification_key<ppT> bacs_ppzksnark_verifier_process_vk(const bacs_ppzksnark_verification_key<ppT> &vk)
 {
-    libff::enter_block("Call to bacs_ppzksnark_verifier_process_vk");
+    //libff::enter_block("Call to bacs_ppzksnark_verifier_process_vk");
     const bacs_ppzksnark_processed_verification_key<ppT> pvk = r1cs_ppzksnark_verifier_process_vk<ppT>(vk);
-    libff::leave_block("Call to bacs_ppzksnark_verifier_process_vk");
+    //libff::leave_block("Call to bacs_ppzksnark_verifier_process_vk");
 
     return pvk;
 }
@@ -92,10 +92,10 @@ bool bacs_ppzksnark_verifier_weak_IC(const bacs_ppzksnark_verification_key<ppT> 
                                      const bacs_ppzksnark_primary_input<ppT> &primary_input,
                                      const bacs_ppzksnark_proof<ppT> &proof)
 {
-    libff::enter_block("Call to bacs_ppzksnark_verifier_weak_IC");
+    //libff::enter_block("Call to bacs_ppzksnark_verifier_weak_IC");
     const bacs_ppzksnark_processed_verification_key<ppT> pvk = bacs_ppzksnark_verifier_process_vk<ppT>(vk);
     const bool bit = r1cs_ppzksnark_online_verifier_weak_IC<ppT>(pvk, primary_input, proof);
-    libff::leave_block("Call to bacs_ppzksnark_verifier_weak_IC");
+    //libff::leave_block("Call to bacs_ppzksnark_verifier_weak_IC");
 
     return bit;
 }
@@ -105,10 +105,10 @@ bool bacs_ppzksnark_verifier_strong_IC(const bacs_ppzksnark_verification_key<ppT
                                        const bacs_ppzksnark_primary_input<ppT> &primary_input,
                                        const bacs_ppzksnark_proof<ppT> &proof)
 {
-    libff::enter_block("Call to bacs_ppzksnark_verifier_strong_IC");
+    //libff::enter_block("Call to bacs_ppzksnark_verifier_strong_IC");
     const bacs_ppzksnark_processed_verification_key<ppT> pvk = bacs_ppzksnark_verifier_process_vk<ppT>(vk);
     const bool bit = r1cs_ppzksnark_online_verifier_strong_IC<ppT>(pvk, primary_input, proof);
-    libff::leave_block("Call to bacs_ppzksnark_verifier_strong_IC");
+    //libff::leave_block("Call to bacs_ppzksnark_verifier_strong_IC");
 
     return bit;
 }
@@ -118,9 +118,9 @@ bool bacs_ppzksnark_online_verifier_weak_IC(const bacs_ppzksnark_processed_verif
                                             const bacs_ppzksnark_primary_input<ppT> &primary_input,
                                             const bacs_ppzksnark_proof<ppT> &proof)
 {
-    libff::enter_block("Call to bacs_ppzksnark_online_verifier_weak_IC");
+    //libff::enter_block("Call to bacs_ppzksnark_online_verifier_weak_IC");
     const bool bit = r1cs_ppzksnark_online_verifier_weak_IC<ppT>(pvk, primary_input, proof);
-    libff::leave_block("Call to bacs_ppzksnark_online_verifier_weak_IC");
+    //libff::leave_block("Call to bacs_ppzksnark_online_verifier_weak_IC");
 
     return bit;
 }
@@ -130,9 +130,9 @@ bool bacs_ppzksnark_online_verifier_strong_IC(const bacs_ppzksnark_processed_ver
                                               const bacs_ppzksnark_primary_input<ppT> &primary_input,
                                               const bacs_ppzksnark_proof<ppT> &proof)
 {
-    libff::enter_block("Call to bacs_ppzksnark_online_verifier_strong_IC");
+    //libff::enter_block("Call to bacs_ppzksnark_online_verifier_strong_IC");
     const bool bit = r1cs_ppzksnark_online_verifier_strong_IC<ppT>(pvk, primary_input, proof);
-    libff::leave_block("Call to bacs_ppzksnark_online_verifier_strong_IC");
+    //libff::leave_block("Call to bacs_ppzksnark_online_verifier_strong_IC");
 
     return bit;
 }

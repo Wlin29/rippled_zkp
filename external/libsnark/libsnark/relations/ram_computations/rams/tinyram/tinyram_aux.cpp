@@ -356,7 +356,7 @@ tinyram_program load_preprocessed_program(const tinyram_architecture_params &ap,
 
     tinyram_program program;
 
-    libff::enter_block("Loading program");
+    //libff::enter_block("Loading program");
     std::string instr, line;
 
     while (preprocessed >> instr)
@@ -371,7 +371,7 @@ tinyram_program load_preprocessed_program(const tinyram_architecture_params &ap,
             program.add_instruction(tinyram_instruction(opcode_values[instr], immflag, des, a1, a2));
         }
     }
-    libff::leave_block("Loading program");
+    //libff::leave_block("Loading program");
 
     return program;
 }
@@ -416,7 +416,7 @@ memory_store_trace tinyram_boot_trace_from_program_and_input(const tinyram_archi
 
 tinyram_input_tape load_tape(std::istream &tape)
 {
-    libff::enter_block("Loading tape");
+    //libff::enter_block("Loading tape");
     tinyram_input_tape result;
 
     libff::print_indent();
@@ -429,7 +429,7 @@ tinyram_input_tape load_tape(std::istream &tape)
     }
     printf("\n");
 
-    libff::leave_block("Loading tape");
+    //libff::leave_block("Loading tape");
     return result;
 }
 

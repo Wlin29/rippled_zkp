@@ -40,7 +40,7 @@ template<typename ppT>
 bool run_r1cs_se_ppzksnark(const r1cs_example<libff::Fr<ppT> > &example,
                         const bool test_serialization)
 {
-    libff::enter_block("Call to run_r1cs_se_ppzksnark");
+    //libff::enter_block("Call to run_r1cs_se_ppzksnark");
 
     libff::print_header("R1CS SEppzkSNARK Generator");
     r1cs_se_ppzksnark_keypair<ppT> keypair = r1cs_se_ppzksnark_generator<ppT>(example.constraint_system);
@@ -51,11 +51,11 @@ bool run_r1cs_se_ppzksnark(const r1cs_example<libff::Fr<ppT> > &example,
 
     if (test_serialization)
     {
-        libff::enter_block("Test serialization of keys");
+        //libff::enter_block("Test serialization of keys");
         keypair.pk = libff::reserialize<r1cs_se_ppzksnark_proving_key<ppT> >(keypair.pk);
         keypair.vk = libff::reserialize<r1cs_se_ppzksnark_verification_key<ppT> >(keypair.vk);
         pvk = libff::reserialize<r1cs_se_ppzksnark_processed_verification_key<ppT> >(pvk);
-        libff::leave_block("Test serialization of keys");
+        //libff::leave_block("Test serialization of keys");
     }
 
     libff::print_header("R1CS SEppzkSNARK Prover");
@@ -64,9 +64,9 @@ bool run_r1cs_se_ppzksnark(const r1cs_example<libff::Fr<ppT> > &example,
 
     if (test_serialization)
     {
-        libff::enter_block("Test serialization of proof");
+        //libff::enter_block("Test serialization of proof");
         proof = libff::reserialize<r1cs_se_ppzksnark_proof<ppT> >(proof);
-        libff::leave_block("Test serialization of proof");
+        //libff::leave_block("Test serialization of proof");
     }
 
     libff::print_header("R1CS SEppzkSNARK Verifier");
@@ -78,7 +78,7 @@ bool run_r1cs_se_ppzksnark(const r1cs_example<libff::Fr<ppT> > &example,
     const bool ans2 = r1cs_se_ppzksnark_online_verifier_strong_IC<ppT>(pvk, example.primary_input, proof);
     assert(ans == ans2);
 
-    libff::leave_block("Call to run_r1cs_se_ppzksnark");
+    //libff::leave_block("Call to run_r1cs_se_ppzksnark");
 
     return ans;
 }

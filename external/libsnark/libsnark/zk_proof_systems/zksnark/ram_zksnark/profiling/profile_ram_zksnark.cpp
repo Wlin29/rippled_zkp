@@ -23,9 +23,9 @@ void simulate_random_memory_contents(const tinyram_architecture_params &ap, cons
     const size_t value_size = 2 * ap.w;
     memory_contents init_random = random_memory_contents(num_addresses, value_size, program_size + (input_size + 1)/2);
 
-    libff::enter_block("Initialize random delegated memory");
+    //libff::enter_block("Initialize random delegated memory");
     delegated_ra_memory<FieldT> dm_random(num_addresses, value_size, init_random);
-    libff::leave_block("Initialize random delegated memory");
+    //libff::leave_block("Initialize random delegated memory");
 }
 
 template<typename ppT>
@@ -40,9 +40,9 @@ void profile_ram_zksnark_verifier(const tinyram_architecture_params &ap, const s
     ram_zksnark_proof<ppT> pi;
     ram_zksnark_verification_key<ppT> vk = ram_zksnark_verification_key<ppT>::dummy_verification_key(ap);
 
-    libff::enter_block("Verify fake proof");
+    //libff::enter_block("Verify fake proof");
     ram_zksnark_verifier<ppT>(vk, example.boot_trace, time_bound, pi);
-    libff::leave_block("Verify fake proof");
+    //libff::leave_block("Verify fake proof");
 }
 
 template<typename ppT>

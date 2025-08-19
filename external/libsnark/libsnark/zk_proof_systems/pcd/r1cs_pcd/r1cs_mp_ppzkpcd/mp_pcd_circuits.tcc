@@ -628,7 +628,7 @@ template<typename ppT>
 r1cs_primary_input<libff::Fr<ppT> > get_mp_compliance_step_pcd_circuit_input(const set_commitment &commitment_to_translation_step_r1cs_vks,
                                                                       const r1cs_pcd_compliance_predicate_primary_input<libff::Fr<ppT> > &primary_input)
 {
-    libff::enter_block("Call to get_mp_compliance_step_pcd_circuit_input");
+    //libff::enter_block("Call to get_mp_compliance_step_pcd_circuit_input");
     typedef libff::Fr<ppT> FieldT;
 
     const r1cs_variable_assignment<FieldT> outgoing_message_as_va = primary_input.outgoing_message->as_r1cs_variable_assignment();
@@ -643,12 +643,12 @@ r1cs_primary_input<libff::Fr<ppT> > get_mp_compliance_step_pcd_circuit_input(con
     block.insert(block.end(), commitment_to_translation_step_r1cs_vks.begin(), commitment_to_translation_step_r1cs_vks.end());
     block.insert(block.end(), msg_bits.begin(), msg_bits.end());
 
-    libff::enter_block("Sample CRH randomness");
+    //libff::enter_block("Sample CRH randomness");
     CRH_with_field_out_gadget<FieldT>::sample_randomness(block.size());
-    libff::leave_block("Sample CRH randomness");
+    //libff::leave_block("Sample CRH randomness");
 
     const std::vector<FieldT> digest = CRH_with_field_out_gadget<FieldT>::get_hash(block);
-    libff::leave_block("Call to get_mp_compliance_step_pcd_circuit_input");
+    //libff::leave_block("Call to get_mp_compliance_step_pcd_circuit_input");
 
     return digest;
 }
@@ -657,7 +657,7 @@ template<typename ppT>
 r1cs_primary_input<libff::Fr<ppT> > get_mp_translation_step_pcd_circuit_input(const set_commitment &commitment_to_translation_step_r1cs_vks,
                                                                        const r1cs_pcd_compliance_predicate_primary_input<libff::Fr<other_curve<ppT> > > &primary_input)
 {
-    libff::enter_block("Call to get_mp_translation_step_pcd_circuit_input");
+    //libff::enter_block("Call to get_mp_translation_step_pcd_circuit_input");
     typedef libff::Fr<ppT> FieldT;
 
     const std::vector<libff::Fr<other_curve<ppT> > > mp_compliance_step_pcd_circuit_input = get_mp_compliance_step_pcd_circuit_input<other_curve<ppT> >(commitment_to_translation_step_r1cs_vks, primary_input);
@@ -671,7 +671,7 @@ r1cs_primary_input<libff::Fr<ppT> > get_mp_translation_step_pcd_circuit_input(co
     mp_compliance_step_pcd_circuit_input_bits.resize(mp_translation_step_pcd_circuit_maker<ppT>::input_capacity_in_bits(), false);
 
     const r1cs_primary_input<FieldT> result = libff::pack_bit_vector_into_field_element_vector<FieldT>(mp_compliance_step_pcd_circuit_input_bits, mp_translation_step_pcd_circuit_maker<ppT>::field_capacity());
-    libff::leave_block("Call to get_mp_translation_step_pcd_circuit_input");
+    //libff::leave_block("Call to get_mp_translation_step_pcd_circuit_input");
 
     return result;
 }

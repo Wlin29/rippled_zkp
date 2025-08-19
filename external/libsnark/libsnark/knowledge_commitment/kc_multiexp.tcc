@@ -33,7 +33,7 @@ knowledge_commitment<T1, T2> kc_multi_exp_with_mixed_addition(const knowledge_co
     libff::UNUSED(scalar_length);
 #endif
 
-    libff::enter_block("Process scalar vector");
+    //libff::enter_block("Process scalar vector");
     auto index_it = std::lower_bound(vec.indices.begin(), vec.indices.end(), min_idx);
     const size_t offset = index_it - vec.indices.begin();
 
@@ -87,10 +87,10 @@ knowledge_commitment<T1, T2> kc_multi_exp_with_mixed_addition(const knowledge_co
         ++value_it;
     }
 
-    libff::print_indent(); printf("* Elements of w skipped: %zu (%0.2f%%)\n", num_skip, 100.*num_skip/(num_skip+num_add+num_other));
-    libff::print_indent(); printf("* Elements of w processed with special addition: %zu (%0.2f%%)\n", num_add, 100.*num_add/(num_skip+num_add+num_other));
-    libff::print_indent(); printf("* Elements of w remaining: %zu (%0.2f%%)\n", num_other, 100.*num_other/(num_skip+num_add+num_other));
-    libff::leave_block("Process scalar vector");
+    libff::print_indent(); // printf("* Elements of w skipped: %zu (%0.2f%%)\n", num_skip, 100.*num_skip/(num_skip+num_add+num_other));
+    libff::print_indent(); // printf("* Elements of w processed with special addition: %zu (%0.2f%%)\n", num_add, 100.*num_add/(num_skip+num_add+num_other));
+    libff::print_indent(); // printf("* Elements of w remaining: %zu (%0.2f%%)\n", num_other, 100.*num_other/(num_skip+num_add+num_other));
+    //libff::leave_block("Process scalar vector");
 
     return acc + libff::multi_exp<knowledge_commitment<T1, T2>, FieldT, Method>(g.begin(), g.end(), p.begin(), p.end(), chunks);
 }
@@ -150,7 +150,7 @@ knowledge_commitment_vector<T1, T2> kc_batch_exp(const size_t scalar_size,
 
     if (!libff::inhibit_profiling_info)
     {
-        libff::print_indent(); printf("Non-zero coordinate count: %zu/%zu (%0.2f%%)\n", nonzero, v.size(), 100.*nonzero/v.size());
+        libff::print_indent(); // printf("Non-zero coordinate count: %zu/%zu (%0.2f%%)\n", nonzero, v.size(), 100.*nonzero/v.size());
     }
 
     std::vector<knowledge_commitment_vector<T1, T2> > tmp(num_chunks);
