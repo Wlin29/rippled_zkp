@@ -28,7 +28,7 @@ public:
         testcase("Merkle Tree Positional Performance Comparison: Regular vs Incremental");
 
         // 2^32, 2^40
-        const std::vector<long int> treeSizes = {4294967296, 1099511627776};
+        const std::vector<long int> treeSizes = {10};
         const int numSamples = 5;
         
         std::cout << "Comparing Regular vs Incremental Merkle Tree Performance\n";

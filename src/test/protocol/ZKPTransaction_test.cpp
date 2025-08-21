@@ -47,7 +47,7 @@ public:
         // testZKTransactionPerformance();      // standalone zk deposit perf
         // testSecp256k1PlusZKPerformance();    // combined secp256k1 + zk deposit perf
         // testEd25519PlusZKPerformance();      // combined ed25519 + zk deposit perf
-        // // testComprehensivePerformanceComparison();
+        // testComprehensivePerformanceComparison();
         testMerkleTreePerformance();
         testIncrementalVsRegularMerkleTree();
     }
