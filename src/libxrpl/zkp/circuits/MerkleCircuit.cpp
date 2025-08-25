@@ -102,14 +102,14 @@ private:
     std::unique_ptr<packing_gadget<FieldT>> nullifier_packer_;
     std::unique_ptr<packing_gadget<FieldT>> value_commitment_packer_;
     
-    // CRITICAL FIX: Helper function to compute proper empty hashes
+    // Helper function to compute proper empty hashes
     // This prevents using all-zero hashes which can be security vulnerabilities
     uint256 computeEmptyHash(size_t level) {
         // Use a deterministic hash for empty nodes at each level
         // This is a common pattern in Merkle tree implementations
         std::string emptyStr = "EMPTY_LEVEL_" + std::to_string(level);
         
-        // Simple hash computation (in practice, you'd use your actual hash function)
+        // Simple hash computation
         uint256 result;
         memset(result.data(), 0, 32);
         
@@ -165,18 +165,6 @@ public:
         note_value_packer_ = std::make_unique<packing_gadget<FieldT>>(
             *pb_, note_value_bits_, note_value_, "note_value_packer");
         
-        // REMOVED: Bypass field element conversion for all cryptographic values
-        // note_rho_packer_ = std::make_unique<packing_gadget<FieldT>>(
-        //     *pb_, note_rho_bits_, note_rho_, "note_rho_packer");
-        // note_r_packer_ = std::make_unique<packing_gadget<FieldT>>(
-        //     *pb_, note_r_bits_, note_r_, "note_r_packer");
-        // note_a_pk_packer_ = std::make_unique<packing_gadget<FieldT>>(
-        //     *pb_, note_a_pk_bits_, note_a_pk_, "note_a_pk_packer");
-        // a_sk_packer_ = std::make_unique<packing_gadget<FieldT>>(
-        //     *pb_, a_sk_bits_, a_sk_, "a_sk_packer");
-        // vcm_r_packer_ = std::make_unique<packing_gadget<FieldT>>(
-        //     *pb_, vcm_r_bits_, vcm_r_, "vcm_r_packer");
-        
         // 3. SETUP SHA256 DIGEST VARIABLES
         note_commitment_hash_ = std::make_unique<digest_variable<FieldT>>(
             *pb_, 256, "note_commitment_hash");
@@ -190,7 +178,7 @@ public:
         computed_root_ = std::make_unique<digest_variable<FieldT>>(
             *pb_, 256, "computed_root");
         
-        // 4. SIMPLIFIED SHA256 HASH GADGETS
+        // 4. SHA256 HASH GADGETS
         
         // Create digest variables for the inputs to SHA256 gadgets
         auto note_input_part1 = std::make_unique<digest_variable<FieldT>>(*pb_, 256, "note_input_part1");
@@ -258,14 +246,7 @@ public:
         
         // 7. GENERATE ALL CONSTRAINTS
     
-        // Input packing constraints (ONLY for note_value - all others bypass field conversion)
         note_value_packer_->generate_r1cs_constraints(true);
-        // REMOVED: Bypass field element conversion for all cryptographic values
-        // note_rho_packer_->generate_r1cs_constraints(true);
-        // note_r_packer_->generate_r1cs_constraints(true);
-        // note_a_pk_packer_->generate_r1cs_constraints(true);
-        // a_sk_packer_->generate_r1cs_constraints(true);
-        // vcm_r_packer_->generate_r1cs_constraints(true);
         
         // Connect bit arrays to digest variables for note commitment
         // Part 1: value(64) + rho(192) = 256 bits
@@ -415,12 +396,6 @@ private:
         try {
             // 1. SET FIELD ELEMENT VALUES FROM NOTE (BYPASS FIELD CONVERSION FOR ALL CRYPTOGRAPHIC VALUES)
             pb_->val(note_value_) = FieldT(note.value);
-            // CRITICAL FIX: DON'T convert cryptographic values through field element - store directly as bits
-            // pb_->val(note_rho_) = MerkleCircuit::uint256ToFieldElement(note.rho);    // REMOVED
-            // pb_->val(note_r_) = MerkleCircuit::uint256ToFieldElement(note.r);        // REMOVED
-            // pb_->val(note_a_pk_) = MerkleCircuit::uint256ToFieldElement(note.a_pk);  // REMOVED
-            // pb_->val(a_sk_) = MerkleCircuit::uint256ToFieldElement(a_sk);            // REMOVED
-            // pb_->val(vcm_r_) = MerkleCircuit::uint256ToFieldElement(vcm_r);          // REMOVED
             pb_->val(read_successful_) = FieldT::one();
             
             // 2. SET ADDRESS BITS
@@ -459,9 +434,6 @@ private:
         auto r_bits = MerkleCircuit::uint256ToBits(note.r);
         auto a_pk_bits = MerkleCircuit::uint256ToBits(note.a_pk);
         auto vcm_r_bits = MerkleCircuit::uint256ToBits(vcm_r);
-        
-        // CRITICAL FIX: Store a_sk directly as 256 bits WITHOUT field element conversion
-        // This preserves the full 256-bit entropy needed for secure hashing
         auto a_sk_bits = MerkleCircuit::uint256ToBits(a_sk);
         
         // DEBUG: Print circuit bit conversion for comparison
@@ -484,19 +456,16 @@ private:
         }
         std::cout << std::endl;
         
-        // Set bit values (all 256 bits for secret values preserved)
         for (size_t i = 0; i < 256; ++i) {
             pb_->val(note_rho_bits_[i]) = rho_bits[i] ? FieldT::one() : FieldT::zero();
             pb_->val(note_r_bits_[i]) = r_bits[i] ? FieldT::one() : FieldT::zero();
             pb_->val(note_a_pk_bits_[i]) = a_pk_bits[i] ? FieldT::one() : FieldT::zero();
-            // CRITICAL: Store a_sk bits directly, bypassing field element conversion
             pb_->val(a_sk_bits_[i]) = a_sk_bits[i] ? FieldT::one() : FieldT::zero();
             pb_->val(vcm_r_bits_[i]) = vcm_r_bits[i] ? FieldT::one() : FieldT::zero();
         }
     }
     
     void setAuthenticationPath(const std::vector<std::vector<bool>>& path) {
-        // CRITICAL FIX: Properly set authentication path with sibling hashes
         // The path contains sibling hashes for each level of the tree
         for (size_t level = 0; level < tree_depth_; ++level) {
             if (level < path.size() && path[level].size() == 256) {
@@ -510,7 +479,7 @@ private:
                     pb_->val(auth_path_->right_digests[level].bits[bit]) = bit_value;
                 }
             } else {
-                // CRITICAL FIX: Use proper empty hash instead of all zeros
+                // Use proper empty hash instead of all zeros
                 // All-zero hashes can be a security vulnerability
                 uint256 emptyHash = computeEmptyHash(level);
                 auto emptyBits = MerkleCircuit::uint256ToBits(emptyHash);
@@ -525,14 +494,7 @@ private:
     }
     
     void generateAllWitnesses() {
-        // Generate witnesses for packing gadgets (ONLY for note_value - all others bypass field conversion)
         note_value_packer_->generate_r1cs_witness_from_packed();
-        // REMOVED: Bypass field element conversion for all cryptographic values
-        // note_rho_packer_->generate_r1cs_witness_from_packed();
-        // note_r_packer_->generate_r1cs_witness_from_packed();
-        // note_a_pk_packer_->generate_r1cs_witness_from_packed();
-        // a_sk_packer_->generate_r1cs_witness_from_packed();
-        // vcm_r_packer_->generate_r1cs_witness_from_packed();
         
         // Set digest witness values for note commitment
         // Part 1: value(64) + rho(192) = 256 bits
@@ -601,14 +563,6 @@ public:
         
         uint256 result = MerkleCircuit::bitsToUint256(nullifier_bits);
         
-        // DEBUG: Print circuit nullifier extraction
-        std::cout << "Circuit getNullifierFromBits debug:" << std::endl;
-        std::cout << "  Circuit result: " << std::hex;
-        for (int i = 0; i < 8; ++i) {
-            std::cout << std::setfill('0') << std::setw(2) << (unsigned int)result.begin()[i];
-        }
-        std::cout << "..." << std::dec << std::endl;
-        
         return result;
     }
     
@@ -671,7 +625,6 @@ FieldT MerkleCircuit::getAnchor() const { return pImpl_->getAnchor(); }
 uint256 MerkleCircuit::getNullifierFromBits() const { return pImpl_->getNullifierFromBits(); }
 
 uint256 MerkleCircuit::getNullifierFromCircuit() const {
-    // Get nullifier from this circuit instance (after witness generation)
     return getNullifierFromBits();
 }
 
@@ -739,12 +692,10 @@ uint256 convertFromLibsnarkBits(const digest_variable<FieldT>& digest, const lib
 }
 
 std::vector<bool> MerkleCircuit::uint256ToBits(const uint256& input) {
-    // Use libsnark-compatible bit ordering
     return convertToLibsnarkBits(input);
 }
 
 uint256 MerkleCircuit::bitsToUint256(const std::vector<bool>& bits) {
-    // Use libsnark-compatible bit ordering
     return convertFromLibsnarkBits(bits);
 }
 
@@ -822,14 +773,14 @@ std::vector<bool> MerkleCircuit::bytesToBits(const std::vector<uint8_t>& bytes) 
     return bits;
 }
 
-// Simplified commitment computations (outside circuit, for testing)
+// commitment computations (outside circuit, for testing)
 uint256 MerkleCircuit::computeNoteCommitment(
     uint64_t value,
     const uint256& rho,
     const uint256& r,
     const uint256& a_pk) {
     
-    // Simplified: SHA256(SHA256(value||rho_192), SHA256(r_128||a_pk_128))
+    // SHA256(SHA256(value||rho_192), SHA256(r_128||a_pk_128))
     
     // First hash: value(8 bytes) + rho(24 bytes) = 32 bytes
     std::vector<uint8_t> input1;
@@ -887,7 +838,7 @@ uint256 MerkleCircuit::computeNullifierWithCircuit(
         std::vector<bool>(256, false)  // dummy root
     );
     
-    // Get the nullifier from the circuit bits (this is the canonical computation)
+    // Get the nullifier from the circuit bits
     return minimalCircuit.getNullifierFromBits();
 }
 
