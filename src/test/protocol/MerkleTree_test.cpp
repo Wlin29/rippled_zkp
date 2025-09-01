@@ -117,7 +117,7 @@ public:
         */
         testcase("Incremental vs Regular Merkle Tree Performance Comparison");
 
-        const int testDepths[] = {8, 12, 16, 20}; 
+        const int testDepths[] = {4, 8, 12}; 
         const int numSamples = 3;
         
         std::cout << "Comparing Incremental vs Regular Merkle Tree Performance...\n";

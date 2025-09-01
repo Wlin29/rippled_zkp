@@ -563,7 +563,7 @@ bool r1cs_gg_ppzksnark_online_verifier_weak_IC(const r1cs_gg_ppzksnark_processed
     {
         if (!libff::inhibit_profiling_info)
         {
-            libff::print_indent(); printf("QAP divisibility check failed.\n");
+            libff::print_indent();
         }
         result = false;
     }
@@ -666,7 +666,7 @@ bool r1cs_gg_ppzksnark_affine_verifier_weak_IC(const r1cs_gg_ppzksnark_verificat
     {
         if (!libff::inhibit_profiling_info)
         {
-            libff::print_indent(); printf("QAP divisibility check failed.\n");
+            libff::print_indent(); 
         }
         result = false;
     }

@@ -123,7 +123,7 @@ private:
 
 public:
     Impl(size_t tree_depth) : tree_depth_(tree_depth) {
-        std::cout << "Creating MerkleCircuit with depth " << tree_depth << std::endl;
+        // std::cout << "Creating MerkleCircuit with depth " << tree_depth << std::endl;
         
         pb_ = std::make_shared<libsnark::protoboard<FieldT>>();
         
@@ -147,11 +147,11 @@ public:
         address_bits_.allocate(*pb_, tree_depth_, "address_bits");
         read_successful_.allocate(*pb_, "read_successful");
         
-        std::cout << "MerkleCircuit initialized successfully" << std::endl;
+        // std::cout << "MerkleCircuit initialized successfully" << std::endl;
     }
     
     void generateConstraints() {
-        std::cout << "Generating constraints..." << std::endl;
+        // std::cout << "Generating constraints..." << std::endl;
         
         // 1. ALLOCATE BIT DECOMPOSITION VARIABLES
         note_value_bits_.allocate(*pb_, 64, "note_value_bits");
@@ -328,7 +328,7 @@ public:
         // Boolean constraints for all bits
         generateBooleanConstraints();
         
-        std::cout << "Constraints generated. Total: " << pb_->num_constraints() << std::endl;
+        //std::cout << "Constraints generated. Total: " << pb_->num_constraints() << std::endl;
     }
     
     void generateBooleanConstraints() {
@@ -361,7 +361,7 @@ public:
         const std::vector<bool>& leaf,
         const std::vector<bool>& root)
     {
-        std::cout << "=== DEPOSIT WITNESS GENERATION ===" << std::endl;
+        // std::cout << "=== DEPOSIT WITNESS GENERATION ===" << std::endl;
         
         // For deposits, use dummy authentication path
         std::vector<std::vector<bool>> dummyPath(tree_depth_, std::vector<bool>(256, false));
@@ -378,7 +378,7 @@ public:
         const std::vector<bool>& root,
         size_t address)
     {
-        std::cout << "=== WITHDRAWAL WITNESS GENERATION ===" << std::endl;
+        //std::cout << "=== WITHDRAWAL WITNESS GENERATION ===" << std::endl;
         
         return generateWitness(note, a_sk, vcm_r, leaf, path, root, address);
     }
@@ -412,7 +412,7 @@ private:
             // 5. GENERATE WITNESSES FOR ALL GADGETS
             generateAllWitnesses();
             
-            std::cout << "Witness generation completed successfully" << std::endl;
+            //std::cout << "Witness generation completed successfully" << std::endl;
             
             return pb_->auxiliary_input();
             
@@ -436,25 +436,25 @@ private:
         auto vcm_r_bits = MerkleCircuit::uint256ToBits(vcm_r);
         auto a_sk_bits = MerkleCircuit::uint256ToBits(a_sk);
         
-        // DEBUG: Print circuit bit conversion for comparison
-        std::cout << "Circuit setBits debug:" << std::endl;
-        std::cout << "  a_sk hex: " << std::hex;
-        for (int i = 0; i < 4; ++i) {
-            std::cout << std::setfill('0') << std::setw(2) << (unsigned int)a_sk.begin()[i];
-        }
-        std::cout << "..." << std::dec << std::endl;
+        // // DEBUG: Print circuit bit conversion for comparison
+        // std::cout << "Circuit setBits debug:" << std::endl;
+        // std::cout << "  a_sk hex: " << std::hex;
+        // for (int i = 0; i < 4; ++i) {
+        //     std::cout << std::setfill('0') << std::setw(2) << (unsigned int)a_sk.begin()[i];
+        // }
+        // std::cout << "..." << std::dec << std::endl;
         
-        std::cout << "  a_sk bits[0-15]: ";
-        for (int i = 0; i < 16; ++i) {
-            std::cout << (a_sk_bits[i] ? "1" : "0");
-        }
-        std::cout << std::endl;
+        // std::cout << "  a_sk bits[0-15]: ";
+        // for (int i = 0; i < 16; ++i) {
+        //     std::cout << (a_sk_bits[i] ? "1" : "0");
+        // }
+        // std::cout << std::endl;
         
-        std::cout << "  rho bits[0-15]: ";
-        for (int i = 0; i < 16; ++i) {
-            std::cout << (rho_bits[i] ? "1" : "0");
-        }
-        std::cout << std::endl;
+        // std::cout << "  rho bits[0-15]: ";
+        // for (int i = 0; i < 16; ++i) {
+        //     std::cout << (rho_bits[i] ? "1" : "0");
+        // }
+        // std::cout << std::endl;
         
         for (size_t i = 0; i < 256; ++i) {
             pb_->val(note_rho_bits_[i]) = rho_bits[i] ? FieldT::one() : FieldT::zero();
@@ -563,6 +563,17 @@ public:
         
         uint256 result = MerkleCircuit::bitsToUint256(nullifier_bits);
         
+<<<<<<< HEAD
+=======
+        // DEBUG: Print circuit nullifier extraction
+        // std::cout << "Circuit getNullifierFromBits debug:" << std::endl;
+        // std::cout << "  Circuit result: " << std::hex;
+        // for (int i = 0; i < 8; ++i) {
+        //     std::cout << std::setfill('0') << std::setw(2) << (unsigned int)result.begin()[i];
+        // }
+        // std::cout << "..." << std::dec << std::endl;
+        
+>>>>>>> e7268d5c9 (Commented out Debugging statement from src and test cases, readings from the tests still pending.)
         return result;
     }
     

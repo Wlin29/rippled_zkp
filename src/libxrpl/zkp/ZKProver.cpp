@@ -29,11 +29,11 @@ public:
             commitment_tree_ = std::make_unique<IncrementalMerkleTree>(
                 IncrementalMerkleTree::deserialize(data));
             
-            std::cout << "Loaded commitment tree with " << commitment_tree_->size() 
-                      << " leaves" << std::endl;
+            // std::cout << "Loaded commitment tree with " << commitment_tree_->size() 
+            //           << " leaves" << std::endl;
         } else {
             commitment_tree_ = std::make_unique<IncrementalMerkleTree>(32);
-            std::cout << "Created new commitment tree" << std::endl;
+            // std::cout << "Created new commitment tree" << std::endl;
         }
     }
     
@@ -73,14 +73,14 @@ public:
         std::ofstream file(tree_path_, std::ios::binary);
         file.write(reinterpret_cast<const char*>(data.data()), data.size());
         
-        std::cout << "Saved commitment tree state" << std::endl;
+        // std::cout << "Saved commitment tree state" << std::endl;
     }
     
     static void optimizeTree() {
         if (!commitment_tree_) return;
         
         commitment_tree_->precomputeNodes(commitment_tree_->size());
-        std::cout << "Optimized commitment tree" << std::endl;
+        // std::cout << "Optimized commitment tree" << std::endl;
     }
 };
 
@@ -99,7 +99,7 @@ void ZkProver::initialize() {
         libff::alt_bn128_pp::init_public_params();
         TreeManager::initialize();
         isInitialized = true;
-        std::cout << "Initializing ZkProver with the circuit..." << std::endl;
+        // std::cout << "Initializing ZkProver with the circuit..." << std::endl;
         
         if (!loadKeys("/tmp/rippled_zkp_keys")) {
             generateKeys(true);
@@ -109,34 +109,34 @@ void ZkProver::initialize() {
 }
 
 bool ZkProver::generateKeys(bool forceRegeneration) {
-    std::cout << "Starting key generation..." << std::endl;
+    // std::cout << "Starting key generation..." << std::endl;
     
     if (!forceRegeneration && provingKey && verificationKey && unifiedCircuit) {
-        std::cout << "keys already exist, skipping generation." << std::endl;
+        // std::cout << "keys already exist, skipping generation." << std::endl;
         return true;
     }
     
     try {
-        std::cout << "Initializing curve parameters..." << std::endl;
+        // std::cout << "Initializing curve parameters..." << std::endl;
         libff::alt_bn128_pp::init_public_params();
         
-        std::cout << "Creating MerkleCircuit..." << std::endl;
+        // std::cout << "Creating MerkleCircuit..." << std::endl;
         unifiedCircuit = std::make_shared<MerkleCircuit>(32);  // Standard depth
         
-        std::cout << "Generating constraints..." << std::endl;
+        // std::cout << "Generating constraints..." << std::endl;
         unifiedCircuit->generateConstraints();
         
-        std::cout << "Getting constraint system..." << std::endl;
+        // std::cout << "Getting constraint system..." << std::endl;
         auto cs = unifiedCircuit->getConstraintSystem();
-        std::cout << "Circuit has " << cs.num_constraints() << " constraints" << std::endl;
+        // std::cout << "Circuit has " << cs.num_constraints() << " constraints" << std::endl;
         
-        std::cout << "Running key generator..." << std::endl;
+        // std::cout << "Running key generator..." << std::endl;
         auto keypair = libsnark::r1cs_gg_ppzksnark_generator<DefaultCurve>(cs);
         
         provingKey = std::make_shared<libsnark::r1cs_gg_ppzksnark_proving_key<DefaultCurve>>(std::move(keypair.pk));
         verificationKey = std::make_shared<libsnark::r1cs_gg_ppzksnark_verification_key<DefaultCurve>>(std::move(keypair.vk));
         
-        std::cout << "Keys generated successfully!" << std::endl;
+        // std::cout << "Keys generated successfully!" << std::endl;
         return true;
         
     } catch (const std::exception& e) {
@@ -154,13 +154,13 @@ bool ZkProver::saveKeys(const std::string& basePath) {
         if (provingKey) {
             std::ofstream pk_file(basePath + "_pk", std::ios::binary);
             pk_file << *provingKey;
-            std::cout << "Saved proving key" << std::endl;
+            // std::cout << "Saved proving key" << std::endl;
         }
         
         if (verificationKey) {
             std::ofstream vk_file(basePath + "_vk", std::ios::binary);
             vk_file << *verificationKey;
-            std::cout << "Saved verification key" << std::endl;
+            // std::cout << "Saved verification key" << std::endl;
         }
         
         return true;
@@ -183,10 +183,10 @@ bool ZkProver::loadKeys(const std::string& basePath) {
             pk_file >> *provingKey;
             vk_file >> *verificationKey;
             
-            std::cout << "Loaded keys with " << provingKey->constraint_system.num_constraints() << " constraints" << std::endl;
+            // std::cout << "Loaded keys with " << provingKey->constraint_system.num_constraints() << " constraints" << std::endl;
             
             // Create circuit that matches the loaded keys
-            std::cout << "Creating circuit to match loaded keys..." << std::endl;
+            // std::cout << "Creating circuit to match loaded keys..." << std::endl;
             unifiedCircuit = std::make_shared<MerkleCircuit>(32);
             unifiedCircuit->generateConstraints();
             
@@ -222,25 +222,25 @@ ProofData ZkProver::createDepositProof(
 {
     try {
         if (!provingKey || !unifiedCircuit) {
-            std::cerr << "Proving key or circuit not available" << std::endl;
+            // std::cerr << "Proving key or circuit not available" << std::endl;
             return {};
         }
         
-        std::cout << "=== UNIFIED DEPOSIT PROOF (TREE INCLUSION) ===" << std::endl;
+        // std::cout << "=== UNIFIED DEPOSIT PROOF (TREE INCLUSION) ===" << std::endl;
         
         // Use the note's computed commitment 
         uint256 noteCommitment = outputNote.commitment();
-        std::cout << "Output note commitment: " << noteCommitment << std::endl;
-        std::cout << "Output note value: " << outputNote.value << std::endl;
+        // std::cout << "Output note commitment: " << noteCommitment << std::endl;
+        // std::cout << "Output note value: " << outputNote.value << std::endl;
         
         // ALWAYS add the note to the tree and get real authentication path
         size_t actualPosition = TreeManager::addCommitment(noteCommitment);
         uint256 currentRoot = TreeManager::getRoot();
         std::vector<uint256> actualAuthPath = TreeManager::getAuthPath(actualPosition);
         
-        std::cout << "Added note to tree at position: " << actualPosition << std::endl;
-        std::cout << "Current tree root: " << currentRoot << std::endl;
-        std::cout << "Authentication path length: " << actualAuthPath.size() << std::endl;
+        // std::cout << "Added note to tree at position: " << actualPosition << std::endl;
+        // std::cout << "Current tree root: " << currentRoot << std::endl;
+        // std::cout << "Authentication path length: " << actualAuthPath.size() << std::endl;
         
         // Convert to circuit format
         std::vector<bool> commitmentBits = uint256ToBits(noteCommitment);
@@ -258,14 +258,14 @@ ProofData ZkProver::createDepositProof(
             pathBits.push_back(std::vector<bool>(256, false));
         }
         
-        std::cout << "Tree depth: " << treeDepth << std::endl;
-        std::cout << "Padded path length: " << pathBits.size() << std::endl;
+        // std::cout << "Tree depth: " << treeDepth << std::endl;
+        // std::cout << "Padded path length: " << pathBits.size() << std::endl;
         
         // Generate a spending key for the depositor (in real use, this would be provided)
         uint256 depositor_a_sk = generateRandomUint256(); 
         uint256 vcm_r = generateRandomUint256(); // Value commitment randomness
         
-        std::cout << "Generating deposit witness with REAL tree inclusion..." << std::endl;
+        // std::cout << "Generating deposit witness with REAL tree inclusion..." << std::endl;
         
         // Use withdrawal witness generation since it handles real tree paths
         auto witness = unifiedCircuit->generateWithdrawalWitness(
@@ -283,21 +283,21 @@ ProofData ZkProver::createDepositProof(
         FieldT public_nullifier = unifiedCircuit->getNullifier();
         FieldT public_value_commitment = unifiedCircuit->getValueCommitment();
         
-        std::cout << "Public outputs:" << std::endl;
-        std::cout << "  Anchor: " << public_anchor << std::endl;
-        std::cout << "  Nullifier: " << public_nullifier << std::endl;
-        std::cout << "  Value commitment: " << public_value_commitment << std::endl;
+        // std::cout << "Public outputs:" << std::endl;
+        // std::cout << "  Anchor: " << public_anchor << std::endl;
+        // std::cout << "  Nullifier: " << public_nullifier << std::endl;
+        // std::cout << "  Value commitment: " << public_value_commitment << std::endl;
         
         // Verify nullifier computation consistency
         uint256 computedNullifier = unifiedCircuit->getNullifierFromBits();
         uint256 expectedNullifier = outputNote.nullifier(depositor_a_sk);
         
         if (computedNullifier != expectedNullifier) {
-            std::cout << "  Nullifier verification:" << std::endl;
-            std::cout << "    Expected: " << expectedNullifier << std::endl;
-            std::cout << "    Computed: " << computedNullifier << std::endl;
+            // std::cout << "  Nullifier verification:" << std::endl;
+            // std::cout << "    Expected: " << expectedNullifier << std::endl;
+            // std::cout << "    Computed: " << computedNullifier << std::endl;
         } else {
-            std::cout << "  Nullifier computation: CONSISTENT" << std::endl;
+            // std::cout << "  Nullifier computation: CONSISTENT" << std::endl;
         }
         
         // Create primary input vector
@@ -307,7 +307,7 @@ ProofData ZkProver::createDepositProof(
         primary_input.push_back(public_value_commitment);
         
         // Generate the proof
-        std::cout << "Generating zk-SNARK proof..." << std::endl;
+        // std::cout << "Generating zk-SNARK proof..." << std::endl;
         auto proof = libsnark::r1cs_gg_ppzksnark_prover<DefaultCurve>(
             *provingKey, primary_input, witness);
         
@@ -316,7 +316,7 @@ ProofData ZkProver::createDepositProof(
         ss << proof;
         std::string proof_str = ss.str();
         
-        std::cout << "Deposit proof generated successfully with REAL tree inclusion" << std::endl;
+        // std::cout << "Deposit proof generated successfully with REAL tree inclusion" << std::endl;
         
         return ProofData{
             std::vector<unsigned char>(proof_str.begin(), proof_str.end()),
@@ -344,16 +344,16 @@ ProofData ZkProver::createWithdrawalProof(
             return {};
         }
         
-        std::cout << "=== WITHDRAWAL PROOF ===" << std::endl;
+        // std::cout << "=== WITHDRAWAL PROOF ===" << std::endl;
         
         // Use the input note's commitment 
         uint256 inputCommitment = inputNote.commitment();
         uint256 inputNullifier = inputNote.nullifier(a_sk);
         
-        std::cout << "Input note commitment: " << inputCommitment << std::endl;
-        std::cout << "Input note value: " << inputNote.value << std::endl;
-        std::cout << "Input nullifier: " << inputNullifier << std::endl;
-        std::cout << "Expected merkle root: " << merkleRoot << std::endl;
+        // std::cout << "Input note commitment: " << inputCommitment << std::endl;
+        // std::cout << "Input note value: " << inputNote.value << std::endl;
+        // std::cout << "Input nullifier: " << inputNullifier << std::endl;
+        // std::cout << "Expected merkle root: " << merkleRoot << std::endl;
         
         // Validate auth path length
         size_t treeDepth = unifiedCircuit->getTreeDepth();
@@ -377,14 +377,14 @@ ProofData ZkProver::createWithdrawalProof(
             pathBits.push_back(std::vector<bool>(256, false));
         }
         
-        std::cout << "Tree depth: " << treeDepth << std::endl;
-        std::cout << "Path length: " << pathBits.size() << std::endl;
-        std::cout << "Position: " << position << std::endl;
+        // std::cout << "Tree depth: " << treeDepth << std::endl;
+        // std::cout << "Path length: " << pathBits.size() << std::endl;
+        // std::cout << "Position: " << position << std::endl;
         
         // Generate value commitment randomness
         uint256 vcm_r = generateRandomUint256();
         
-        std::cout << "Generating withdrawal witness..." << std::endl;
+        // std::cout << "Generating withdrawal witness..." << std::endl;
         
         // Generate witness using the complete input note
         auto witness = unifiedCircuit->generateWithdrawalWitness(
@@ -402,17 +402,17 @@ ProofData ZkProver::createWithdrawalProof(
         FieldT public_nullifier = unifiedCircuit->getNullifier();
         FieldT public_value_commitment = unifiedCircuit->getValueCommitment();
         
-        std::cout << "Public outputs:" << std::endl;
-        std::cout << "  Anchor: " << public_anchor << std::endl;
-        std::cout << "  Nullifier: " << public_nullifier << std::endl;
-        std::cout << "  Value commitment: " << public_value_commitment << std::endl;
+        // std::cout << "Public outputs:" << std::endl;
+        // std::cout << "  Anchor: " << public_anchor << std::endl;
+        // std::cout << "  Nullifier: " << public_nullifier << std::endl;
+        // std::cout << "  Value commitment: " << public_value_commitment << std::endl;
         
         // Get nullifier directly from digest bits
         uint256 computedNullifier = unifiedCircuit->getNullifierFromBits();
         if (computedNullifier != inputNullifier) {
-            std::cout << "  Nullifier mismatch:" << std::endl;
-            std::cout << "    Expected: " << inputNullifier << std::endl;
-            std::cout << "    Computed: " << computedNullifier << std::endl;
+            // std::cout << "  Nullifier mismatch:" << std::endl;
+            // std::cout << "    Expected: " << inputNullifier << std::endl;
+            // std::cout << "    Computed: " << computedNullifier << std::endl;
         }
         
         // Create primary input vector
@@ -422,7 +422,7 @@ ProofData ZkProver::createWithdrawalProof(
         primary_input.push_back(public_value_commitment);
         
         // Generate the proof
-        std::cout << "Generating zk-SNARK proof..." << std::endl;
+        // std::cout << "Generating zk-SNARK proof..." << std::endl;
         auto proof = libsnark::r1cs_gg_ppzksnark_prover<DefaultCurve>(
             *provingKey, primary_input, witness);
         
@@ -431,7 +431,7 @@ ProofData ZkProver::createWithdrawalProof(
         ss << proof;
         std::string proof_str = ss.str();
         
-        std::cout << "Withdrawal proof generated successfully" << std::endl;
+        // std::cout << "Withdrawal proof generated successfully" << std::endl;
         
         return ProofData{
             std::vector<unsigned char>(proof_str.begin(), proof_str.end()),
@@ -472,16 +472,16 @@ bool ZkProver::verifyProof(
         primary_input.push_back(nullifier);
         primary_input.push_back(value_commitment);
 
-        std::cout << "=== UNIFIED PROOF VERIFICATION ===" << std::endl;
-        std::cout << "Anchor: " << anchor << std::endl;
-        std::cout << "Nullifier: " << nullifier << std::endl;
-        std::cout << "Value commitment: " << value_commitment << std::endl;
+        // std::cout << "=== UNIFIED PROOF VERIFICATION ===" << std::endl;
+        // std::cout << "Anchor: " << anchor << std::endl;
+        // std::cout << "Nullifier: " << nullifier << std::endl;
+        // std::cout << "Value commitment: " << value_commitment << std::endl;
         
         // Verify using verification key (same algorithm for all proofs)
         bool verification_result = libsnark::r1cs_gg_ppzksnark_verifier_strong_IC<DefaultCurve>(
             *verificationKey, primary_input, proof);
         
-        std::cout << "Verification result: " << (verification_result ? "PASS" : "FAIL") << std::endl;
+        // std::cout << "Verification result: " << (verification_result ? "PASS" : "FAIL") << std::endl;
         
         return verification_result;
             

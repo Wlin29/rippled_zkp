@@ -45,66 +45,66 @@ private:
     }
 
     void printMerklePathDebug(const std::vector<uint256>& authPath, size_t noteIndex, const uint256& merkleRoot, const std::string& testName) {
-        std::cout << "\n=== MERKLE PATH DEBUG: " << testName << " ===" << std::endl;
-        std::cout << "Note index: " << noteIndex << std::endl;
-        std::cout << "Merkle root: " << strHex(merkleRoot) << std::endl;
-        std::cout << "Auth path length: " << authPath.size() << std::endl;
-        std::cout << "Address bits (LSB first): ";
+        //std::cout << "\n=== MERKLE PATH DEBUG: " << testName << " ===" << std::endl;
+        //std::cout << "Note index: " << noteIndex << std::endl;
+        //std::cout << "Merkle root: " << strHex(merkleRoot) << std::endl;
+        //std::cout << "Auth path length: " << authPath.size() << std::endl;
+        //std::cout << "Address bits (LSB first): ";
         for (int i = 0; i < authPath.size(); ++i) {
-            std::cout << ((noteIndex >> i) & 1);
+            //std::cout << ((noteIndex >> i) & 1);
         }
-        std::cout << std::endl;
+        //std::cout << std::endl;
         
         for (size_t i = 0; i < authPath.size(); ++i) {
-            std::cout << "  Level " << i << ": " << strHex(authPath[i]) << std::endl;
+            //std::cout << "  Level " << i << ": " << strHex(authPath[i]) << std::endl;
             if (authPath[i] == uint256{}) {
-                std::cout << "    ^^ WARNING: All-zero hash at level " << i << std::endl;
+                //std::cout << "    ^^ WARNING: All-zero hash at level " << i << std::endl;
             }
         }
-        std::cout << "=== END MERKLE PATH DEBUG ===" << std::endl;
+        //std::cout << "=== END MERKLE PATH DEBUG ===" << std::endl;
     }
 
     void printNullifierDebug(const zkp::Note& note, const uint256& a_sk, const std::string& testName) {
-        std::cout << "\n=== NULLIFIER DEBUG: " << testName << " ===" << std::endl;
-        std::cout << "Note rho: " << strHex(note.rho) << std::endl;
-        std::cout << "Spending key: " << strHex(a_sk) << std::endl;
+        //std::cout << "\n=== NULLIFIER DEBUG: " << testName << " ===" << std::endl;
+        //std::cout << "Note rho: " << strHex(note.rho) << std::endl;
+        //std::cout << "Spending key: " << strHex(a_sk) << std::endl;
         uint256 expectedNullifier = note.nullifier(a_sk);
-        std::cout << "Expected nullifier: " << strHex(expectedNullifier) << std::endl;
-        std::cout << "=== END NULLIFIER DEBUG ===" << std::endl;
+        //std::cout << "Expected nullifier: " << strHex(expectedNullifier) << std::endl;
+        //std::cout << "=== END NULLIFIER DEBUG ===" << std::endl;
     }
 
     void printNoteDebug(const zkp::Note& note, const std::string& testName) {
-        std::cout << "\n=== NOTE DEBUG: " << testName << " ===" << std::endl;
-        std::cout << "Value: " << note.value << std::endl;
-        std::cout << "Rho: " << strHex(note.rho) << std::endl;
-        std::cout << "R: " << strHex(note.r) << std::endl;
-        std::cout << "A_pk: " << strHex(note.a_pk) << std::endl;
-        std::cout << "Commitment: " << strHex(note.commitment()) << std::endl;
-        std::cout << "=== END NOTE DEBUG ===" << std::endl;
+        //std::cout << "\n=== NOTE DEBUG: " << testName << " ===" << std::endl;
+        //std::cout << "Value: " << note.value << std::endl;
+        //std::cout << "Rho: " << strHex(note.rho) << std::endl;
+        //std::cout << "R: " << strHex(note.r) << std::endl;
+        //std::cout << "A_pk: " << strHex(note.a_pk) << std::endl;
+        //std::cout << "Commitment: " << strHex(note.commitment()) << std::endl;
+        //std::cout << "=== END NOTE DEBUG ===" << std::endl;
     }
 
     void printProofDebug(const zkp::ProofData& proofData, const std::string& testName) {
-        std::cout << "\n=== PROOF DEBUG: " << testName << " ===" << std::endl;
-        std::cout << "Proof size: " << proofData.proof.size() << " bytes" << std::endl;
-        std::cout << "Anchor: " << strHex(zkp::ZkProver::fieldElementToUint256(proofData.anchor)) << std::endl;
-        std::cout << "Nullifier: " << strHex(zkp::ZkProver::fieldElementToUint256(proofData.nullifier)) << std::endl;
-        std::cout << "Value commitment: " << strHex(zkp::ZkProver::fieldElementToUint256(proofData.value_commitment)) << std::endl;
+        //std::cout << "\n=== PROOF DEBUG: " << testName << " ===" << std::endl;
+        //std::cout << "Proof size: " << proofData.proof.size() << " bytes" << std::endl;
+        //std::cout << "Anchor: " << strHex(zkp::ZkProver::fieldElementToUint256(proofData.anchor)) << std::endl;
+        //std::cout << "Nullifier: " << strHex(zkp::ZkProver::fieldElementToUint256(proofData.nullifier)) << std::endl;
+        //std::cout << "Value commitment: " << strHex(zkp::ZkProver::fieldElementToUint256(proofData.value_commitment)) << std::endl;
         
         //  ADD: Field element range validation
         auto anchorUint = zkp::ZkProver::fieldElementToUint256(proofData.anchor);
         auto nullifierUint = zkp::ZkProver::fieldElementToUint256(proofData.nullifier);
         auto vcUint = zkp::ZkProver::fieldElementToUint256(proofData.value_commitment);
         
-        std::cout << "Field validation:" << std::endl;
-        std::cout << "  Anchor field valid: " << (anchorUint != uint256{}) << std::endl;
-        std::cout << "  Nullifier field valid: " << (nullifierUint != uint256{}) << std::endl;
-        std::cout << "  Value commitment field valid: " << (vcUint != uint256{}) << std::endl;
-        std::cout << "=== END PROOF DEBUG ===" << std::endl;
+        //std::cout << "Field validation:" << std::endl;
+        //std::cout << "  Anchor field valid: " << (anchorUint != uint256{}) << std::endl;
+        //std::cout << "  Nullifier field valid: " << (nullifierUint != uint256{}) << std::endl;
+        //std::cout << "  Value commitment field valid: " << (vcUint != uint256{}) << std::endl;
+        //std::cout << "=== END PROOF DEBUG ===" << std::endl;
     }
 
     //  ADD: Enhanced verification with detailed error reporting
     bool verifyProofWithDebug(const zkp::ProofData& proofData, const std::string& testName) {
-        std::cout << "\n=== VERIFICATION DEBUG: " << testName << " ===" << std::endl;
+        //std::cout << "\n=== VERIFICATION DEBUG: " << testName << " ===" << std::endl;
         
         //  ADD: Pre-verification constraint validation
         auto anchorUint = zkp::ZkProver::fieldElementToUint256(proofData.anchor);
@@ -116,19 +116,19 @@ private:
         bool nullifierValid = (nullifierUint != uint256{}) && !isFieldOverflow(nullifierUint);
         bool vcValid = (vcUint != uint256{}) && !isFieldOverflow(vcUint);
         
-        std::cout << "Pre-verification validation:" << std::endl;
-        std::cout << "  Anchor valid: " << anchorValid << " (" << strHex(anchorUint).substr(0, 16) << "...)" << std::endl;
-        std::cout << "  Nullifier valid: " << nullifierValid << " (" << strHex(nullifierUint).substr(0, 16) << "...)" << std::endl;
-        std::cout << "  Value commitment valid: " << vcValid << " (" << strHex(vcUint).substr(0, 16) << "...)" << std::endl;
+        //std::cout << "Pre-verification validation:" << std::endl;
+        //std::cout << "  Anchor valid: " << anchorValid << " (" << strHex(anchorUint).substr(0, 16) << "...)" << std::endl;
+        //std::cout << "  Nullifier valid: " << nullifierValid << " (" << strHex(nullifierUint).substr(0, 16) << "...)" << std::endl;
+        //std::cout << "  Value commitment valid: " << vcValid << " (" << strHex(vcUint).substr(0, 16) << "...)" << std::endl;
         
         bool result = zkp::ZkProver::verifyProof(proofData);
         
         if (!result) {
-            std::cout << " QAP DIVISIBILITY FAILURE DETECTED " << std::endl;
-            std::cout << "Failed inputs:" << std::endl;
-            std::cout << "  Anchor: " << strHex(zkp::ZkProver::fieldElementToUint256(proofData.anchor)) << std::endl;
-            std::cout << "  Nullifier: " << strHex(zkp::ZkProver::fieldElementToUint256(proofData.nullifier)) << std::endl;
-            std::cout << "  Value commitment: " << strHex(zkp::ZkProver::fieldElementToUint256(proofData.value_commitment)) << std::endl;
+            //std::cout << " QAP DIVISIBILITY FAILURE DETECTED " << std::endl;
+            //std::cout << "Failed inputs:" << std::endl;
+            //std::cout << "  Anchor: " << strHex(zkp::ZkProver::fieldElementToUint256(proofData.anchor)) << std::endl;
+            //std::cout << "  Nullifier: " << strHex(zkp::ZkProver::fieldElementToUint256(proofData.nullifier)) << std::endl;
+            //std::cout << "  Value commitment: " << strHex(zkp::ZkProver::fieldElementToUint256(proofData.value_commitment)) << std::endl;
             
             // Try legacy verification for comparison
             bool legacyResult = false;
@@ -138,23 +138,23 @@ private:
                 } else if (testName.find("Withdrawal") != std::string::npos) {
                     legacyResult = zkp::ZkProver::verifyWithdrawalProof(proofData);
                 }
-                std::cout << "  Legacy verification: " << (legacyResult ? "PASS" : "FAIL") << std::endl;
+                //std::cout << "  Legacy verification: " << (legacyResult ? "PASS" : "FAIL") << std::endl;
             } catch (...) {
-                std::cout << "  Legacy verification: EXCEPTION" << std::endl;
+                //std::cout << "  Legacy verification: EXCEPTION" << std::endl;
             }
             
             //  ADD: Attempt retry with field element normalization
-            std::cout << "Attempting normalized verification..." << std::endl;
+            //std::cout << "Attempting normalized verification..." << std::endl;
             bool retryResult = attemptNormalizedVerification(proofData, testName);
             if (retryResult != result) {
-                std::cout << " RETRY SUCCESSFUL with normalized inputs!" << std::endl;
+                //std::cout << " RETRY SUCCESSFUL with normalized inputs!" << std::endl;
                 return retryResult;
             }
         } else {
-            std::cout << " Verification PASSED" << std::endl;
+            //std::cout << " Verification PASSED" << std::endl;
         }
         
-        std::cout << "=== END VERIFICATION DEBUG ===" << std::endl;
+        //std::cout << "=== END VERIFICATION DEBUG ===" << std::endl;
         return result;
     }
 
@@ -168,21 +168,21 @@ private:
 
     //  ADD: Simplified retry mechanism
     bool attemptNormalizedVerification(const zkp::ProofData& originalProof, const std::string& testName) {
-        std::cout << "Attempting alternative verification methods..." << std::endl;
+        //std::cout << "Attempting alternative verification methods..." << std::endl;
         
         // Try legacy verification methods as fallback
         try {
             if (testName.find("Deposit") != std::string::npos) {
                 bool legacyResult = zkp::ZkProver::verifyDepositProof(originalProof);
-                std::cout << "Legacy deposit verification: " << (legacyResult ? "PASS" : "FAIL") << std::endl;
+                //std::cout << "Legacy deposit verification: " << (legacyResult ? "PASS" : "FAIL") << std::endl;
                 return legacyResult;
             } else if (testName.find("Withdrawal") != std::string::npos) {
                 bool legacyResult = zkp::ZkProver::verifyWithdrawalProof(originalProof);
-                std::cout << "Legacy withdrawal verification: " << (legacyResult ? "PASS" : "FAIL") << std::endl;
+                //std::cout << "Legacy withdrawal verification: " << (legacyResult ? "PASS" : "FAIL") << std::endl;
                 return legacyResult;
             }
         } catch (const std::exception& e) {
-            std::cout << "Legacy verification failed: " << e.what() << std::endl;
+            //std::cout << "Legacy verification failed: " << e.what() << std::endl;
         }
         
         return false;
@@ -235,7 +235,7 @@ public:
         // Test loading keys
         BEAST_EXPECT(zkp::ZkProver::loadKeys(keyPath));
         
-        std::cout << "Unified key persistence: SUCCESS" << std::endl;
+        //std::cout << "Unified key persistence: SUCCESS" << std::endl;
     }
     
     void testNoteCreationAndCommitment() {
@@ -293,7 +293,7 @@ public:
         BEAST_EXPECT(deserialized.r == randomNote.r);
         BEAST_EXPECT(deserialized.a_pk == randomNote.a_pk);
         
-        std::cout << "note functionality test: SUCCESS" << std::endl;
+        //std::cout << "note functionality test: SUCCESS" << std::endl;
     }
 
     void testDepositProofCreation()
@@ -304,7 +304,7 @@ public:
         for (size_t idx = 0; idx < 3; ++idx) {
             uint64_t amount = 1000000 + idx * 100000;
 
-            std::cout << "=== CREATING DEPOSIT PROOF " << idx << " ===" << std::endl;
+            //std::cout << "=== CREATING DEPOSIT PROOF " << idx << " ===" << std::endl;
 
             // Create note first
             zkp::Note depositNote = zkp::ZkProver::createRandomNote(amount);
@@ -327,8 +327,8 @@ public:
             bool legacyValid = zkp::ZkProver::verifyDepositProof(proofData);
             BEAST_EXPECT(legacyValid == isValid);
             
-            std::cout << "deposit proof " << idx << " verification: " << (isValid ? "PASS" : "FAIL") 
-                      << " (legacy: " << (legacyValid ? "PASS" : "FAIL") << ")" << std::endl;
+            //std::cout << "deposit proof " << idx << " verification: " << (isValid ? "PASS" : "FAIL") 
+                    //   << " (legacy: " << (legacyValid ? "PASS" : "FAIL") << ")" << std::endl;
         }
     }
 
@@ -368,12 +368,12 @@ public:
         printMerklePathDebug(authPath, noteIndex, merkleRoot, "Withdrawal Proof Creation");
         printNullifierDebug(inputNote, a_sk, "Withdrawal Nullifier");
 
-        std::cout << "=== CREATING WITHDRAWAL PROOF ===" << std::endl;
-        std::cout << "Input note value: " << inputNote.value << std::endl;
-        std::cout << "Input note commitment: " << noteCommitment << std::endl;
-        std::cout << "Tree root: " << merkleRoot << std::endl;
-        std::cout << "Auth path length: " << authPath.size() << std::endl;
-        std::cout << "Position: " << noteIndex << std::endl;
+        //std::cout << "=== CREATING WITHDRAWAL PROOF ===" << std::endl;
+        //std::cout << "Input note value: " << inputNote.value << std::endl;
+        //std::cout << "Input note commitment: " << noteCommitment << std::endl;
+        //std::cout << "Tree root: " << merkleRoot << std::endl;
+        //std::cout << "Auth path length: " << authPath.size() << std::endl;
+        //std::cout << "Position: " << noteIndex << std::endl;
 
         auto proofData = zkp::ZkProver::createWithdrawalProof(
             inputNote,      // Note being spent
@@ -384,7 +384,7 @@ public:
         );
         
         BEAST_EXPECT(!proofData.empty());
-        std::cout << "withdrawal proof creation: " << (!proofData.empty() ? "SUCCESS" : "FAILED") << std::endl;
+        //std::cout << "withdrawal proof creation: " << (!proofData.empty() ? "SUCCESS" : "FAILED") << std::endl;
         
         //  ADD: Debug the withdrawal proof
         if (!proofData.empty()) {
@@ -395,7 +395,7 @@ public:
         if (!proofData.empty()) {
             bool isValid = zkp::ZkProver::verifyWithdrawalProof(proofData);
             BEAST_EXPECT(isValid);
-            std::cout << "withdrawal proof verification: " << (isValid ? "PASS" : "FAIL") << std::endl;
+            //std::cout << "withdrawal proof verification: " << (isValid ? "PASS" : "FAIL") << std::endl;
         }
     }
 
@@ -433,8 +433,8 @@ public:
         bool emptyValid = zkp::ZkProver::verifyDepositProof(emptyProof);
         BEAST_EXPECT(!emptyValid);
         
-        std::cout << "deposit verification: valid=" << isValid 
-                  << ", tampered=" << tamperedValid << ", empty=" << emptyValid << std::endl;
+        //std::cout << "deposit verification: valid=" << isValid 
+                //   << ", tampered=" << tamperedValid << ", empty=" << emptyValid << std::endl;
     }
 
     void testWithdrawalProofVerification()
@@ -463,7 +463,7 @@ public:
         printMerklePathDebug(authPath, noteIndex, merkleRoot, "Withdrawal Verification");
         printNullifierDebug(inputNote, a_sk, "Withdrawal Verification Nullifier");
 
-        std::cout << "=== WITHDRAWAL PROOF VERIFICATION ===" << std::endl;
+        //std::cout << "=== WITHDRAWAL PROOF VERIFICATION ===" << std::endl;
 
         // Create proof using new signature
         auto proofData = zkp::ZkProver::createWithdrawalProof(
@@ -487,11 +487,11 @@ public:
             bool wrongRootValid = verifyProofWithDebug(wrongRoot, "Tampered Withdrawal");
             BEAST_EXPECT(!wrongRootValid);
             
-            std::cout << "withdrawal verification: valid=" << isValid 
-                      << ", legacy=" << legacyValid
-                      << ", tampered=" << wrongRootValid << std::endl;
+            //std::cout << "withdrawal verification: valid=" << isValid 
+                    //   << ", legacy=" << legacyValid
+                    //   << ", tampered=" << wrongRootValid << std::endl;
         } else {
-            std::cout << "Withdrawal proof creation failed" << std::endl;
+            //std::cout << "Withdrawal proof creation failed" << std::endl;
         }
     }
 
@@ -517,9 +517,9 @@ public:
         bool withdrawalProofDataSatisfied = zkp::ZkProver::verifyWithdrawalProof(invalidProofData);
         BEAST_EXPECT(!withdrawalProofDataSatisfied);
         
-        std::cout << "Invalid proof rejection: deposit=" << !depositSatisfied 
-                  << ", withdrawal=" << !withdrawalSatisfied 
-                  << ", proofData=" << !depositProofDataSatisfied << std::endl;
+        //std::cout << "Invalid proof rejection: deposit=" << !depositSatisfied 
+                //   << ", withdrawal=" << !withdrawalSatisfied 
+                //   << ", proofData=" << !depositProofDataSatisfied << std::endl;
     }
 
     void testMultipleProofs()
@@ -556,8 +556,8 @@ public:
             bool isValid = zkp::ZkProver::verifyProof(proofs[i]);
             BEAST_EXPECT(isValid);
             
-            std::cout << "Proof " << i << " for note value " << notes[i].value 
-                      << ": " << (isValid ? "VALID" : "INVALID") << std::endl;
+            //std::cout << "Proof " << i << " for note value " << notes[i].value 
+                    //   << ": " << (isValid ? "VALID" : "INVALID") << std::endl;
         }
         
         // Test that proofs with different public inputs fail verification
@@ -569,13 +569,13 @@ public:
                     bool mismatchValid = zkp::ZkProver::verifyProof(
                         proofs[i].proof, proofs[j].anchor, proofs[j].nullifier, proofs[j].value_commitment);
                     BEAST_EXPECT(!mismatchValid);
-                    std::cout << "Public input mismatch test " << i << "→" << j << ": " 
-                              << (mismatchValid ? "UNEXPECTED_PASS" : "CORRECTLY_FAILED") << std::endl;
+                    //std::cout << "Public input mismatch test " << i << "→" << j << ": " 
+                            //   << (mismatchValid ? "UNEXPECTED_PASS" : "CORRECTLY_FAILED") << std::endl;
                 }
             }
         }
         
-        std::cout << "Multiple proofs test: " << proofs.size() << " proofs generated and verified" << std::endl;
+        //std::cout << "Multiple proofs test: " << proofs.size() << " proofs generated and verified" << std::endl;
     }
 
     void testEdgeCases()
@@ -617,18 +617,18 @@ public:
             printProofDebug(maxProof, "Max Amount Proof");
             
             maxValid = zkp::ZkProver::verifyDepositProof(maxProof);
-            std::cout << "Using safe max amount " << safeMaxAmount << " (2^50-1): " << (maxValid ? "SUCCESS" : "FAILED") << std::endl;
+            //std::cout << "Using safe max amount " << safeMaxAmount << " (2^50-1): " << (maxValid ? "SUCCESS" : "FAILED") << std::endl;
             
         } catch (const std::exception& e) {
-            std::cout << "Safe max amount test caught exception: " << e.what() << std::endl;
+            //std::cout << "Safe max amount test caught exception: " << e.what() << std::endl;
             maxValid = false;
         }
         
         // Test should pass with the safe amount
         BEAST_EXPECT(maxValid);
         
-        std::cout << "edge cases: zero=" << zeroValid 
-                  << ", large=" << largeValid << ", max=" << maxValid << std::endl;
+        //std::cout << "edge cases: zero=" << zeroValid 
+                //   << ", large=" << largeValid << ", max=" << maxValid << std::endl;
     }
 
     void testIncrementalMerkleTree() {
@@ -684,14 +684,14 @@ public:
         BEAST_EXPECT(tree.verify(leaf2, path2, pos2, root));
         BEAST_EXPECT(tree.verify(leaf3, path3, pos3, root));
         
-        std::cout << "Incremental tree test: final size=" << tree.size() 
-                  << ", root=" << strHex(root) << std::endl;
+        //std::cout << "Incremental tree test: final size=" << tree.size() 
+                //   << ", root=" << strHex(root) << std::endl;
     }
 
     void testMerkleTreeVerificationDebug() {
         testcase("Merkle Tree Verification Debug");
         
-        std::cout << "\n=== DEBUGGING INCREMENTAL MERKLE TREE VERIFICATION ===" << std::endl;
+        //std::cout << "\n=== DEBUGGING INCREMENTAL MERKLE TREE VERIFICATION ===" << std::endl;
         
         // Create a small tree for detailed debugging
         zkp::IncrementalMerkleTree tree(8);  // Depth 8 like in the failing test
@@ -700,7 +700,7 @@ public:
         std::vector<uint256> testCommitments;
         std::vector<zkp::Note> testNotes;
         
-        std::cout << "Creating test notes and commitments..." << std::endl;
+        //std::cout << "Creating test notes and commitments..." << std::endl;
         for (int i = 0; i < 256; ++i) {  // Fill tree to match failing test
             zkp::Note note = zkp::ZkProver::createRandomNote(1000000 + i);
             testNotes.push_back(note);
@@ -709,8 +709,8 @@ public:
         }
         
         uint256 finalRoot = tree.root();
-        std::cout << "Tree filled with " << tree.size() << " nodes" << std::endl;
-        std::cout << "Final root: " << strHex(finalRoot) << std::endl;
+        //std::cout << "Tree filled with " << tree.size() << " nodes" << std::endl;
+        //std::cout << "Final root: " << strHex(finalRoot) << std::endl;
         
         // Test the three positions that are failing
         std::vector<size_t> testPositions = {0, 128, 255};  // first, middle, last
@@ -720,49 +720,49 @@ public:
             size_t pos = testPositions[i];
             std::string name = positionNames[i];
             
-            std::cout << "\n--- Testing " << name << " Position (index " << pos << ") ---" << std::endl;
+            //std::cout << "\n--- Testing " << name << " Position (index " << pos << ") ---" << std::endl;
             
             uint256 leaf = testCommitments[pos];
             std::vector<uint256> authPath = tree.authPath(pos);
             uint256 root = tree.root();
             
-            std::cout << "Leaf: " << strHex(leaf) << std::endl;
-            std::cout << "Root: " << strHex(root) << std::endl;
-            std::cout << "Auth path length: " << authPath.size() << std::endl;
+            //std::cout << "Leaf: " << strHex(leaf) << std::endl;
+            //std::cout << "Root: " << strHex(root) << std::endl;
+            //std::cout << "Auth path length: " << authPath.size() << std::endl;
             
             // Debug the authentication path
-            std::cout << "Auth path details:" << std::endl;
+            //std::cout << "Auth path details:" << std::endl;
             for (size_t level = 0; level < authPath.size(); ++level) {
-                std::cout << "  Level " << level << ": " << strHex(authPath[level]) << std::endl;
+                //std::cout << "  Level " << level << ": " << strHex(authPath[level]) << std::endl;
                 
                 // Check for suspicious patterns
                 if (authPath[level] == uint256{}) {
-                    std::cout << "    WARNING: Zero hash at level " << level << std::endl;
+                    //std::cout << "    WARNING: Zero hash at level " << level << std::endl;
                 }
                 
                 // Check if hash appears in multiple levels (potential caching issue)
                 for (size_t j = level + 1; j < authPath.size(); ++j) {
                     if (authPath[level] == authPath[j]) {
-                        std::cout << "    WARNING: Duplicate hash at levels " << level << " and " << j << std::endl;
+                        //std::cout << "    WARNING: Duplicate hash at levels " << level << " and " << j << std::endl;
                     }
                 }
             }
             
             // Manual verification step-by-step
-            std::cout << "Manual verification:" << std::endl;
+            //std::cout << "Manual verification:" << std::endl;
             uint256 currentHash = leaf;
             size_t currentPos = pos;
             
-            std::cout << "  Starting with leaf: " << strHex(currentHash) << std::endl;
+            //std::cout << "  Starting with leaf: " << strHex(currentHash) << std::endl;
             
             for (size_t level = 0; level < authPath.size(); ++level) {
                 uint256 sibling = authPath[level];
                 bool isLeft = (currentPos & 1) == 0;
                 
-                std::cout << "  Level " << level << ":" << std::endl;
-                std::cout << "    Position: " << currentPos << " (" << (isLeft ? "left" : "right") << ")" << std::endl;
-                std::cout << "    Current: " << strHex(currentHash) << std::endl;
-                std::cout << "    Sibling: " << strHex(sibling) << std::endl;
+                //std::cout << "  Level " << level << ":" << std::endl;
+                //std::cout << "    Position: " << currentPos << " (" << (isLeft ? "left" : "right") << ")" << std::endl;
+                //std::cout << "    Current: " << strHex(currentHash) << std::endl;
+                //std::cout << "    Sibling: " << strHex(sibling) << std::endl;
                 
                 // Compute parent hash
                 uint256 leftChild, rightChild;
@@ -780,25 +780,25 @@ public:
                 std::memcpy(&combinedData[32], rightChild.begin(), 32);
                 SHA256(combinedData.data(), combinedData.size(), currentHash.begin());
                 
-                std::cout << "    Left:   " << strHex(leftChild) << std::endl;
-                std::cout << "    Right:  " << strHex(rightChild) << std::endl;
-                std::cout << "    Parent: " << strHex(currentHash) << std::endl;
+                //std::cout << "    Left:   " << strHex(leftChild) << std::endl;
+                //std::cout << "    Right:  " << strHex(rightChild) << std::endl;
+                //std::cout << "    Parent: " << strHex(currentHash) << std::endl;
                 
                 currentPos >>= 1;
             }
             
-            std::cout << "Final computed root: " << strHex(currentHash) << std::endl;
-            std::cout << "Expected root:       " << strHex(root) << std::endl;
+            //std::cout << "Final computed root: " << strHex(currentHash) << std::endl;
+            //std::cout << "Expected root:       " << strHex(root) << std::endl;
             bool manualMatch = (currentHash == root);
-            std::cout << "Manual verification: " << (manualMatch ? "PASS" : "FAIL") << std::endl;
+            //std::cout << "Manual verification: " << (manualMatch ? "PASS" : "FAIL") << std::endl;
             
             // Test the tree's verify function
             bool treeVerify = tree.verify(leaf, authPath, pos, root);
-            std::cout << "Tree verify():       " << (treeVerify ? "PASS" : "FAIL") << std::endl;
+            //std::cout << "Tree verify():       " << (treeVerify ? "PASS" : "FAIL") << std::endl;
             
             // Compare results
             if (manualMatch != treeVerify) {
-                std::cout << "CRITICAL: Manual and tree verification disagree!" << std::endl;
+                //std::cout << "CRITICAL: Manual and tree verification disagree!" << std::endl;
             }
             
             BEAST_EXPECT(manualMatch);
@@ -806,31 +806,31 @@ public:
             
             // Additional debugging for failures
             if (!treeVerify || !manualMatch) {
-                std::cout << "\nDEBUGGING FAILURE:" << std::endl;
+                //std::cout << "\nDEBUGGING FAILURE:" << std::endl;
                 
                 // Check if the leaf is actually in the tree at this position
                 if (pos < tree.size()) {
-                    std::cout << "Position " << pos << " is within tree bounds (" << tree.size() << ")" << std::endl;
+                    //std::cout << "Position " << pos << " is within tree bounds (" << tree.size() << ")" << std::endl;
                 } else {
-                    std::cout << "ERROR: Position " << pos << " exceeds tree size " << tree.size() << std::endl;
+                    //std::cout << "ERROR: Position " << pos << " exceeds tree size " << tree.size() << std::endl;
                 }
                 
                 // Check tree internal state
-                std::cout << "Tree size: " << tree.size() << std::endl;
-                std::cout << "Tree empty: " << tree.empty() << std::endl;
+                //std::cout << "Tree size: " << tree.size() << std::endl;
+                //std::cout << "Tree empty: " << tree.empty() << std::endl;
                 
                 // Get a fresh auth path to see if it's different
                 std::vector<uint256> freshPath = tree.authPath(pos);
                 bool pathsMatch = (authPath == freshPath);
-                std::cout << "Auth path consistency: " << (pathsMatch ? "CONSISTENT" : "INCONSISTENT") << std::endl;
+                //std::cout << "Auth path consistency: " << (pathsMatch ? "CONSISTENT" : "INCONSISTENT") << std::endl;
                 
                 if (!pathsMatch) {
-                    std::cout << "Fresh auth path differs!" << std::endl;
+                    //std::cout << "Fresh auth path differs!" << std::endl;
                     for (size_t j = 0; j < std::min(authPath.size(), freshPath.size()); ++j) {
                         if (authPath[j] != freshPath[j]) {
-                            std::cout << "  Difference at level " << j << ":" << std::endl;
-                            std::cout << "    Original: " << strHex(authPath[j]) << std::endl;
-                            std::cout << "    Fresh:    " << strHex(freshPath[j]) << std::endl;
+                            //std::cout << "  Difference at level " << j << ":" << std::endl;
+                            //std::cout << "    Original: " << strHex(authPath[j]) << std::endl;
+                            //std::cout << "    Fresh:    " << strHex(freshPath[j]) << std::endl;
                         }
                     }
                 }
@@ -838,7 +838,7 @@ public:
         }
         
         // Test reconstruction of the tree from scratch
-        std::cout << "\n--- Tree Reconstruction Test ---" << std::endl;
+        //std::cout << "\n--- Tree Reconstruction Test ---" << std::endl;
         zkp::IncrementalMerkleTree freshTree(8);
         
         for (size_t i = 0; i < testCommitments.size(); ++i) {
@@ -847,16 +847,16 @@ public:
         
         uint256 freshRoot = freshTree.root();
         bool rootsMatch = (finalRoot == freshRoot);
-        std::cout << "Tree reconstruction: " << (rootsMatch ? "CONSISTENT" : "INCONSISTENT") << std::endl;
+        //std::cout << "Tree reconstruction: " << (rootsMatch ? "CONSISTENT" : "INCONSISTENT") << std::endl;
         
         if (!rootsMatch) {
-            std::cout << "Original root: " << strHex(finalRoot) << std::endl;
-            std::cout << "Fresh root:    " << strHex(freshRoot) << std::endl;
+            //std::cout << "Original root: " << strHex(finalRoot) << std::endl;
+            //std::cout << "Fresh root:    " << strHex(freshRoot) << std::endl;
         }
         
         BEAST_EXPECT(rootsMatch);
         
-        std::cout << "\n=== MERKLE TREE DEBUG COMPLETE ===" << std::endl;
+        //std::cout << "\n=== MERKLE TREE DEBUG COMPLETE ===" << std::endl;
     }
 
     void testMerkleVerificationEnforcement() {
@@ -896,7 +896,7 @@ public:
         }
         
         BEAST_EXPECT(validResult);
-        std::cout << "Valid Merkle path: " << (validResult ? "PASS" : "FAIL") << std::endl;
+        //std::cout << "Valid Merkle path: " << (validResult ? "PASS" : "FAIL") << std::endl;
 
         // Test 2: Create invalid path
         std::vector<uint256> invalidPath(validPath.size());
@@ -911,7 +911,7 @@ public:
         //  ADD: Debug invalid path
         printMerklePathDebug(invalidPath, position, validRoot, "Invalid Merkle Path");
         
-        std::cout << "Testing with invalid path..." << std::endl;
+        //std::cout << "Testing with invalid path..." << std::endl;
         
         // This should FAIL during proof generation or verification
         bool proofGenerationFailed = false;
@@ -921,7 +921,7 @@ public:
             invalidProof = zkp::ZkProver::createWithdrawalProof(
                 inputNote, a_sk, invalidPath, position, validRoot);
         } catch (const std::exception& e) {
-            std::cout << "Good: Invalid path rejected during proof generation: " << e.what() << std::endl;
+            //std::cout << "Good: Invalid path rejected during proof generation: " << e.what() << std::endl;
             proofGenerationFailed = true;
         }
         
@@ -931,7 +931,7 @@ public:
             try {
                 invalidResult = zkp::ZkProver::verifyWithdrawalProof(invalidProof);
             } catch (const std::exception& e) {
-                std::cout << "Good: Invalid proof rejected during verification: " << e.what() << std::endl;
+                //std::cout << "Good: Invalid proof rejected during verification: " << e.what() << std::endl;
                 invalidResult = false;
             }
         }
@@ -940,8 +940,8 @@ public:
         bool securityWorking = proofGenerationFailed || !invalidResult;
         
         if (!securityWorking) {
-            std::cout << "CRITICAL BUG: Invalid Merkle path accepted!" << std::endl;
-            std::cout << "This indicates the ZK circuit is not properly constraining Merkle paths." << std::endl;
+            //std::cout << "CRITICAL BUG: Invalid Merkle path accepted!" << std::endl;
+            //std::cout << "This indicates the ZK circuit is not properly constraining Merkle paths." << std::endl;
             
             // Try to fix by using a proper validation method
             // Test if manual verification catches the error
@@ -971,11 +971,11 @@ public:
                 manualVerificationPassed = (computedRoot == validRoot);
                 
             } catch (const std::exception& e) {
-                std::cout << "Manual verification failed with exception: " << e.what() << std::endl;
+                //std::cout << "Manual verification failed with exception: " << e.what() << std::endl;
                 manualVerificationPassed = false;
             }
             
-            std::cout << "Manual Merkle verification result: " << (manualVerificationPassed ? "PASS" : "FAIL") << std::endl;
+            //std::cout << "Manual Merkle verification result: " << (manualVerificationPassed ? "PASS" : "FAIL") << std::endl;
             
             // The test should only pass if manual verification also fails (proving the path is indeed invalid)
             securityWorking = !manualVerificationPassed;
@@ -984,15 +984,15 @@ public:
         BEAST_EXPECT(securityWorking);
         
         if (securityWorking) {
-            std::cout << " Security working: Invalid Merkle path properly rejected" << std::endl;
+            //std::cout << " Security working: Invalid Merkle path properly rejected" << std::endl;
         } else {
-            std::cout << " Security failure: Invalid Merkle path was accepted" << std::endl;
+            //std::cout << " Security failure: Invalid Merkle path was accepted" << std::endl;
         }
         
         // Test 3: Invalid root should fail - implement proper validation
         uint256 invalidRoot = generateRandomUint256();
         
-        std::cout << "Testing with invalid root: " << strHex(invalidRoot) << std::endl;
+        //std::cout << "Testing with invalid root: " << strHex(invalidRoot) << std::endl;
         
         bool invalidRootTest = true; // Start with assumption that security works
         
@@ -1007,31 +1007,31 @@ public:
                 bool invalidRootResult = zkp::ZkProver::verifyWithdrawalProof(invalidRootProof);
                 
                 if (invalidRootResult) {
-                    std::cout << "ERROR: Invalid root verification unexpectedly passed!" << std::endl;
+                    //std::cout << "ERROR: Invalid root verification unexpectedly passed!" << std::endl;
                     
                     // This is a security bug - the ZK circuit should reject proofs with wrong roots
                     // For now, we'll document this as a known issue rather than failing the test
-                    std::cout << "KNOWN ISSUE: ZK circuit does not properly validate Merkle roots" << std::endl;
-                    std::cout << "This may be due to how the witness generation works with different roots" << std::endl;
+                    //std::cout << "KNOWN ISSUE: ZK circuit does not properly validate Merkle roots" << std::endl;
+                    //std::cout << "This may be due to how the witness generation works with different roots" << std::endl;
                     
                     // The test should still "pass" but with a warning about this security issue
                     invalidRootTest = true; // Accept this limitation for now
                 } else {
-                    std::cout << " Invalid root correctly rejected during verification" << std::endl;
+                    //std::cout << " Invalid root correctly rejected during verification" << std::endl;
                     invalidRootTest = true;
                 }
             } else {
-                std::cout << " Invalid root correctly rejected during proof generation" << std::endl;
+                //std::cout << " Invalid root correctly rejected during proof generation" << std::endl;
                 invalidRootTest = true;
             }
             
         } catch (const std::exception& e) {
-            std::cout << " Invalid root correctly rejected with exception: " << e.what() << std::endl;
+            //std::cout << " Invalid root correctly rejected with exception: " << e.what() << std::endl;
             invalidRootTest = true;
         }
         
         BEAST_EXPECT(invalidRootTest);
-        std::cout << "Invalid root test: " << (invalidRootTest ? "PASS" : "FAIL") << " (with known limitations)" << std::endl;
+        //std::cout << "Invalid root test: " << (invalidRootTest ? "PASS" : "FAIL") << " (with known limitations)" << std::endl;
     }
     
     void testUnifiedCircuitBehavior() {
@@ -1041,7 +1041,7 @@ public:
         
         uint64_t amount = 1500000;
         
-        std::cout << "=== UNIFIED CIRCUIT BEHAVIOR TEST ===" << std::endl;
+        //std::cout << "=== UNIFIED CIRCUIT BEHAVIOR TEST ===" << std::endl;
         
         // Create deposit note and proof
         zkp::Note depositNote = zkp::ZkProver::createRandomNote(amount);
@@ -1093,14 +1093,14 @@ public:
             
             BEAST_EXPECT(!mismatchTest);  // Should fail - different public inputs
             
-            std::cout << "Unified circuit results:" << std::endl;
-            std::cout << "  - Deposit proof verification: " << (depositValid ? "PASS" : "FAIL") << std::endl;
-            std::cout << "  - Withdrawal proof verification: " << (withdrawalValid ? "PASS" : "FAIL") << std::endl;
-            std::cout << "  - Legacy compatibility: " << ((depositLegacy == depositValid && withdrawalLegacy == withdrawalValid) ? "PASS" : "FAIL") << std::endl;
-            std::cout << "  - Public input binding: " << (mismatchTest ? "FAIL" : "PASS") << std::endl;
+            //std::cout << "Unified circuit results:" << std::endl;
+            //std::cout << "  - Deposit proof verification: " << (depositValid ? "PASS" : "FAIL") << std::endl;
+            //std::cout << "  - Withdrawal proof verification: " << (withdrawalValid ? "PASS" : "FAIL") << std::endl;
+            //std::cout << "  - Legacy compatibility: " << ((depositLegacy == depositValid && withdrawalLegacy == withdrawalValid) ? "PASS" : "FAIL") << std::endl;
+            //std::cout << "  - Public input binding: " << (mismatchTest ? "FAIL" : "PASS") << std::endl;
             
         } else {
-            std::cout << "Withdrawal proof creation failed" << std::endl;
+            //std::cout << "Withdrawal proof creation failed" << std::endl;
         }
     }
     
@@ -1109,7 +1109,7 @@ public:
         
         BEAST_EXPECT(zkp::ZkProver::generateKeys(false));
         
-        std::cout << "=== COMPLETE WORKFLOW ===" << std::endl;
+        //std::cout << "=== COMPLETE WORKFLOW ===" << std::endl;
         
         // Step 1: Alice creates a shielded note (deposit)
         uint64_t depositAmount = 1000000;
@@ -1117,8 +1117,8 @@ public:
         
         printNoteDebug(aliceNote, "Alice's Note");
 
-        std::cout << "1. Alice creates note with value: " << aliceNote.value << std::endl;
-        std::cout << "   Commitment: " << aliceNote.commitment() << std::endl;
+        //std::cout << "1. Alice creates note with value: " << aliceNote.value << std::endl;
+        //std::cout << "   Commitment: " << aliceNote.commitment() << std::endl;
 
         // Step 2: Alice creates deposit proof
         auto depositProof = zkp::ZkProver::createDepositProof(aliceNote);
@@ -1127,7 +1127,7 @@ public:
         
         printProofDebug(depositProof, "Alice's Deposit Proof");
         
-        std::cout << "2. Alice creates valid deposit proof" << std::endl;
+        //std::cout << "2. Alice creates valid deposit proof" << std::endl;
         
         // Step 3: Add Alice's note to the commitment tree
         zkp::IncrementalMerkleTree commitmentTree(10);
@@ -1141,8 +1141,8 @@ public:
         }
         
         uint256 currentRoot = commitmentTree.root();
-        std::cout << "3. Alice's note added to tree at index " << aliceIndex 
-                  << ", tree size: " << commitmentTree.size() << std::endl;
+        //std::cout << "3. Alice's note added to tree at index " << aliceIndex 
+                //   << ", tree size: " << commitmentTree.size() << std::endl;
         
         // Step 4: Alice wants to withdraw (spend her note)
         uint256 aliceSpendingKey = zkp::ZkProver::generateRandomUint256();
@@ -1162,12 +1162,12 @@ public:
             
             BEAST_EXPECT(zkp::ZkProver::verifyWithdrawalProof(withdrawalProof));
             
-            std::cout << "4. Alice creates valid withdrawal proof" << std::endl;
+            //std::cout << "4. Alice creates valid withdrawal proof" << std::endl;
             
             // Step 6: Verify privacy properties
             // The withdrawal proof should not reveal which note Alice is spending
             uint256 aliceNullifier = zkp::ZkProver::fieldElementToUint256(withdrawalProof.nullifier);
-            std::cout << "5. Alice's nullifier: " << strHex(aliceNullifier) << std::endl;
+            //std::cout << "5. Alice's nullifier: " << strHex(aliceNullifier) << std::endl;
 
             // Step 7: Test double-spending prevention
             // Alice tries to spend the same note again (should be prevented by nullifier tracking)
@@ -1179,8 +1179,8 @@ public:
                 bool sameNullifier = (aliceNullifier == secondNullifier);
                 BEAST_EXPECT(sameNullifier);  // Same note should produce same nullifier
                 
-                std::cout << "6. Double-spend check: Same nullifier produced" << std::endl;
-                std::cout << "   (In practice, the ledger would reject the second transaction)" << std::endl;
+                //std::cout << "6. Double-spend check: Same nullifier produced" << std::endl;
+                //std::cout << "   (In practice, the ledger would reject the second transaction)" << std::endl;
             }
             
             // Step 8: Test that different notes produce different nullifiers
@@ -1206,11 +1206,11 @@ public:
                 bool differentNullifiers = (aliceNullifier != bobNullifier);
                 BEAST_EXPECT(differentNullifiers);
                 
-                std::cout << "7. Privacy check: Different notes produce different nullifiers" << std::endl;
+                //std::cout << "7. Privacy check: Different notes produce different nullifiers" << std::endl;
             }
         }
         
-        std::cout << "=== WORKFLOW COMPLETE ===" << std::endl;
+        //std::cout << "=== WORKFLOW COMPLETE ===" << std::endl;
     }
 };
 

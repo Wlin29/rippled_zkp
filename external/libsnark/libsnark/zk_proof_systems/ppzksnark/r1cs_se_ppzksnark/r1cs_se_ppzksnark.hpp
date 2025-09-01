@@ -151,9 +151,9 @@ public:
 
     void print_size() const
     {
-        libff::print_indent(); printf("* G1 elements in PK: %zu\n", this->G1_size());
-        libff::print_indent(); printf("* G2 elements in PK: %zu\n", this->G2_size());
-        libff::print_indent(); printf("* PK size in bits: %zu\n", this->size_in_bits());
+        libff::print_indent(); //printf("* G1 elements in PK: %zu\n", this->G1_size());
+        libff::print_indent(); //printf("* G2 elements in PK: %zu\n", this->G2_size());
+        libff::print_indent(); //printf("* PK size in bits: %zu\n", this->size_in_bits());
     }
 
     bool operator==(const r1cs_se_ppzksnark_proving_key<ppT> &other) const;
@@ -231,12 +231,12 @@ public:
 
     void print_size() const
     {
-        libff::print_indent(); printf("* G1 elements in VK: %zu\n",
-            this->G1_size());
-        libff::print_indent(); printf("* G2 elements in VK: %zu\n",
-            this->G2_size());
+        libff::print_indent(); //printf("* G1 elements in VK: %zu\n",
+            //this->G1_size());
+        libff::print_indent(); //printf("* G2 elements in VK: %zu\n",
+            //this->G2_size());
         libff::print_indent(); printf("* VK size in bits: %zu\n",
-            this->size_in_bits());
+            //this->size_in_bits());
     }
 
     bool operator==(const r1cs_se_ppzksnark_verification_key<ppT> &other) const;
@@ -357,12 +357,12 @@ public:
 
     void print_size() const
     {
-        libff::print_indent(); printf("* G1 elements in proof: %zu\n",
-            this->G1_size());
-        libff::print_indent(); printf("* G2 elements in proof: %zu\n",
-            this->G2_size());
-        libff::print_indent(); printf("* Proof size in bits: %zu\n",
-            this->size_in_bits());
+        libff::print_indent(); //printf("* G1 elements in proof: %zu\n",
+            //this->G1_size());
+        libff::print_indent(); //printf("* G2 elements in proof: %zu\n",
+            //this->G2_size());
+        libff::print_indent(); //printf("* Proof size in bits: %zu\n",
+            //this->size_in_bits());
     }
 
     bool is_well_formed() const

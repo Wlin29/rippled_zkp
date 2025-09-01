@@ -978,7 +978,7 @@ bool r1cs_ppzkadsnark_online_verifier(const r1cs_ppzkadsnark_processed_verificat
     {
         if (!libff::inhibit_profiling_info)
         {
-            libff::print_indent(); printf("QAP divisibility check failed.\n");
+            libff::print_indent(); 
         }
         result = false;
     }
@@ -1195,7 +1195,7 @@ bool r1cs_ppzkadsnark_online_verifier(const r1cs_ppzkadsnark_processed_verificat
     {
         if (!libff::inhibit_profiling_info)
         {
-            libff::print_indent(); printf("QAP divisibility check failed.\n");
+            libff::print_indent();
         }
         result = false;
     }
