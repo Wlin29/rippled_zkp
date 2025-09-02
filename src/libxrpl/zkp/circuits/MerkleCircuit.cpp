@@ -563,8 +563,7 @@ public:
         
         uint256 result = MerkleCircuit::bitsToUint256(nullifier_bits);
         
-<<<<<<< HEAD
-=======
+
         // DEBUG: Print circuit nullifier extraction
         // std::cout << "Circuit getNullifierFromBits debug:" << std::endl;
         // std::cout << "  Circuit result: " << std::hex;
@@ -573,7 +572,7 @@ public:
         // }
         // std::cout << "..." << std::dec << std::endl;
         
->>>>>>> e7268d5c9 (Commented out Debugging statement from src and test cases, readings from the tests still pending.)
+// e7268d5c9 (Commented out Debugging statement from src and test cases, readings from the tests still pending.)
         return result;
     }
     

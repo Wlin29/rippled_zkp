@@ -229,10 +229,10 @@ r1cs_gg_ppzksnark_keypair<ppT> r1cs_gg_ppzksnark_generator(const r1cs_gg_ppzksna
     /* A quadratic arithmetic program evaluated at t. */
     qap_instance_evaluation<libff::Fr<ppT> > qap = r1cs_to_qap_instance_map_with_evaluation(r1cs_copy, t);
 
-    libff::print_indent(); printf("* QAP number of variables: %zu\n", qap.num_variables());
-    libff::print_indent(); printf("* QAP pre degree: %zu\n", r1cs_copy.constraints.size());
-    libff::print_indent(); printf("* QAP degree: %zu\n", qap.degree());
-    libff::print_indent(); printf("* QAP number of input variables: %zu\n", qap.num_inputs());
+    libff::print_indent(); //printf("* QAP number of variables: %zu\n", qap.num_variables());
+    libff::print_indent(); //printf("* QAP pre degree: %zu\n", r1cs_copy.constraints.size());
+    libff::print_indent(); //printf("* QAP degree: %zu\n", qap.degree());
+    libff::print_indent(); //printf("* QAP number of input variables: %zu\n", qap.num_inputs());
 
     //libff::enter_block("Compute query densities");
     size_t non_zero_At = 0;

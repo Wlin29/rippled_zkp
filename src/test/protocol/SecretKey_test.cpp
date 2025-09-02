@@ -418,11 +418,7 @@ public:
             r1cs_gg_ppzksnark_verifier_strong_IC<default_r1cs_gg_ppzksnark_pp>(
                 keypair.vk, pb.primary_input(), proof);
 
-        if (verified)
-        {
-            std::cout << "Proof verified successfully!" << std::endl;
-        }
-        else
+        if (!verified)
         {
             std::cerr << "Proof verification failed!" << std::endl;
         }

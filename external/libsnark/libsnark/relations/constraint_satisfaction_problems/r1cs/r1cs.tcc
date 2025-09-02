@@ -208,8 +208,8 @@ void r1cs_constraint_system<FieldT>::swap_AB_if_beneficial()
 
     if (!libff::inhibit_profiling_info)
     {
-        libff::print_indent(); printf("* Non-zero A-count (estimate): %zu\n", non_zero_A_count);
-        libff::print_indent(); printf("* Non-zero B-count (estimate): %zu\n", non_zero_B_count);
+        libff::print_indent(); //printf("* Non-zero A-count (estimate): %zu\n", non_zero_A_count);
+        libff::print_indent(); //printf("* Non-zero B-count (estimate): %zu\n", non_zero_B_count);
     }
     //libff::leave_block("Estimate densities");
 

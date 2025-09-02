@@ -120,9 +120,9 @@ public:
         const int testDepths[] = {4, 8, 12}; 
         const int numSamples = 3;
         
-        std::cout << "Comparing Incremental vs Regular Merkle Tree Performance...\n";
-        std::cout << "This test compares equivalent operations (single leaf updates and authentication path generation)\n";
-        std::cout << "to provide a fair comparison between incremental and regular Merkle trees.\n\n";
+        //std::cout << "Comparing Incremental vs Regular Merkle Tree Performance...\n";
+        //std::cout << "This test compares equivalent operations (single leaf updates and authentication path generation)\n";
+        //std::cout << "to provide a fair comparison between incremental and regular Merkle trees.\n\n";
 
         // Results storage
         std::vector<long long> testSizesResults;
@@ -135,7 +135,7 @@ public:
 
         for (int depth : testDepths) {
             long long size = (1LL << depth); // Calculate size for this depth
-            std::cout << "=== Testing with depth " << depth << " (" << size << " nodes) ===\n";
+            //std::cout << "=== Testing with depth " << depth << " (" << size << " nodes) ===\n";
             
             long long totalIncAppend = 0, totalRegAppend = 0;
             long long totalIncAuthPath = 0, totalRegAuthPath = 0;
@@ -298,12 +298,12 @@ public:
                         if (sample == 0) { // Only print on first sample for clarity
                             double authPathSpeedup = (regAuthPathTime > 0) ? (double)regAuthPathTime / incAuthPathTime : 0.0;
                             double verifySpeedup = (regVerifyTime > 0) ? (double)regVerifyTime / incVerifyTime : 0.0;
-                            std::cout << "    " << posName << " (" << authPathPosition << "): " 
-                                     << "AUTH_PATH Inc=" << incAuthPathTime << "ns (len=" << incAuthPath.size() << "), "
-                                     << "Reg=" << regAuthPathTime << "ns (len=" << regAuthPath.size() << ") (" 
-                                     << std::fixed << std::setprecision(1) << authPathSpeedup << "x), "
-                                     << "VERIFY Inc=" << incVerifyTime << "ns, Reg=" << regVerifyTime << "ns (" 
-                                     << verifySpeedup << "x)\n";
+                            // std::cout << "    " << posName << " (" << authPathPosition << "): " 
+                            //          << "AUTH_PATH Inc=" << incAuthPathTime << "ns (len=" << incAuthPath.size() << "), "
+                            //          << "Reg=" << regAuthPathTime << "ns (len=" << regAuthPath.size() << ") (" 
+                            //          << std::fixed << std::setprecision(1) << authPathSpeedup << "x), "
+                            //          << "VERIFY Inc=" << incVerifyTime << "ns, Reg=" << regVerifyTime << "ns (" 
+                            //          << verifySpeedup << "x)\n";
                         }
                     }
 
@@ -317,7 +317,7 @@ public:
                     successfulSamples++;
 
                 } catch (std::exception& e) {
-                    std::cout << "Sample " << sample << " failed: " << e.what() << "\n";
+                    //std::cout << "Sample " << sample << " failed: " << e.what() << "\n";
                 }
             }
 
@@ -341,10 +341,10 @@ public:
                 double authPathSpeedup = (avgRegAuthPath > 0) ? (double)avgRegAuthPath / avgIncAuthPath : 0.0;
                 double verifySpeedup = (avgRegVerify > 0) ? (double)avgRegVerify / avgIncVerify : 0.0;
                 
-                std::cout << "Results for " << size << " nodes (" << successfulSamples << " samples):\n";
-                std::cout << "  APPEND: Inc=" << avgIncAppend << "ns, Reg=" << avgRegAppend << "ns, Speedup=" << std::fixed << std::setprecision(1) << appendSpeedup << "x\n";
-                std::cout << "  AUTH_PATH:  Inc=" << avgIncAuthPath << "ns, Reg=" << avgRegAuthPath << "ns, Speedup=" << authPathSpeedup << "x\n";
-                std::cout << "  VERIFY: Inc=" << avgIncVerify << "ns, Reg=" << avgRegVerify << "ns, Speedup=" << verifySpeedup << "x\n\n";
+                //std::cout << "Results for " << size << " nodes (" << successfulSamples << " samples):\n";
+                //std::cout << "  APPEND: Inc=" << avgIncAppend << "ns, Reg=" << avgRegAppend << "ns, Speedup=" << std::fixed << std::setprecision(1) << appendSpeedup << "x\n";
+                //std::cout << "  AUTH_PATH:  Inc=" << avgIncAuthPath << "ns, Reg=" << avgRegAuthPath << "ns, Speedup=" << authPathSpeedup << "x\n";
+                //std::cout << "  VERIFY: Inc=" << avgIncVerify << "ns, Reg=" << avgRegVerify << "ns, Speedup=" << verifySpeedup << "x\n\n";
                 
                 // Validate test results
                 BEAST_EXPECT(avgIncAppend >= 0);
@@ -355,13 +355,13 @@ public:
         }
 
         // Display comprehensive comparison
-        std::cout << "==========================================\n";
-        std::cout << "INCREMENTAL VS REGULAR MERKLE TREE COMPARISON\n";
-        std::cout << "==========================================\n";
+        //std::cout << "==========================================\n";
+        //std::cout << "INCREMENTAL VS REGULAR MERKLE TREE COMPARISON\n";
+        //std::cout << "==========================================\n";
         
         if (!testSizesResults.empty()) {
-            std::cout << "Operation\tNodes\tIncremental(ns)\tRegular(ns)\tSpeedup\n";
-            std::cout << "---------\t-----\t--------------\t----------\t-------\n";
+            //std::cout << "Operation\tNodes\tIncremental(ns)\tRegular(ns)\tSpeedup\n";
+            //std::cout << "---------\t-----\t--------------\t----------\t-------\n";
             
             for (size_t i = 0; i < testSizesResults.size(); ++i) {
                 long long size = testSizesResults[i];
@@ -376,19 +376,19 @@ public:
                 double authPathSpeedup = (regAuthPath > 0) ? (double)regAuthPath / incAuthPath : 0.0;
                 double verifySpeedup = (regVerify > 0) ? (double)regVerify / incVerify : 0.0;
                 
-                std::cout << "APPEND\t\t" << size << "\t" << incAppend << "\t\t" << regAppend << "\t\t" 
-                         << std::fixed << std::setprecision(1) << appendSpeedup << "x\n";
-                std::cout << "AUTH_PATH\t\t" << size << "\t" << incAuthPath << "\t\t" << regAuthPath << "\t\t" 
-                         << authPathSpeedup << "x\n";
-                std::cout << "VERIFY\t\t" << size << "\t" << incVerify << "\t\t" << regVerify << "\t\t" 
-                         << verifySpeedup << "x\n";
-                std::cout << "-----\t\t-----\t--------------\t----------\t-------\n";
+                // std::cout << "APPEND\t\t" << size << "\t" << incAppend << "\t\t" << regAppend << "\t\t" 
+                //          << std::fixed << std::setprecision(1) << appendSpeedup << "x\n";
+                // std::cout << "AUTH_PATH\t\t" << size << "\t" << incAuthPath << "\t\t" << regAuthPath << "\t\t" 
+                //          << authPathSpeedup << "x\n";
+                // std::cout << "VERIFY\t\t" << size << "\t" << incVerify << "\t\t" << regVerify << "\t\t" 
+                //          << verifySpeedup << "x\n";
+                // std::cout << "-----\t\t-----\t--------------\t----------\t-------\n";
             }
             
 
             
         }
-        std::cout << "==========================================\n";
+        //std::cout << "==========================================\n";
     }
 
 private:

@@ -42,12 +42,11 @@ public:
     void
     run() override
     {
-        // testSecp256k1Transaction();          // standalone secp256k1 perf (already self-contained)
-        // testEd25519Transaction();            // standalone ed25519 perf (already self-contained)
-        // testZKTransactionPerformance();      // standalone zk deposit perf
-        // testSecp256k1PlusZKPerformance();    // combined secp256k1 + zk deposit perf
-        // testEd25519PlusZKPerformance();      // combined ed25519 + zk deposit perf
-        // testComprehensivePerformanceComparison();
+        testSecp256k1Transaction();          // standalone secp256k1 perf (already self-contained)
+        testEd25519Transaction();            // standalone ed25519 perf (already self-contained)
+        testZKTransactionPerformance();      // standalone zk deposit perf
+        testSecp256k1PlusZKPerformance();    // combined secp256k1 + zk deposit perf
+        testEd25519PlusZKPerformance();      // combined ed25519 + zk deposit perf
         testMerkleTreePerformance();
         testIncrementalVsRegularMerkleTree();
     }
@@ -116,13 +115,13 @@ public:
         long long avgV = totalVerify / iterations;
         long long avgTotal = avgK + avgS + avgV;
 
-        std::cout << "\n=== Secp256k1 Performance (standalone) ===\n";
-        std::cout << "Iterations: " << iterations << "\n";
-        std::cout << "KeyGen: avg=" << avgK << " us, min=" << minKeygen << " us, max=" << maxKeygen << " us\n";
-        std::cout << "Sign:   avg=" << avgS << " us, min=" << minSign   << " us, max=" << maxSign   << " us\n";
-        std::cout << "Verify: avg=" << avgV << " us, min=" << minVerify << " us, max=" << maxVerify << " us\n";
-        std::cout << "Total/txn: " << avgTotal << " us\n";
-        std::cout << "Throughput: " << (avgTotal > 0 ? (1000000.0 / avgTotal) : 0.0) << " tx/s\n";
+        //std::cout << "\n=== Secp256k1 Performance (standalone) ===\n";
+        //std::cout << "Iterations: " << iterations << "\n";
+        //std::cout << "KeyGen: avg=" << avgK << " us, min=" << minKeygen << " us, max=" << maxKeygen << " us\n";
+        //std::cout << "Sign:   avg=" << avgS << " us, min=" << minSign   << " us, max=" << maxSign   << " us\n";
+        //std::cout << "Verify: avg=" << avgV << " us, min=" << minVerify << " us, max=" << maxVerify << " us\n";
+        //std::cout << "Total/txn: " << avgTotal << " us\n";
+        //std::cout << "Throughput: " << (avgTotal > 0 ? (1000000.0 / avgTotal) : 0.0) << " tx/s\n";
     }
 
     void
@@ -187,13 +186,13 @@ public:
         long long avgV = totalVerify / iterations;
         long long avgTotal = avgK + avgS + avgV;
 
-        std::cout << "\n=== Ed25519 Performance (standalone) ===\n";
-        std::cout << "Iterations: " << iterations << "\n";
-        std::cout << "KeyGen: avg=" << avgK << " us, min=" << minKeygen << " us, max=" << maxKeygen << " us\n";
-        std::cout << "Sign:   avg=" << avgS << " us, min=" << minSign   << " us, max=" << maxSign   << " us\n";
-        std::cout << "Verify: avg=" << avgV << " us, min=" << minVerify << " us, max=" << maxVerify << " us\n";
-        std::cout << "Total/txn: " << avgTotal << " us\n";
-        std::cout << "Throughput: " << (avgTotal > 0 ? (1000000.0 / avgTotal) : 0.0) << " tx/s\n";
+        //std::cout << "\n=== Ed25519 Performance (standalone) ===\n";
+        //std::cout << "Iterations: " << iterations << "\n";
+        //std::cout << "KeyGen: avg=" << avgK << " us, min=" << minKeygen << " us, max=" << maxKeygen << " us\n";
+        //std::cout << "Sign:   avg=" << avgS << " us, min=" << minSign   << " us, max=" << maxSign   << " us\n";
+        //std::cout << "Verify: avg=" << avgV << " us, min=" << minVerify << " us, max=" << maxVerify << " us\n";
+        //std::cout << "Total/txn: " << avgTotal << " us\n";
+        //std::cout << "Throughput: " << (avgTotal > 0 ? (1000000.0 / avgTotal) : 0.0) << " tx/s\n";
     }
 
 
@@ -202,7 +201,7 @@ public:
     {
         testcase("ZK Deposit Proof (Standalone) Performance");
 
-        const int iterations = 20; // tune as needed
+        const int iterations = 10; // tune as needed
         long long total = 0;
         long long minT = std::numeric_limits<long long>::max();
         long long maxT = 0;
@@ -212,9 +211,9 @@ public:
         try {
             ripple::zkp::ZkProver::initialize();
             zkp_initialized = ripple::zkp::ZkProver::generateKeys(false);
-            std::cout << "ZKP system initialized successfully\n";
+            //std::cout << "ZKP system initialized successfully\n";
         } catch (std::exception& e) {
-            std::cout << "ZKP initialization failed: " << e.what() << "\n";
+            //std::cout << "ZKP initialization failed: " << e.what() << "\n";
             BEAST_EXPECT(false);
             return;
         }
@@ -239,7 +238,7 @@ public:
                 bool depositValid = ripple::zkp::ZkProver::verifyDepositProof(depositProof);
                 BEAST_EXPECT(depositValid);
             } catch (std::exception& e) {
-                std::cout << "ZK deposit test failed for " << i << ": " << e.what() << std::endl;
+                //std::cout << "ZK deposit test failed for " << i << ": " << e.what() << std::endl;
                 BEAST_EXPECT(false);
             }
             auto end = std::chrono::high_resolution_clock::now();
@@ -252,10 +251,10 @@ public:
 
         long long avg = (iterations > 0) ? (total / iterations) : 0;
 
-        std::cout << "\n=== ZK Deposit Performance (standalone) ===\n";
-        std::cout << "Iterations: " << iterations << "\n";
-        std::cout << "Full deposit (prove+verify): avg=" << avg << " us, min=" << minT << " us, max=" << maxT << " us\n";
-        std::cout << "Throughput: " << (avg > 0 ? (1000000.0 / avg) : 0.0) << " tx/s\n";
+        //std::cout << "\n=== ZK Deposit Performance (standalone) ===\n";
+        //std::cout << "Iterations: " << iterations << "\n";
+        //std::cout << "Full deposit (prove+verify): avg=" << avg << " us, min=" << minT << " us, max=" << maxT << " us\n";
+        //std::cout << "Throughput: " << (avg > 0 ? (1000000.0 / avg) : 0.0) << " tx/s\n";
     }
 
     void
@@ -263,7 +262,7 @@ public:
     {
         testcase("Combined: Secp256k1 Signature + ZK Deposit (Performance)");
 
-        const int iterations = 100; // tune as needed
+        const int iterations = 10; // tune as needed
         long long total = 0;
         long long minT = std::numeric_limits<long long>::max();
         long long maxT = 0;
@@ -274,7 +273,7 @@ public:
             ripple::zkp::ZkProver::initialize();
             zkp_initialized = ripple::zkp::ZkProver::generateKeys(false);
         } catch (std::exception& e) {
-            std::cout << "ZKP init failed: " << e.what() << "\n";
+            //std::cout << "ZKP init failed: " << e.what() << "\n";
             BEAST_EXPECT(false);
             return;
         }
@@ -323,10 +322,10 @@ public:
 
         long long avg = (iterations > 0) ? (total / iterations) : 0;
 
-        std::cout << "\n=== Combined Secp256k1 + ZK Deposit Performance ===\n";
-        std::cout << "Iterations: " << iterations << "\n";
-        std::cout << "End-to-end: avg=" << avg << " us, min=" << minT << " us, max=" << maxT << " us\n";
-        std::cout << "Throughput: " << (avg > 0 ? (1000000.0 / avg) : 0.0) << " tx/s\n";
+        //std::cout << "\n=== Combined Secp256k1 + ZK Deposit Performance ===\n";
+        //std::cout << "Iterations: " << iterations << "\n";
+        //std::cout << "End-to-end: avg=" << avg << " us, min=" << minT << " us, max=" << maxT << " us\n";
+        //std::cout << "Throughput: " << (avg > 0 ? (1000000.0 / avg) : 0.0) << " tx/s\n";
     }
 
     void
@@ -334,7 +333,7 @@ public:
     {
         testcase("Combined: Ed25519 Signature + ZK Deposit (Performance)");
 
-        const int iterations = 100; // tune as needed
+        const int iterations = 10; // tune as needed
         long long total = 0;
         long long minT = std::numeric_limits<long long>::max();
         long long maxT = 0;
@@ -345,7 +344,7 @@ public:
             ripple::zkp::ZkProver::initialize();
             zkp_initialized = ripple::zkp::ZkProver::generateKeys(false);
         } catch (std::exception& e) {
-            std::cout << "ZKP init failed: " << e.what() << "\n";
+            //std::cout << "ZKP init failed: " << e.what() << "\n";
             BEAST_EXPECT(false);
             return;
         }
@@ -392,193 +391,12 @@ public:
 
         long long avg = (iterations > 0) ? (total / iterations) : 0;
 
-        std::cout << "\n=== Combined Ed25519 + ZK Deposit Performance ===\n";
-        std::cout << "Iterations: " << iterations << "\n";
-        std::cout << "End-to-end: avg=" << avg << " us, min=" << minT << " us, max=" << maxT << " us\n";
-        std::cout << "Throughput: " << (avg > 0 ? (1000000.0 / avg) : 0.0) << " tx/s\n";
+        //std::cout << "\n=== Combined Ed25519 + ZK Deposit Performance ===\n";
+        //std::cout << "Iterations: " << iterations << "\n";
+        //std::cout << "End-to-end: avg=" << avg << " us, min=" << minT << " us, max=" << maxT << " us\n";
+        //std::cout << "Throughput: " << (avg > 0 ? (1000000.0 / avg) : 0.0) << " tx/s\n";
     }
 
-    void
-    testComprehensivePerformanceComparison()
-    {
-        testcase("Comprehensive Performance Comparison: Secp256k1 vs Ed25519 vs ZKP");
-
-        const int iterations = 1000; // More iterations for statistical significance
-        
-        // Performance metrics storage
-        long long totalSecp256k1KeygenTime = 0;
-        long long totalSecp256k1SignTime = 0;
-        long long totalSecp256k1VerifyTime = 0;
-        
-        long long totalEd25519KeygenTime = 0;
-        long long totalEd25519SignTime = 0;
-        long long totalEd25519VerifyTime = 0;
-        
-        long long totalZKDepositTime = 0;
-
-        // Initialize ZKP system once
-        bool zkp_initialized = false;
-        try {
-            ripple::zkp::ZkProver::initialize();
-            zkp_initialized = ripple::zkp::ZkProver::generateKeys(false);
-            std::cout << "ZKP system initialized successfully for comparison testing\n";
-        } catch (std::exception& e) {
-            std::cout << "ZKP initialization failed: " << e.what() << "\n";
-        }
-
-        std::cout << "Starting comprehensive performance comparison with " << iterations << " iterations...\n";
-
-        for (int i = 0; i < iterations; ++i)
-        {
-            // ===========================================
-            // SECP256K1 PERFORMANCE
-            // ===========================================
-            {
-                // Key Generation
-                auto startKeygen = std::chrono::high_resolution_clock::now();
-                auto keyPair = randomKeyPair(KeyType::secp256k1);
-                auto endKeygen = std::chrono::high_resolution_clock::now();
-                auto keygenDuration = static_cast<long long>(std::chrono::duration_cast<std::chrono::microseconds>(endKeygen - startKeygen).count());
-                totalSecp256k1KeygenTime += keygenDuration;
-
-                auto const& sk = keyPair.second;
-                auto const& pk = keyPair.first;
-
-                // Signing
-                std::string message = "Performance test message for secp256k1";
-                uint256 digest = sha512Half(Slice{message.data(), message.size()});
-                
-                auto startSign = std::chrono::high_resolution_clock::now();
-                auto sig = signDigest(pk, sk, digest);
-                auto endSign = std::chrono::high_resolution_clock::now();
-                auto signDuration = static_cast<long long>(std::chrono::duration_cast<std::chrono::microseconds>(endSign - startSign).count());
-                totalSecp256k1SignTime += signDuration;
-
-                // Verification
-                auto startVerify = std::chrono::high_resolution_clock::now();
-                bool isValid = verifyDigest(pk, digest, sig);
-                auto endVerify = std::chrono::high_resolution_clock::now();
-                auto verifyDuration = static_cast<long long>(std::chrono::duration_cast<std::chrono::microseconds>(endVerify - startVerify).count());
-                totalSecp256k1VerifyTime += verifyDuration;
-
-                BEAST_EXPECT(isValid);
-            }
-
-            // ===========================================
-            // ED25519 PERFORMANCE
-            // ===========================================
-            {
-                // Key Generation
-                auto startKeygen = std::chrono::high_resolution_clock::now();
-                auto keyPair = randomKeyPair(KeyType::ed25519);
-                auto endKeygen = std::chrono::high_resolution_clock::now();
-                auto keygenDuration = static_cast<long long>(std::chrono::duration_cast<std::chrono::microseconds>(endKeygen - startKeygen).count());
-                totalEd25519KeygenTime += keygenDuration;
-
-                auto const& sk = keyPair.second;
-                auto const& pk = keyPair.first;
-
-                // Signing
-                std::string message = "Performance test message for ed25519";
-                
-                auto startSign = std::chrono::high_resolution_clock::now();
-                auto sig = sign(pk, sk, Slice{message.data(), message.size()});
-                auto endSign = std::chrono::high_resolution_clock::now();
-                auto signDuration = static_cast<long long>(std::chrono::duration_cast<std::chrono::microseconds>(endSign - startSign).count());
-                totalEd25519SignTime += signDuration;
-
-                // Verification
-                auto startVerify = std::chrono::high_resolution_clock::now();
-                bool isValid = verify(pk, Slice{message.data(), message.size()}, sig);
-                auto endVerify = std::chrono::high_resolution_clock::now();
-                auto verifyDuration = static_cast<long long>(std::chrono::duration_cast<std::chrono::microseconds>(endVerify - startVerify).count());
-                totalEd25519VerifyTime += verifyDuration;
-
-                BEAST_EXPECT(isValid);
-            }
-
-            // ===========================================
-            // ZK DEPOSIT PERFORMANCE (Every 100 iterations to manage time)
-            // ===========================================
-            if (zkp_initialized && (i % 100 == 0)) {
-                try {
-                    auto startZKDeposit = std::chrono::high_resolution_clock::now();
-
-                    // Create note
-                    ripple::zkp::Note depositNote = ripple::zkp::ZkProver::createRandomNote(1000000 + i);
-                    
-                    // Generate deposit proof
-                    auto depositProof = ripple::zkp::ZkProver::createDepositProof(depositNote);
-                    
-                    // Verify deposit proof
-                    bool depositValid = ripple::zkp::ZkProver::verifyDepositProof(depositProof);
-
-                    auto endZKDeposit = std::chrono::high_resolution_clock::now();
-                    auto zkDepositDuration = static_cast<long long>(std::chrono::duration_cast<std::chrono::microseconds>(endZKDeposit - startZKDeposit).count());
-                    totalZKDepositTime += zkDepositDuration;
-
-                    BEAST_EXPECT(depositValid);
-                } catch (std::exception& e) {
-                    std::cout << "ZK test failed for iteration " << i << ": " << e.what() << std::endl;
-                }
-            }
-
-            // Progress indicator
-            if ((i + 1) % 100 == 0) {
-                std::cout << "Completed " << (i + 1) << "/" << iterations << " iterations\n";
-            }
-        }
-
-        // Calculate averages
-        long long avgSecp256k1Keygen = totalSecp256k1KeygenTime / iterations;
-        long long avgSecp256k1Sign = totalSecp256k1SignTime / iterations;
-        long long avgSecp256k1Verify = totalSecp256k1VerifyTime / iterations;
-        
-        long long avgEd25519Keygen = totalEd25519KeygenTime / iterations;
-        long long avgEd25519Sign = totalEd25519SignTime / iterations;
-        long long avgEd25519Verify = totalEd25519VerifyTime / iterations;
-        
-        int zkIterations = iterations / 100;
-        long long avgZKDeposit = zkp_initialized && zkIterations > 0 ? totalZKDepositTime / zkIterations : 0;
-
-        // Display comprehensive results
-        std::cout << "\n==========================================\n";
-        std::cout << "COMPREHENSIVE PERFORMANCE COMPARISON\n";
-        std::cout << "==========================================\n";
-        std::cout << "Total Iterations: " << iterations << "\n\n";
-
-        std::cout << "SECP256K1 PERFORMANCE:\n";
-        std::cout << "  Key Generation: " << avgSecp256k1Keygen << " μs average\n";
-        std::cout << "  Signing: " << avgSecp256k1Sign << " μs average\n";
-        std::cout << "  Verification: " << avgSecp256k1Verify << " μs average\n";
-        std::cout << "  Total Transaction: " << (avgSecp256k1Keygen + avgSecp256k1Sign + avgSecp256k1Verify) << " μs average\n";
-        std::cout << "  Throughput: " << (1000000.0 / (avgSecp256k1Keygen + avgSecp256k1Sign + avgSecp256k1Verify)) << " transactions/second\n\n";
-
-        std::cout << "ED25519 PERFORMANCE:\n";
-        std::cout << "  Key Generation: " << avgEd25519Keygen << " μs average\n";
-        std::cout << "  Signing: " << avgEd25519Sign << " μs average\n";
-        std::cout << "  Verification: " << avgEd25519Verify << " μs average\n";
-        std::cout << "  Total Transaction: " << (avgEd25519Keygen + avgEd25519Sign + avgEd25519Verify) << " μs average\n";
-        std::cout << "  Throughput: " << (1000000.0 / (avgEd25519Keygen + avgEd25519Sign + avgEd25519Verify)) << " transactions/second\n\n";
-
-        if (zkp_initialized && avgZKDeposit > 0) {
-            std::cout << "ZK DEPOSIT PERFORMANCE:\n";
-            std::cout << "  Full Deposit Process: " << avgZKDeposit << " μs average (" << zkIterations << " samples)\n";
-            std::cout << "  Throughput: " << (1000000.0 / avgZKDeposit) << " transactions/second\n\n";
-        }
-
-        std::cout << "PERFORMANCE RATIOS (vs Secp256k1):\n";
-        long long secp256k1Total = avgSecp256k1Keygen + avgSecp256k1Sign + avgSecp256k1Verify;
-        long long ed25519Total = avgEd25519Keygen + avgEd25519Sign + avgEd25519Verify;
-        
-        std::cout << "  Ed25519 vs Secp256k1: " << (double)ed25519Total / secp256k1Total << "x\n";
-        if (zkp_initialized && avgZKDeposit > 0) {
-            std::cout << "  ZK vs Secp256k1: " << (double)avgZKDeposit / secp256k1Total << "x\n";
-            std::cout << "  ZK vs Ed25519: " << (double)avgZKDeposit / ed25519Total << "x\n";
-        }
-
-        std::cout << "==========================================\n";
-    }
 
     void
     testMerkleTreePerformance()
@@ -588,26 +406,19 @@ public:
         // Test configuration
         const int maxDepth = 128;
         
-        std::cout << "Starting Complete Transaction Performance Analysis...\n";
-        std::cout << "Testing full transaction workflow including:\n";
-        std::cout << "1. ZK proof generation\n";
-        std::cout << "2. Merkle tree operations (insert/proof/verify)\n";
-        std::cout << "3. Complete verification (ZK + Merkle)\n";
-        std::cout << "Comparing Incremental vs Regular Merkle trees at various depths\n\n";
-
         // Initialize ZKP system
         bool zkp_initialized = false;
         try {
             ripple::zkp::ZkProver::initialize();
             zkp_initialized = ripple::zkp::ZkProver::generateKeys(false);
-            std::cout << "ZKP system initialized for Merkle tree testing\n";
+            //std::cout << "ZKP system initialized for Merkle tree testing\n";
         } catch (std::exception& e) {
-            std::cout << "ZKP initialization failed: " << e.what() << "\n";
+            //std::cout << "ZKP initialization failed: " << e.what() << "\n";
             return;
         }
 
         if (!zkp_initialized) {
-            std::cout << "Cannot proceed without ZKP initialization\n";
+            //std::cout << "Cannot proceed without ZKP initialization\n";
             return;
         }
 
@@ -628,9 +439,9 @@ public:
             
             int actualLastPos = maxNodes - 1; 
             
-            std::cout << "\n=== COMPREHENSIVE MERKLE TREE COMPARISON - DEPTH " << targetDepth << " ===\n";
-            std::cout << "Testing " << maxNodes << " nodes (middle tests) + last position (" << actualLastPos << ")\n";
-            std::cout << "Comparing Incremental vs Regular Merkle Tree performance\n\n";
+            //std::cout << "\n=== COMPREHENSIVE MERKLE TREE COMPARISON - DEPTH " << targetDepth << " ===\n";
+            //std::cout << "Testing " << maxNodes << " nodes (middle tests) + last position (" << actualLastPos << ")\n";
+            //std::cout << "Comparing Incremental vs Regular Merkle Tree performance\n\n";
             
             const int numSamples = 3;
             
@@ -656,7 +467,7 @@ public:
 
             for (int sample = 0; sample < numSamples; ++sample) {
                 try {
-                    std::cout << "Sample " << (sample + 1) << "/" << numSamples << " for depth " << targetDepth << "\n";
+                    //std::cout << "Sample " << (sample + 1) << "/" << numSamples << " for depth " << targetDepth << "\n";
                     
                     // Pre-generate test commitments for all positions we need to test
                     // We need commitments up to the actual last position
@@ -673,7 +484,7 @@ public:
                     // INCREMENTAL MERKLE TREE TESTING
                     // ================================================
                     
-                    std::cout << "  Testing Incremental Merkle Tree...\n";
+                    //std::cout << "  Testing Incremental Merkle Tree...\n";
                     ripple::zkp::IncrementalMerkleTree incrementalTree(std::max(32, targetDepth));
                     
                     // Measure total insertion time for incremental tree
@@ -754,10 +565,10 @@ public:
                         results.zkProofTime += zkProofTime;
                         results.totalTransactionTime += totalTransactionTime;
                         
-                        std::cout << "    " << posName << " (" << position << "): Total=" << totalTransactionTime << "μs"
-                                 << " (ZK=" << zkProofTime << "μs, Insert=" << insertTime << "μs"
-                                 << ", MerkleProof=" << proofTime << "μs, Verify=" << verifyTime << "μs)"
-                                 << " Valid=" << (zkProofValid && merkleProofValid ? "Yes" : "No") << "\n";
+                        //std::cout << "    " << posName << " (" << position << "): Total=" << totalTransactionTime << "μs"
+                                //  << " (ZK=" << zkProofTime << "μs, Insert=" << insertTime << "μs"
+                                //  << ", MerkleProof=" << proofTime << "μs, Verify=" << verifyTime << "μs)"
+                                //  << " Valid=" << (zkProofValid && merkleProofValid ? "Yes" : "No") << "\n";
                         
                         BEAST_EXPECT(zkProofValid && merkleProofValid);
                     };
@@ -770,7 +581,7 @@ public:
                     // REGULAR MERKLE TREE TESTING
                     // ================================================
                     
-                    std::cout << "  Testing Regular Merkle Tree...\n";
+                    //std::cout << "  Testing Regular Merkle Tree...\n";
                     
                     auto testRegularPosition = [&](int position, PositionResults& results, const std::string& posName) {
                         // ==========================================
@@ -902,10 +713,10 @@ public:
                         results.zkProofTime += zkProofTime;
                         results.totalTransactionTime += totalTransactionTime;
                         
-                        std::cout << "    " << posName << " (" << position << "): Total=" << totalTransactionTime << "μs"
-                                 << " (ZK=" << zkProofTime << "μs, TreeBuild=" << (regInsertTime / commitments.size()) << "μs"
-                                 << ", MerkleProof=" << proofTime << "μs, Verify=" << verifyTime << "μs)"
-                                 << " Valid=" << (zkProofValid && merkleProofValid ? "Yes" : "No") << "\n";
+                        // std::cout << "    " << posName << " (" << position << "): Total=" << totalTransactionTime << "μs"
+                        //          << " (ZK=" << zkProofTime << "μs, TreeBuild=" << (regInsertTime / commitments.size()) << "μs"
+                        //          << ", MerkleProof=" << proofTime << "μs, Verify=" << verifyTime << "μs)"
+                        //          << " Valid=" << (zkProofValid && merkleProofValid ? "Yes" : "No") << "\n";
                         
                         BEAST_EXPECT(zkProofValid && merkleProofValid);
                     };
@@ -920,7 +731,7 @@ public:
                     lastResults.successfulSamples++;
                     
                 } catch (std::exception& e) {
-                    std::cout << "Sample " << sample << " failed: " << e.what() << "\n";
+                    //std::cout << "Sample " << sample << " failed: " << e.what() << "\n";
                 }
             }
 
@@ -941,32 +752,32 @@ public:
                     double proofSpeedup = avgRegProof > 0 ? (double)avgRegProof / avgIncProof : 0.0;
                     double verifySpeedup = avgRegVerify > 0 ? (double)avgRegVerify / avgIncVerify : 0.0;
                     
-                    std::cout << "\n--- " << position << " Position (index " << pos << ") Results ---\n";
-                    std::cout << "=== COMPLETE TRANSACTION BREAKDOWN ===\n";
-                    std::cout << "ZK Proof Generation:     " << avgZKProof << " μs (" 
-                             << std::fixed << std::setprecision(1) << (100.0 * avgZKProof / avgTotalTransaction) << "%)\n";
-                    std::cout << "Tree Operations:         " << (avgIncInsert + avgIncProof) << " μs (" 
-                             << (100.0 * (avgIncInsert + avgIncProof) / avgTotalTransaction) << "%)\n";
-                    std::cout << "Verification:            " << avgIncVerify << " μs (" 
-                             << (100.0 * avgIncVerify / avgTotalTransaction) << "%)\n";
-                    std::cout << "TOTAL TRANSACTION:       " << avgTotalTransaction << " μs (100%)\n";
-                    std::cout << "Transaction Throughput:  " << std::fixed << std::setprecision(2) 
-                             << (1000000.0 / avgTotalTransaction) << " tx/s\n\n";
+                    // std::cout << "\n--- " << position << " Position (index " << pos << ") Results ---\n";
+                    // std::cout << "=== COMPLETE TRANSACTION BREAKDOWN ===\n";
+                    // std::cout << "ZK Proof Generation:     " << avgZKProof << " μs (" 
+                    //          << std::fixed << std::setprecision(1) << (100.0 * avgZKProof / avgTotalTransaction) << "%)\n";
+                    // std::cout << "Tree Operations:         " << (avgIncInsert + avgIncProof) << " μs (" 
+                    //          << (100.0 * (avgIncInsert + avgIncProof) / avgTotalTransaction) << "%)\n";
+                    // std::cout << "Verification:            " << avgIncVerify << " μs (" 
+                    //          << (100.0 * avgIncVerify / avgTotalTransaction) << "%)\n";
+                    // std::cout << "TOTAL TRANSACTION:       " << avgTotalTransaction << " μs (100%)\n";
+                    // std::cout << "Transaction Throughput:  " << std::fixed << std::setprecision(2) 
+                    //          << (1000000.0 / avgTotalTransaction) << " tx/s\n\n";
                     
-                    std::cout << "=== TREE OPERATION COMPARISON ===\n";
-                    std::cout << "Operation\t\tIncremental(μs)\tRegular(μs)\tSpeedup\n";
-                    std::cout << "Insert/Node\t\t" << avgIncInsert << "\t\t" << avgRegInsert << "\t\t" 
-                             << insertSpeedup << "x\n";
-                    std::cout << "Proof Gen\t\t" << avgIncProof << "\t\t" << avgRegProof << "\t\t" 
-                             << proofSpeedup << "x\n";
-                    std::cout << "Verify\t\t\t" << avgIncVerify << "\t\t" << avgRegVerify << "\t\t" 
-                             << verifySpeedup << "x\n";
+                    // std::cout << "=== TREE OPERATION COMPARISON ===\n";
+                    // std::cout << "Operation\t\tIncremental(μs)\tRegular(μs)\tSpeedup\n";
+                    // std::cout << "Insert/Node\t\t" << avgIncInsert << "\t\t" << avgRegInsert << "\t\t" 
+                    //          << insertSpeedup << "x\n";
+                    // std::cout << "Proof Gen\t\t" << avgIncProof << "\t\t" << avgRegProof << "\t\t" 
+                    //          << proofSpeedup << "x\n";
+                    // std::cout << "Verify\t\t\t" << avgIncVerify << "\t\t" << avgRegVerify << "\t\t" 
+                    //          << verifySpeedup << "x\n";
                 }
             };
             
-            std::cout << "\n" << std::string(60, '=') << "\n";
-            std::cout << "DEPTH " << targetDepth << " COMPREHENSIVE RESULTS\n";
-            std::cout << std::string(60, '=') << "\n";
+            // std::cout << "\n" << std::string(60, '=') << "\n";
+            // std::cout << "DEPTH " << targetDepth << " COMPREHENSIVE RESULTS\n";
+            // std::cout << std::string(60, '=') << "\n";
             
             displayPositionResults(firstResults, "FIRST", firstPos);
             displayPositionResults(middleResults, "MIDDLE", middlePos);
@@ -981,15 +792,15 @@ public:
         }
 
         // Display comprehensive results
-        std::cout << "\n" << std::string(80, '=') << "\n";
-        std::cout << "COMPLETE TRANSACTION PERFORMANCE ANALYSIS SUMMARY\n";
-        std::cout << "ZK PROOF + MERKLE TREE OPERATIONS\n";
-        std::cout << std::string(80, '=') << "\n";
+        // std::cout << "\n" << std::string(80, '=') << "\n";
+        // std::cout << "COMPLETE TRANSACTION PERFORMANCE ANALYSIS SUMMARY\n";
+        // std::cout << "ZK PROOF + MERKLE TREE OPERATIONS\n";
+        // std::cout << std::string(80, '=') << "\n";
         
         if (!testDepths.empty()) {
-            std::cout << "\nTRANSACTION PERFORMANCE METRICS:\n";
-            std::cout << "Depth\tAvg Insert(μs)\tAvg Proof(μs)\tAvg Verify(μs)\tZK Proof(μs)\tTotal Tx(μs)\n";
-            std::cout << "-----\t--------------\t-------------\t--------------\t-------------\t-----------\n";
+            // std::cout << "\nTRANSACTION PERFORMANCE METRICS:\n";
+            // std::cout << "Depth\tAvg Insert(μs)\tAvg Proof(μs)\tAvg Verify(μs)\tZK Proof(μs)\tTotal Tx(μs)\n";
+            // std::cout << "-----\t--------------\t-------------\t--------------\t-------------\t-----------\n";
             
             for (size_t i = 0; i < testDepths.size(); ++i) {
                 int depth = testDepths[i];
@@ -998,51 +809,51 @@ public:
                 long long avgVerify = avgVerifyTimes[i];
                 // Note: We'd need to track ZK proof times separately for this summary
                 
-                std::cout << depth << "\t" << avgInsert << "\t\t" << avgProof << "\t\t" 
-                         << avgVerify << "\t\t" << "~500000" << "\t\t" << (avgInsert + avgProof + avgVerify + 500000) << "\n";
+                // std::cout << depth << "\t" << avgInsert << "\t\t" << avgProof << "\t\t" 
+                //          << avgVerify << "\t\t" << "~500000" << "\t\t" << (avgInsert + avgProof + avgVerify + 500000) << "\n";
             }
             
-            std::cout << "\nKEY FINDINGS:\n";
-            std::cout << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
-            std::cout << "✓ COMPLETE TRANSACTION ANALYSIS:\n";
-            std::cout << "  • ZK Proof Generation: Dominates transaction time (80-95%)\n";
-            std::cout << "  • Merkle Tree Operations: Fast and scalable (O(log n))\n";
-            std::cout << "  • Total Transaction Time: Primarily limited by ZK proof generation\n";
-            std::cout << "  • Position in Tree: Minimal impact on overall transaction performance\n";
+            // std::cout << "\nKEY FINDINGS:\n";
+            // std::cout << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
+            // std::cout << "✓ COMPLETE TRANSACTION ANALYSIS:\n";
+            // std::cout << "  • ZK Proof Generation: Dominates transaction time (80-95%)\n";
+            // std::cout << "  • Merkle Tree Operations: Fast and scalable (O(log n))\n";
+            // std::cout << "  • Total Transaction Time: Primarily limited by ZK proof generation\n";
+            // std::cout << "  • Position in Tree: Minimal impact on overall transaction performance\n";
             
-            std::cout << "\n✓ INCREMENTAL vs REGULAR TREE COMPARISON:\n";
-            std::cout << "  • Incremental trees maintain consistent O(log n) performance\n";
-            std::cout << "  • Regular trees show O(n) rebuilding overhead\n";
-            std::cout << "  • Performance gap widens significantly with tree size\n";
-            std::cout << "  • Incremental trees essential for high-throughput applications\n";
+            // std::cout << "\n✓ INCREMENTAL vs REGULAR TREE COMPARISON:\n";
+            // std::cout << "  • Incremental trees maintain consistent O(log n) performance\n";
+            // std::cout << "  • Regular trees show O(n) rebuilding overhead\n";
+            // std::cout << "  • Performance gap widens significantly with tree size\n";
+            // std::cout << "  • Incremental trees essential for high-throughput applications\n";
             
-            std::cout << "\n✓ TRANSACTION THROUGHPUT INSIGHTS:\n";
-            std::cout << "  • Transaction throughput primarily constrained by ZK proof generation\n";
-            std::cout << "  • Tree operations add minimal overhead to transaction time\n";
-            std::cout << "  • Incremental trees enable real-time transaction processing\n";
-            std::cout << "  • Verification is fast enough for immediate transaction confirmation\n";
+            // std::cout << "\n✓ TRANSACTION THROUGHPUT INSIGHTS:\n";
+            // std::cout << "  • Transaction throughput primarily constrained by ZK proof generation\n";
+            // std::cout << "  • Tree operations add minimal overhead to transaction time\n";
+            // std::cout << "  • Incremental trees enable real-time transaction processing\n";
+            // std::cout << "  • Verification is fast enough for immediate transaction confirmation\n";
             
-            std::cout << "\n✓ SCALING CHARACTERISTICS:\n";
-            std::cout << "  • Tree depth has minimal impact on transaction time\n";
-            std::cout << "  • System can handle millions of historical transactions\n";
-            std::cout << "  • Memory usage scales linearly with transaction count\n";
-            std::cout << "  • Authentication path generation scales logarithmically\n";
+            // std::cout << "\n✓ SCALING CHARACTERISTICS:\n";
+            // std::cout << "  • Tree depth has minimal impact on transaction time\n";
+            // std::cout << "  • System can handle millions of historical transactions\n";
+            // std::cout << "  • Memory usage scales linearly with transaction count\n";
+            // std::cout << "  • Authentication path generation scales logarithmically\n";
             
-            std::cout << "\n✓ OPTIMIZATION OPPORTUNITIES:\n";
-            std::cout << "  • ZK proof generation: Consider parallel processing or hardware acceleration\n";
-            std::cout << "  • Tree operations: Already well-optimized with incremental approach\n";
-            std::cout << "  • Batch processing: Could amortize ZK proof setup costs\n";
-            std::cout << "  • Proof caching: Could improve performance for repeated operations\n";
+            // std::cout << "\n✓ OPTIMIZATION OPPORTUNITIES:\n";
+            // std::cout << "  • ZK proof generation: Consider parallel processing or hardware acceleration\n";
+            // std::cout << "  • Tree operations: Already well-optimized with incremental approach\n";
+            // std::cout << "  • Batch processing: Could amortize ZK proof setup costs\n";
+            // std::cout << "  • Proof caching: Could improve performance for repeated operations\n";
         }
         
-        std::cout << "\n" << std::string(80, '=') << "\n";
-        std::cout << "TEST METHODOLOGY:\n";
-        std::cout << "• Simulated complete transaction workflow with ZK proof generation\n";
-        std::cout << "• Measured all transaction components: ZK proof, tree ops, verification\n";
-        std::cout << "• Compared incremental vs regular Merkle trees at multiple depths\n";
-        std::cout << "• Analyzed performance breakdown and scaling characteristics\n";
-        std::cout << "• Validated correctness of all ZK and Merkle proof operations\n";
-        std::cout << std::string(80, '=') << "\n";
+        // std::cout << "\n" << std::string(80, '=') << "\n";
+        // std::cout << "TEST METHODOLOGY:\n";
+        // std::cout << "• Simulated complete transaction workflow with ZK proof generation\n";
+        // std::cout << "• Measured all transaction components: ZK proof, tree ops, verification\n";
+        // std::cout << "• Compared incremental vs regular Merkle trees at multiple depths\n";
+        // std::cout << "• Analyzed performance breakdown and scaling characteristics\n";
+        // std::cout << "• Validated correctness of all ZK and Merkle proof operations\n";
+        // std::cout << std::string(80, '=') << "\n";
     }
 
     void
@@ -1053,9 +864,9 @@ public:
         const int testSizes[] = {10, 50, 100, 500, 1000, 5000}; // Different tree sizes to test
         const int numSamples = 10; // Samples per test
         
-        std::cout << "Comparing Incremental vs Regular Merkle Tree Performance...\n";
-        std::cout << "This test demonstrates the performance advantages of incremental trees\n";
-        std::cout << "over regular trees that recompute everything from scratch.\n\n";
+        //std::cout << "Comparing Incremental vs Regular Merkle Tree Performance...\n";
+        //std::cout << "This test demonstrates the performance advantages of incremental trees\n";
+        //std::cout << "over regular trees that recompute everything from scratch.\n\n";
 
         // Results storage
         std::vector<int> testSizesResults;
@@ -1064,7 +875,7 @@ public:
         std::vector<double> speedupRatios;
 
         for (int size : testSizes) {
-            std::cout << "=== Testing with " << size << " nodes ===\n";
+            //std::cout << "=== Testing with " << size << " nodes ===\n";
             
             long long totalIncrementalTime = 0;
             long long totalRegularTime = 0;
@@ -1160,7 +971,7 @@ public:
                     successfulSamples++;
 
                 } catch (std::exception& e) {
-                    std::cout << "Sample " << sample << " failed: " << e.what() << "\n";
+                    //std::cout << "Sample " << sample << " failed: " << e.what() << "\n";
                 }
             }
 
@@ -1174,23 +985,23 @@ public:
                 regularTimes.push_back(avgRegular);
                 speedupRatios.push_back(speedup);
                 
-                std::cout << "Results for " << size << " nodes (" << successfulSamples << " samples):\n";
-                std::cout << "  Incremental Tree: " << avgIncremental << " μs\n";
-                std::cout << "  Regular Tree: " << avgRegular << " μs\n";
-                std::cout << "  Speedup: " << speedup << "x faster\n";
-                std::cout << "  Time per node (incremental): " << (avgIncremental / size) << " μs\n";
-                std::cout << "  Time per node (regular): " << (avgRegular / size) << " μs\n\n";
+                //std::cout << "Results for " << size << " nodes (" << successfulSamples << " samples):\n";
+                //std::cout << "  Incremental Tree: " << avgIncremental << " μs\n";
+                //std::cout << "  Regular Tree: " << avgRegular << " μs\n";
+                //std::cout << "  Speedup: " << speedup << "x faster\n";
+                //std::cout << "  Time per node (incremental): " << (avgIncremental / size) << " μs\n";
+                //std::cout << "  Time per node (regular): " << (avgRegular / size) << " μs\n\n";
             }
         }
 
         // Display comprehensive comparison
-        std::cout << "==========================================\n";
-        std::cout << "INCREMENTAL VS REGULAR MERKLE TREE COMPARISON\n";
-        std::cout << "==========================================\n";
+        //std::cout << "==========================================\n";
+        //std::cout << "INCREMENTAL VS REGULAR MERKLE TREE COMPARISON\n";
+        //std::cout << "==========================================\n";
         
         if (!testSizesResults.empty()) {
-            std::cout << "Nodes\tIncremental(μs)\tRegular(μs)\tSpeedup\tInc/Node\tReg/Node\n";
-            std::cout << "-----\t--------------\t----------\t-------\t--------\t--------\n";
+            //std::cout << "Nodes\tIncremental(μs)\tRegular(μs)\tSpeedup\tInc/Node\tReg/Node\n";
+            //std::cout << "-----\t--------------\t----------\t-------\t--------\t--------\n";
             
             for (size_t i = 0; i < testSizesResults.size(); ++i) {
                 int size = testSizesResults[i];
@@ -1200,41 +1011,41 @@ public:
                 long long incPerNode = inc / size;
                 long long regPerNode = reg / size;
                 
-                std::cout << size << "\t" << inc << "\t\t" << reg << "\t\t" 
-                         << std::fixed << std::setprecision(1) << speedup << "x\t" 
-                         << incPerNode << "\t\t" << regPerNode << "\n";
+                // std::cout << size << "\t" << inc << "\t\t" << reg << "\t\t" 
+                //          << std::fixed << std::setprecision(1) << speedup << "x\t" 
+                //          << incPerNode << "\t\t" << regPerNode << "\n";
             }
             
-            std::cout << "\nKEY PERFORMANCE INSIGHTS:\n";
-            std::cout << "1. INCREMENTAL ADVANTAGES:\n";
-            std::cout << "   - Cached intermediate nodes avoid redundant computations\n";
-            std::cout << "   - O(log n) updates vs O(n log n) for regular trees\n";
-            std::cout << "   - Frontier optimization for efficient appends\n";
-            std::cout << "   - Memory-efficient with strategic caching\n\n";
+            //std::cout << "\nKEY PERFORMANCE INSIGHTS:\n";
+            //std::cout << "1. INCREMENTAL ADVANTAGES:\n";
+            //std::cout << "   - Cached intermediate nodes avoid redundant computations\n";
+            //std::cout << "   - O(log n) updates vs O(n log n) for regular trees\n";
+            //std::cout << "   - Frontier optimization for efficient appends\n";
+            //std::cout << "   - Memory-efficient with strategic caching\n\n";
             
-            std::cout << "2. REGULAR TREE LIMITATIONS:\n";
-            std::cout << "   - Must recompute entire tree structure for each update\n";
-            std::cout << "   - No intermediate node caching\n";
-            std::cout << "   - O(n) operations for every tree modification\n";
-            std::cout << "   - Authentication path generation requires full tree rebuild\n\n";
+            //std::cout << "2. REGULAR TREE LIMITATIONS:\n";
+            //std::cout << "   - Must recompute entire tree structure for each update\n";
+            //std::cout << "   - No intermediate node caching\n";
+            //std::cout << "   - O(n) operations for every tree modification\n";
+            //std::cout << "   - Authentication path generation requires full tree rebuild\n\n";
             
-            std::cout << "3. SCALING ANALYSIS:\n";
+            //std::cout << "3. SCALING ANALYSIS:\n";
             if (speedupRatios.size() >= 2) {
                 double firstSpeedup = speedupRatios[0];
                 double lastSpeedup = speedupRatios.back();
-                std::cout << "   - Speedup improvement: " << firstSpeedup << "x → " << lastSpeedup << "x\n";
-                std::cout << "   - Performance gap widens with tree size\n";
-                std::cout << "   - Incremental trees scale much better for large datasets\n";
+                //std::cout << "   - Speedup improvement: " << firstSpeedup << "x → " << lastSpeedup << "x\n";
+                //std::cout << "   - Performance gap widens with tree size\n";
+                //std::cout << "   - Incremental trees scale much better for large datasets\n";
             }
             
-            std::cout << "\n4. PRACTICAL IMPLICATIONS:\n";
-            std::cout << "   - Incremental trees essential for real-time applications\n";
-            std::cout << "   - Regular trees impractical for frequent updates\n";
-            std::cout << "   - Memory vs computation tradeoff heavily favors incremental\n";
-            std::cout << "   - ZK applications require incremental approach for scalability\n";
+            //std::cout << "\n4. PRACTICAL IMPLICATIONS:\n";
+            //std::cout << "   - Incremental trees essential for real-time applications\n";
+            //std::cout << "   - Regular trees impractical for frequent updates\n";
+            //std::cout << "   - Memory vs computation tradeoff heavily favors incremental\n";
+            //std::cout << "   - ZK applications require incremental approach for scalability\n";
         }
         
-        std::cout << "==========================================\n";
+        //std::cout << "==========================================\n";
     }
 
     void testMetrics()
@@ -1249,7 +1060,7 @@ public:
             ripple::zkp::ZkProver::initialize();
             zkp_initialized = ripple::zkp::ZkProver::generateKeys(false);
         } catch (std::exception& e) {
-            std::cout << "ZKP initialization failed: " << e.what() << std::endl;
+            //std::cout << "ZKP initialization failed: " << e.what() << std::endl;
         }
         
         // Secp256k1 Key Generation Timing
@@ -1274,12 +1085,12 @@ public:
                     ripple::zkp::Note note = ripple::zkp::ZkProver::createRandomNote(1000000);
                     zkp_notes.push_back(note);
                     
-                    std::cout << "\n=== ZKP NOTE DEBUG " << i << " ===" << std::endl;
-                    std::cout << "  Value: " << note.value << std::endl;
-                    std::cout << "  Commitment: " << note.commitment() << std::endl;
+                    //std::cout << "\n=== ZKP NOTE DEBUG " << i << " ===" << std::endl;
+                    //std::cout << "  Value: " << note.value << std::endl;
+                    //std::cout << "  Commitment: " << note.commitment() << std::endl;
                     
                 } catch (std::exception& e) {
-                    std::cout << "ZKP note generation failed for " << i << ": " << e.what() << std::endl;
+                    //std::cout << "ZKP note generation failed for " << i << ": " << e.what() << std::endl;
                 }
             }
         }
@@ -1288,15 +1099,15 @@ public:
         auto zkp_keygen_duration = std::chrono::duration_cast<std::chrono::microseconds>(zkp_keygen_end - zkp_keygen_start);
         
         // Results
-        std::cout << "\n=== KEY GENERATION PERFORMANCE ===" << std::endl;
-        std::cout << "Secp256k1 (avg per key): " << secp256k1_keygen_duration.count() / NUM_ITERATIONS << " μs" << std::endl;
+        //std::cout << "\n=== KEY GENERATION PERFORMANCE ===" << std::endl;
+        //std::cout << "Secp256k1 (avg per key): " << secp256k1_keygen_duration.count() / NUM_ITERATIONS << " μs" << std::endl;
         if (!zkp_notes.empty()) {
-            std::cout << "ZKP Note (avg per note): " << zkp_keygen_duration.count() / zkp_notes.size() << " μs" << std::endl;
+            //std::cout << "ZKP Note (avg per note): " << zkp_keygen_duration.count() / zkp_notes.size() << " μs" << std::endl;
         }
         
         BEAST_EXPECT(secp256k1_keys.size() == NUM_ITERATIONS);
         
-        std::cout << "\n=== TEST COMPLETED ===" << std::endl;
+        //std::cout << "\n=== TEST COMPLETED ===" << std::endl;
     }
 };
 
