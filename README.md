@@ -1,3 +1,5 @@
+This repository contains the experimental Zero-Knowledge Proof (ZKP) protocol layer for `rippled`, the server software that powers the XRP Ledger. This module enables privacy-preserving shielded transactions on the XRPL and lays the groundwork for future private cross-chain bridging solutions.
+
 # The XRP Ledger
 
 The [XRP Ledger](https://xrpl.org/) is a decentralized cryptographic ledger powered by a network of peer-to-peer nodes. The XRP Ledger uses a novel Byzantine Fault Tolerant consensus algorithm to settle and record transactions in a secure distributed database without a central operator.
